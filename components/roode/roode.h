@@ -97,6 +97,8 @@ class Roode : public PollingComponent {
   void set_entry_exit_event_text_sensor(text_sensor::TextSensor *entry_exit_event_sensor_) {
     entry_exit_event_sensor = entry_exit_event_sensor_;
   }
+  void set_recalibration_interval(uint32_t interval) { this->recalibration_interval_ = interval; }
+  void reset_counter();
   void recalibration();
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
@@ -137,6 +139,8 @@ class Roode : public PollingComponent {
   int medium_distance_threshold = 2000;
   int medium_long_distance_threshold = 2700;
   int long_distance_threshold = 3400;
+  uint32_t recalibration_interval_{0};
+  uint32_t last_recalibration_{0};
 };
 
 }  // namespace roode

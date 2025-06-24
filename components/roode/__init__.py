@@ -30,6 +30,7 @@ CONF_MIN = "min"
 CONF_ROI = "roi"
 CONF_SAMPLING = "sampling"
 CONF_ZONES = "zones"
+CONF_RECALIBRATION_INTERVAL = "recalibration_interval"
 
 Orientation = roode_ns.enum("Orientation")
 ORIENTATION_VALUES = {
@@ -72,6 +73,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(CONF_SENSOR): cv.use_id(VL53L1X),
         cv.Optional(CONF_ORIENTATION, default="parallel"): cv.enum(ORIENTATION_VALUES),
         cv.Optional(CONF_SAMPLING, default=2): cv.All(cv.uint8_t, cv.Range(min=1)),
+        cv.Optional(CONF_RECALIBRATION_INTERVAL): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_ROI, default={}): ROI_SCHEMA,
         cv.Optional(CONF_DETECTION_THRESHOLDS, default={}): THRESHOLDS_SCHEMA,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
@@ -94,6 +96,12 @@ async def to_code(config: Dict):
 
     cg.add(roode.set_orientation(config[CONF_ORIENTATION]))
     cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
+    if CONF_RECALIBRATION_INTERVAL in config:
+        cg.add(
+            roode.set_recalibration_interval(
+                config[CONF_RECALIBRATION_INTERVAL].total_milliseconds
+            )
+        )
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)

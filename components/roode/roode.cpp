@@ -42,6 +42,11 @@ void Roode::loop() {
   path_tracking(this->current_zone);
   handle_sensor_status();
   this->current_zone = this->current_zone == this->entry ? this->exit : this->entry;
+  if (this->recalibration_interval_ > 0 && millis() - this->last_recalibration_ >= this->recalibration_interval_) {
+    ESP_LOGI(TAG, "Auto recalibration triggered");
+    this->recalibration();
+    this->last_recalibration_ = millis();
+  }
   // ESP_LOGI("Experimental", "Entry zone: %d, exit zone: %d",
   // entry->getDistance(Roode::distanceSensor, Roode::sensor_status),
   // exit->getDistance(Roode::distanceSensor, Roode::sensor_status)); unsigned
@@ -69,7 +74,7 @@ bool Roode::handle_sensor_status() {
 }
 
 void Roode::path_tracking(Zone *zone) {
-  static int PathTrack[] = {0, 0, 0, 0};
+  static int PathTrack[6] = {0, 0, 0, 0, 0, 0};
   static int PathTrackFillingSize = 1;  // init this to 1 as we start from state
                                         // where nobody is any of the zones
   static int LeftPreviousStatus = NOBODY;
@@ -126,16 +131,15 @@ void Roode::path_tracking(Zone *zone) {
   // if an event has occured
   if (AnEventHasOccured) {
     ESP_LOGD(TAG, "Event has occured, AllZonesCurrentStatus: %d", AllZonesCurrentStatus);
-    if (PathTrackFillingSize < 4) {
+    if (PathTrackFillingSize < 6) {
       PathTrackFillingSize++;
     }
 
     // if nobody anywhere lets check if an exit or entry has happened
     if ((LeftPreviousStatus == NOBODY) && (RightPreviousStatus == NOBODY)) {
       ESP_LOGD(TAG, "Nobody anywhere, AllZonesCurrentStatus: %d", AllZonesCurrentStatus);
-      // check exit or entry only if PathTrackFillingSize is 4 (for example 0 1
-      // 3 2) and last event is 0 (nobobdy anywhere)
-      if (PathTrackFillingSize == 4) {
+      // check exit or entry if we have at least four states recorded
+      if (PathTrackFillingSize >= 4) {
         // check exit or entry. no need to check PathTrack[0] == 0 , it is
         // always the case
 
@@ -167,7 +171,14 @@ void Roode::path_tracking(Zone *zone) {
       // 0 1 3 1
       // 0 1 3 3
       // 0 1 3 2 ==> if next is 0 : check if exit
-      PathTrack[PathTrackFillingSize - 1] = AllZonesCurrentStatus;
+      if (PathTrackFillingSize < 6) {
+        PathTrack[PathTrackFillingSize - 1] = AllZonesCurrentStatus;
+      } else {
+        for (int i = 0; i < 5; i++) {
+          PathTrack[i] = PathTrack[i + 1];
+        }
+        PathTrack[5] = AllZonesCurrentStatus;
+      }
     }
   }
   if (presence_sensor != nullptr) {
@@ -185,6 +196,15 @@ void Roode::updateCounter(int delta) {
   ESP_LOGI(TAG, "Updating people count: %d", (int) next);
   auto call = this->people_counter->make_call();
   call.set_value(next);
+  call.perform();
+}
+
+void Roode::reset_counter() {
+  if (this->people_counter == nullptr) {
+    return;
+  }
+  auto call = this->people_counter->make_call();
+  call.set_value(0);
   call.perform();
 }
 void Roode::recalibration() { calibrate_zones(); }

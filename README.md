@@ -111,16 +111,22 @@ vl53l1x:
 
   # Hardware pins
   pins:
-    # Shutdown/Enable pin, which is needed to change the I2C address. Required with multiple sensors.
+    # Shutdown/Enable pin, which is needed to change the I2C address when using
+    # more than one sensor. If only one sensor is used this pin is optional.
     xshut: GPIO3
-    # Interrupt pin. Use to notify us when a measurement is ready. This feature is WIP.
+    # Interrupt pin. When given the sensor will raise this pin when a
+    # measurement is ready which allows the ESP to sleep while waiting.
     # This needs to be an internal pin.
     interrupt: GPIO1
+    # When using multiple sensors repeat the vl53l1x: block with different
+    # addresses and a separate xshut pin for each sensor.
 
 # Roode people counting algorithm
 roode:
   # Smooth out measurements by using the minimum distance from this number of readings
   sampling: 2
+  # Optionally auto recalibrate thresholds every day
+  # recalibration_interval: 24h
 
   # The orientation of the two sensor pads in relation to the entryway being tracked.
   # The advised orientation is parallel, but if needed this can be changed to perpendicular.

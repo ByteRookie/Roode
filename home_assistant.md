@@ -1,5 +1,7 @@
-To make all functions of Roode work with home assistant you need to set up a few entities and automations. 
-Roode has endpoints to set the count value, reset the counter to 0 and to recalibrate. Unfourtunately its not possible to expose buttons via ESPHome that do just that.
+To make all functions of Roode work with Home Assistant you can now use ESPHome
+buttons for resetting the counter and starting a recalibration.
+The examples below still demonstrate how to wire automations if you prefer that
+approach.
 
 ```
 # This automation script runs when the counter has changed.
@@ -22,4 +24,21 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
     service: esphome.roode32_set_counter
     data:
       newCount: "{{ states('input_number.set_people32') | int }}"
+```
+
+If using ESPHome 2022.11 or newer you can create buttons directly in the Roode
+configuration:
+
+```yaml
+button:
+  - platform: template
+    name: Reset counter
+    on_press:
+      - lambda: |-
+          id(roode_platform)->reset_counter();
+  - platform: template
+    name: Recalibrate
+    on_press:
+      - lambda: |-
+          id(roode_platform)->recalibration();
 ```

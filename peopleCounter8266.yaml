@@ -1,12 +1,6 @@
 substitutions:
-  name: "bathroom-door-sensor"
-  sensor_name: "Bathroom Door"
-  project_name: "J-Sensor.Doorway-Counter"
-  project_version: "1.0.0 D"
-  sensor_invert: "true"
-  sensor_min: "0%" # % or mm
-  sensor_max: "95%" # % or mm
-  occupancy_delay: 5s
+  devicename: roode8266
+  friendly_name: $devicename
 
 external_components:
   refresh: always
@@ -16,32 +10,37 @@ external_components:
     ref: master
 
 esphome:
-  name: "${name}"
-  # name_add_mac_suffix: true
-  project:
-    name: "${project_name}"
-    version: "${project_version}"
+  name: $devicename
   platform: ESP8266
   board: d1_mini
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+  networks:
+    - ssid: !secret ssid1
+      password: !secret ssid1_password
+  use_address: $devicename
   fast_connect: True
-  power_save_mode: light
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
-  ap:
-    ssid: "${name}-WIFI"
-    password: "NEAG2LwwsWCO"
+  power_save_mode: none
+  domain: .local
 
 captive_portal:
 
 api:
+  password: !secret api_password
+  reboot_timeout: 60min
+  services:
+    - service: recalibrate
+      then:
+        - lambda: "id(roode_platform)->recalibration();"
 
 ota:
-  #password:
-  platform: esphome
+  password: !secret ota_password
 
+web_server:
+  port: 80
+  auth:
+    username: admin
+    password: !secret web_password
 
 # Enable logging
 logger:
@@ -63,24 +62,26 @@ roode:
   id: roode_platform
   # Smooth out measurements by using the minimum distance from this number of readings
   sampling: 2
+  # This controls the size of the Region of Interest the sensor should take readings in.
   roi: { height: 16, width: 6 }
-  orientation: parallel
   # The detection thresholds for determining whether a measurement should count as a person crossing.
   # A reading must be greater than the minimum and less than the maximum to count as a crossing.
   # These can be given as absolute distances or as percentages.
   # Percentages are based on the automatically determined idle or resting distance.
-  detection_thresholds:
-     min: ${sensor_min}  #234mm # absolute distance
-     max: ${sensor_max} # percent based on idle distance
+  detection_thresholds: # defaults for both zones. These also default to 0% & 85% as previously done.
+    # min: 234mm # absolute distance
+    max: 85% # percent based on idle distance
+  # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
+  # This allows for detecting whether a crossing is an entry or exit based on which zones was crossed first.
   zones:
-    invert: ${sensor_invert}
+    invert: true
 
 button:
   - platform: restart
-    name: ${sensor_name} Sensor Restart
+    name: $friendly_name Restart
     entity_category: config
   - platform: template
-    name: ${sensor_name} Sensor Recalibrate
+    name: $friendly_name Recalibrate
     on_press:
       - lambda: id(roode_platform)->recalibration();
     entity_category: config
@@ -89,47 +90,47 @@ number:
   - platform: roode
     people_counter:
       id: counter
-      name: ${sensor_name} Sensor people counter
+      name: $friendly_name people counter
 
 binary_sensor:
   - platform: status
-    name: ${sensor_name}  Sensor API Status
+    name: $friendly_name API Status
   - platform: roode
     presence_sensor:
-      name: ${sensor_name}  Sensor presence
+      name: $friendly_name presence
 
 sensor:
   - platform: roode
     id: roode_sensors
     distance_entry:
-      name: ${sensor_name} Sensor distance zone 0
+      name: $friendly_name distance zone 0
       filters:
         - delta: 100
     distance_exit:
-      name: ${sensor_name} distance zone 1
+      name: $friendly_name distance zone 1
       filters:
         - delta: 100
     max_threshold_entry:
-      name: ${sensor_name} Sensor max zone 0
+      name: $friendly_name max zone 0
     max_threshold_exit:
-      name: ${sensor_name} Sensor max zone 1
+      name: $friendly_name max zone 1
     min_threshold_entry:
-      name: ${sensor_name} Sensor min zone 0
+      name: $friendly_name min zone 0
     min_threshold_exit:
-      name: ${sensor_name} Sensor min zone 1
+      name: $friendly_name min zone 1
     roi_height_entry:
-      name: ${sensor_name} Sensor ROI height zone 0
+      name: $friendly_name ROI height zone 0
     roi_width_entry:
-      name: ${sensor_name} Sensor ROI width zone 0
+      name: $friendly_name ROI width zone 0
     roi_height_exit:
-      name: ${sensor_name} Sensor ROI height zone 1
+      name: $friendly_name ROI height zone 1
     roi_width_exit:
-      name: ${sensor_name} Sensor ROI width zone 1
+      name: $friendly_name ROI width zone 1
     sensor_status:
       name: Sensor Status
 
   - platform: wifi_signal
-    name: ${sensor_name} Sensor RSSI
+    name: $friendly_name RSSI
     update_interval: 60s
 
   - platform: uptime
@@ -159,11 +160,11 @@ sensor:
 text_sensor:
   - platform: roode
     version:
-      name: ${sensor_name} Sensor version
+      name: $friendly_name version
   - platform: roode
     entry_exit_event:
-      name: ${sensor_name} Sensor last direction
+      name: $friendly_name last direction
   - platform: template
-    name: ${sensor_name} Sensor Uptime Human Readable
+    name: $friendly_name Uptime Human Readable
     id: uptime_human
     icon: mdi:clock-start

@@ -160,10 +160,14 @@ void Roode::path_tracking(Zone *zone) {
                             : NOBODY;
 
   if (measured_status != zone_candidate[idx]) {
+    ESP_LOGV(TAG, "Guard reset for zone %d: candidate %s -> %s", zone->id,
+             zone_candidate[idx] == SOMEONE ? "SOMEONE" : "NOBODY", measured_status == SOMEONE ? "SOMEONE" : "NOBODY");
     zone_candidate[idx] = measured_status;
     zone_consistency[idx] = 1;
   } else if (zone_state[idx] != measured_status) {
     zone_consistency[idx]++;
+    ESP_LOGV(TAG, "Guard window %d/%d for zone %d (%s)", zone_consistency[idx], fsm_consistency_window_, zone->id,
+             measured_status == SOMEONE ? "SOMEONE" : "NOBODY");
   }
 
   bool state_changed = false;

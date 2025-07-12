@@ -1,4 +1,5 @@
 #include "roode.h"
+#include "Arduino.h"
 
 namespace esphome {
 namespace roode {
@@ -29,6 +30,9 @@ void Roode::setup() {
   }
 
   calibrate_zones();
+  loop_window_start_ = millis();
+  loop_time_sum_ = 0;
+  loop_count_ = 0;
 }
 
 void Roode::update() {
@@ -41,7 +45,7 @@ void Roode::update() {
 }
 
 void Roode::loop() {
-  // unsigned long start = micros();
+  unsigned long start = micros();
   this->current_zone->readDistance(distanceSensor);
   // uint16_t samplingDistance = sampling(this->current_zone);
   path_tracking(this->current_zone);
@@ -50,8 +54,29 @@ void Roode::loop() {
   // ESP_LOGI("Experimental", "Entry zone: %d, exit zone: %d",
   // entry->getDistance(Roode::distanceSensor, Roode::sensor_status),
   // exit->getDistance(Roode::distanceSensor, Roode::sensor_status)); unsigned
-  // long end = micros(); unsigned long delta = end - start; ESP_LOGI("Roode
-  // loop", "loop took %lu microseconds", delta);
+  unsigned long end = micros();
+  unsigned long delta = end - start;
+  loop_time_sum_ += delta;
+  loop_count_++;
+
+  uint32_t now = millis();
+  if (now - loop_window_start_ >= 30000) {
+    if (loop_count_ > 0) {
+      float avg_ms = (float) loop_time_sum_ / loop_count_ / 1000.0f;
+      if (loop_time_sensor != nullptr)
+        loop_time_sensor->publish_state(avg_ms);
+      float cpu = ((float) loop_time_sum_ / ((now - loop_window_start_) * 1000.0f)) * 100.0f;
+      if (cpu_usage_sensor != nullptr)
+        cpu_usage_sensor->publish_state(cpu);
+    }
+    if (ram_free_sensor != nullptr)
+      ram_free_sensor->publish_state(ESP.getFreeHeap());
+    if (flash_free_sensor != nullptr)
+      flash_free_sensor->publish_state(ESP.getFreeSketchSpace());
+    loop_time_sum_ = 0;
+    loop_count_ = 0;
+    loop_window_start_ = now;
+  }
 }
 
 bool Roode::handle_sensor_status() {

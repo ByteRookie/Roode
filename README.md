@@ -26,6 +26,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Startup check that logs whether the xshut and interrupt pins are functional
 - If a pin test fails at boot the feature is automatically disabled so the sensor continues operating
 - Xshut and interrupt pins use internal pull-ups so no extra resistors are needed
+- Optional sensors report loop time, CPU usage, free RAM and flash space
 
 ## Hardware Recommendation
 
@@ -193,6 +194,7 @@ roode:
 Also feel free to check out running examples for:
 - [Wemos D1 mini with ESP32](peopleCounter32.yaml)
 - [Wemos D1 mini with ESP8266](peopleCounter8266.yaml)
+- [Extra diagnostic sensors](extra_sensors_example.yaml)
 
 ### Sensors
 
@@ -233,6 +235,14 @@ sensor:
       name: $friendly_name ROI height
     roi_width:
       name: $friendly_name ROI width
+    loop_time:
+      name: $friendly_name loop time
+    cpu_usage:
+      name: $friendly_name CPU usage
+    ram_free:
+      name: $friendly_name free RAM
+    flash_free:
+      name: $friendly_name free flash
 
 text_sensor:
   - platform: roode

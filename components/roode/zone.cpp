@@ -54,10 +54,19 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   int sum = 0;
   for (int i = 0; i < number_attempts; i++) {
     this->readDistance(distanceSensor);
+    if (sensor_status != VL53L1_ERROR_NONE) {
+      ESP_LOGW(CALIBRATION, "Distance read failed during calibration. status: %d", sensor_status);
+      break;
+    }
     zone_distances.push_back(this->getDistance());
     sum += zone_distances.back();
   };
-  threshold->idle = this->getOptimizedValues(zone_distances, sum);
+  if (zone_distances.empty()) {
+    threshold->idle = 0;
+    ESP_LOGW(CALIBRATION, "Calibration failed: no valid distances recorded");
+  } else {
+    threshold->idle = this->getOptimizedValues(zone_distances, sum);
+  }
 
   if (threshold->max_percentage.has_value()) {
     threshold->max = (threshold->idle * threshold->max_percentage.value()) / 100;

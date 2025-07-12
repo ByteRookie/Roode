@@ -69,7 +69,10 @@ void VL53L1X::setup() {
     }
   }
 
-  this->check_features();
+  if (!this->check_features()) {
+    ESP_LOGE(TAG, "Feature check failed. Sensor disabled");
+    return;
+  }
 
   ESP_LOGI(TAG, "Setup complete");
 }
@@ -251,7 +254,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   return {distance};
 }
 
-void VL53L1X::check_features() {
+bool VL53L1X::check_features() {
   bool xshut_ok = !this->xshut_pin.has_value();
   bool int_ok = !this->interrupt_pin.has_value();
 
@@ -263,8 +266,10 @@ void VL53L1X::check_features() {
     if (!xshut_ok) {
       ESP_LOGE(TAG, "XShut pin validation failed, disabling power cycle support");
       this->xshut_pin.reset();
-      // try to continue with sensor powered on
-      this->wait_for_boot();
+      if (this->wait_for_boot() != VL53L1_ERROR_NONE) {
+        this->mark_failed();
+        return false;
+      }
     }
   }
 
@@ -291,6 +296,8 @@ void VL53L1X::check_features() {
 
   ESP_LOGI(TAG, "XShut %s", xshut_ok ? "working" : "disabled");
   ESP_LOGI(TAG, "Interrupt %s", int_ok ? "working" : "disabled");
+
+  return !this->is_failed();
 }
 
 }  // namespace vl53l1x

@@ -32,7 +32,7 @@ void Roode::setup() {
   if (calibration_persistence_) {
     calibration_prefs_[0] = global_preferences->make_preference<CalibrationPrefs>(0xA0);
     calibration_prefs_[1] = global_preferences->make_preference<CalibrationPrefs>(0xA1);
-    bool loaded = false;
+    bool loaded = true;
     for (int i = 0; i < 2; i++) {
       if (calibration_prefs_[i].load(&calibration_data_[i])) {
         Zone *z = i == 0 ? entry : exit;
@@ -49,10 +49,21 @@ void Roode::setup() {
           loaded = false;
           break;
         }
-        loaded = true;
+      } else {
+        loaded = false;
+        break;
       }
     }
-    if (!loaded) {
+    if (loaded) {
+      entry->reset_roi(orientation_ == Parallel ? 167 : 195);
+      exit->reset_roi(orientation_ == Parallel ? 231 : 60);
+      entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
+      exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
+      auto *mode = determine_raning_mode(entry->threshold->idle, exit->threshold->idle);
+      distanceSensor->set_ranging_mode(mode);
+      publish_sensor_configuration(entry, exit, true);
+      publish_sensor_configuration(entry, exit, false);
+    } else {
       calibrate_zones();
     }
   } else {

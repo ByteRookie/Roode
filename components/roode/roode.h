@@ -124,14 +124,14 @@ class Roode : public PollingComponent {
  protected:
   TofSensor *distanceSensor;
   Zone *current_zone = entry;
-  sensor::Sensor *distance_entry;
-  sensor::Sensor *distance_exit;
-  number::Number *people_counter;
-  sensor::Sensor *max_threshold_entry_sensor;
-  sensor::Sensor *max_threshold_exit_sensor;
-  sensor::Sensor *min_threshold_entry_sensor;
-  sensor::Sensor *min_threshold_exit_sensor;
-  sensor::Sensor *exit_roi_height_sensor;
+  sensor::Sensor *distance_entry{nullptr};
+  sensor::Sensor *distance_exit{nullptr};
+  number::Number *people_counter{nullptr};
+  sensor::Sensor *max_threshold_entry_sensor{nullptr};
+  sensor::Sensor *max_threshold_exit_sensor{nullptr};
+  sensor::Sensor *min_threshold_entry_sensor{nullptr};
+  sensor::Sensor *min_threshold_exit_sensor{nullptr};
+  sensor::Sensor *exit_roi_height_sensor{nullptr};
   sensor::Sensor *exit_roi_width_sensor{nullptr};
   sensor::Sensor *entry_roi_height_sensor{nullptr};
   sensor::Sensor *entry_roi_width_sensor{nullptr};

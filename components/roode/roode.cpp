@@ -85,6 +85,17 @@ void Roode::setup() {
   loop_window_start_ = millis();
   loop_time_sum_ = 0;
   loop_count_ = 0;
+  if (status_sensor != nullptr)
+    status_sensor->publish_state(sensor_status);
+
+  if (loop_time_sensor != nullptr)
+    loop_time_sensor->publish_state(0);
+  if (cpu_usage_sensor != nullptr)
+    cpu_usage_sensor->publish_state(0);
+  if (ram_free_sensor != nullptr)
+    ram_free_sensor->publish_state(0);
+  if (flash_free_sensor != nullptr)
+    flash_free_sensor->publish_state(0);
 }
 
 void Roode::update() {

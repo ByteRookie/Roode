@@ -33,6 +33,7 @@ enum class FilterMode { MINIMUM, MEDIAN };
 
 constexpr uint8_t MAX_SAMPLE_SIZE = 16;
 constexpr uint8_t CAL_SAMPLE_SIZE = 50;
+constexpr uint8_t CAL_THRESHOLD_SIZE = 32;
 
 class Zone {
  public:

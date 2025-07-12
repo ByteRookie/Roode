@@ -255,6 +255,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
 }
 
 bool VL53L1X::check_features() {
+  ESP_LOGI(TAG, "Validating optional pins");
   bool xshut_ok = false;
   bool int_ok = false;
 
@@ -270,6 +271,8 @@ bool VL53L1X::check_features() {
         this->mark_failed();
         return false;
       }
+    } else {
+      ESP_LOGI(TAG, "XShut pin working");
     }
   }
 
@@ -295,6 +298,8 @@ bool VL53L1X::check_features() {
     if (!int_ok) {
       ESP_LOGE(TAG, "Interrupt pin validation failed, falling back to polling");
       this->interrupt_pin.reset();
+    } else {
+      ESP_LOGI(TAG, "Interrupt pin working");
     }
   }
 

@@ -14,10 +14,10 @@
 - [🚀 Quick Start](#-quick-start)
 - [🔧 Features Overview](#-features-overview)
 - [🛠️ Hardware Setup](#-hardware-setup)
-- [🧬 ROI Zones](#-roi-zones)
-- [📈 Detection Algorithm](#-detection-algorithm)
-- [🛡️ Protection & Filtering Logic](#-protection--filtering-logic)
-- [🧪 Debug & Diagnostics](#-debug--diagnostics)
+- [🧬 ROI Zones & Grid Details](#-roi-zones--grid-details)
+- [📈 Detection Algorithm & State Machine](#-detection-algorithm--state-machine)
+- [🛡️ Filtering, Protection & Safeguards](#-filtering-protection--safeguards)
+- [🧪 Sensors, Diagnostics & Output](#-sensors-diagnostics--output)
 - [📘 Configuration References](#-configuration-references)
 - [❓ FAQ](#-faq)
 - [💬 Support](#-support)
@@ -27,11 +27,13 @@
 
 ## 📌 What is RooDe?
 
-**RooDe** is a smart people counter built with ESPHome and the VL53L1X time-of-flight sensor. It tracks when people enter or exit a room by detecting motion across vertical zones created by programmable Regions of Interest (ROIs).
+**RooDe** is a smart occupancy and directional people counter that uses a time-of-flight sensor (VL53L1X) to determine whether someone is entering or leaving a room. It's fully compatible with ESPHome and Home Assistant and uses zone-based analysis and an internal algorithm to make accurate real-time decisions.
 
 ---
 
 ## 🚀 Quick Start
+
+Add this to your ESPHome YAML:
 
 ```yaml
 external_components:
@@ -41,133 +43,138 @@ vl53l1x:
 roode:
 ```
 
+Supports:
+- ESP32 (fully supported)
+- ESP8266 (limited performance, polling only)
+
 ---
 
 ## 🔧 Features Overview
 
 | Feature                          | Description |
 |----------------------------------|-------------|
-| Directional People Counting      | Tracks movement direction (entry vs exit) |
-| Custom ROI Grid                  | Flexible vertical ROI layout |
-| Auto Sensor Recovery             | Uses `xshut` to restart sensor on failure |
-| Interrupt Pin Support            | Uses hardware pin to reduce polling overhead |
-| Boot-Time Safety Checks          | Disables features if pins are missing or unresponsive |
-| Persistence                      | Entry/Exit/Occupancy values survive reboot |
-| Zone Visualization (Agraerthiom)| Diagnostic visual representation of zone layout |
-| Internal Filters                 | Timeout, delay, and distance filtering for accuracy |
+| Directional Counting             | Entry/Exit detection with bidirectional logic |
+| ROI Zone Customization           | You define the Regions of Interest on the sensor grid |
+| XSHUT Pin Support                | Reset the sensor on boot or on fault |
+| Interrupt Pin Support            | Data-ready signal improves efficiency |
+| Boot-Time Pin Verification       | Gracefully disables features if wiring is incomplete |
+| State Persistence                | Occupancy persists after reboots |
+| Agraerthiom Debug View           | Live exposure of zone distance and logic status |
+| Adaptive ROI Logic               | Internal mapping supports dynamic zone reshaping |
 
 ---
 
 ## 🛠️ Hardware Setup
 
-### Recommended Pins for ESP32
-
-| VL53L1X Pin | ESP32 GPIO | Purpose           |
-|-------------|------------|-------------------|
-| SDA         | 21         | I²C Data          |
-| SCL         | 22         | I²C Clock         |
-| XSHUT       | 5          | Sensor reset pin  |
-| INTERRUPT   | 4          | Data-ready signal |
+| Pin       | ESP32 GPIO | Description               |
+|-----------|------------|---------------------------|
+| SDA       | 21         | I²C Data                   |
+| SCL       | 22         | I²C Clock                  |
+| XSHUT     | 5          | Shutdown pin (optional)    |
+| INTERRUPT | 4          | Data ready pin (optional)  |
 
 ---
 
-## 🧬 ROI Zones
+## 🧬 ROI Zones & Grid Details
 
-### Understanding ROI
+### VL53L1X ROI System
 
-The VL53L1X sensor has a 16x16 internal SPAD grid. With RooDe, this grid is divided into vertical rectangular ROIs (Regions of Interest). Each ROI is defined using a coordinate pair: `[x_min, y_min, x_max, y_max]`.
+The VL53L1X sensor has a 16×16 SPAD matrix, which RooDe divides into **2 or more vertical rectangular ROIs**. You define these zones via the `roode.zones` config.
 
-Typical usage splits the sensor vertically like this:
+Example split:
 
 ```yaml
 roode:
   zones:
-    - roi: [8, 0, 15, 15]  # Right/top side
+    - roi: [8, 0, 15, 15]
       name: top_zone
-    - roi: [0, 0, 7, 15]   # Left/bottom side
+    - roi: [0, 0, 7, 15]
       name: bottom_zone
 ```
 
-This configuration allows RooDe to detect the order of movement through the zones—critical for determining whether someone is entering or exiting.
+This configuration divides the full width into **top (right)** and **bottom (left)** segments. People crossing from one zone to the other are tracked.
+
+> Each ROI works like a motion detector that records distance in mm over time.
 
 ---
 
-## 📈 Detection Algorithm
+## 📈 Detection Algorithm & State Machine
 
-### Logic Summary
+### Entry Flow:
+1. `top_zone` triggers first
+2. `bottom_zone` triggers next (within time window)
+3. → Counts as entry
 
-RooDe uses a state machine to analyze movement patterns between zones. The sequence of zone activations is monitored in real time.
+### Exit Flow:
+1. `bottom_zone` triggers first
+2. `top_zone` triggers next (within time window)
+3. → Counts as exit
 
-- **Entry Detected**:  
-  - First, `top_zone` is triggered (person enters field)
-  - Then `bottom_zone` is triggered (they pass fully through)
-  - → Result: `entry_count` increases
+### State Machine Highlights
 
-- **Exit Detected**:  
-  - First, `bottom_zone` is triggered
-  - Then `top_zone` is triggered
-  - → Result: `exit_count` increases
-
-### Agraerthiom System
-
-Agraerthiom is RooDe’s internal representation of sensor state across zones. It records real-time distance changes and flags transitions, supporting:
-
-- Instant detection of movement direction
-- Optional debug visualization of distance values
-- Time-limited transitions to reduce false positives
+- Internal state machine tracks transition sequences.
+- Valid sequences result in counter adjustments.
+- Invalid or incomplete transitions are discarded.
 
 ---
 
-## 🛡️ Protection & Filtering Logic
+## 🛡️ Filtering, Protection & Safeguards
 
-| Method               | Purpose                                  |
-|----------------------|------------------------------------------|
-| Timeout Guard        | Ignores transitions that take too long   |
-| Cooldown Delay       | Prevents immediate repeated triggers     |
-| Distance Threshold   | Ignores invalid distance values          |
-| Boot Diagnostics     | Disables features if pin test fails      |
-| Memory Cleanup       | Frees resources from invalid states      |
+RooDe includes built-in stability checks and filters:
+
+| Type               | Description |
+|--------------------|-------------|
+| Timeout Filter     | Prevents stale triggers from affecting counts |
+| Cooldown Window    | Avoids double-counting from slow walkers |
+| Invalid Distance   | Ignores reflections or erroneous sensor spikes |
+| Pin Test at Boot   | Disables features if pins are unset or unstable |
+| Async Safety       | Ensures state resets don’t crash ESP during loops |
 
 ---
 
-## 🧪 Debug & Diagnostics
+## 🧪 Sensors, Diagnostics & Output
 
-| Entity                         | Description                   |
-|--------------------------------|-------------------------------|
-| `sensor.roode_entry_count`     | People entered                |
-| `sensor.roode_exit_count`      | People exited                 |
-| `sensor.roode_occupancy`       | Entry − Exit count            |
-| `sensor.roode_zone_top`        | Measured mm in top zone       |
-| `sensor.roode_zone_bottom`     | Measured mm in bottom zone    |
-| `text_sensor.roode_status`     | Internal algorithm state      |
+RooDe exposes the following sensors in ESPHome:
+
+| Entity                        | Description |
+|-------------------------------|-------------|
+| `sensor.roode_entry_count`    | Count of detected entries |
+| `sensor.roode_exit_count`     | Count of detected exits |
+| `sensor.roode_occupancy`      | Entry - Exit total |
+| `sensor.roode_zone_top`       | Distance from top zone (mm) |
+| `sensor.roode_zone_bottom`    | Distance from bottom zone (mm) |
+| `text_sensor.roode_status`    | Algorithm state (e.g., idle, triggering, blocked) |
 
 ---
 
 ## 📘 Configuration References
 
-- [`peopleCounter32.yaml`](peopleCounter32.yaml)  
-- [`extra_sensors_example.yaml`](extra_sensors_example.yaml)  
+- [`peopleCounter32.yaml`](peopleCounter32.yaml)
+- [`extra_sensors_example.yaml`](extra_sensors_example.yaml)
 - [`home_assistant.md`](home_assistant.md)
 
 ---
 
 ## ❓ FAQ
 
-**Q: What if my wiring is incorrect?**  
-A: RooDe performs a boot-time check and disables features like `xshut` or `interrupt` automatically if miswired.
+**Q: Can I use only one zone?**  
+No, directional tracking requires at least two zones for comparison.
 
-**Q: Can I use RooDe with only one zone?**  
-A: Technically yes, but it will not be able to detect direction—only motion.
+**Q: Why does my sensor sometimes read `0mm`?**  
+This may indicate an invalid reflection. Increase the distance threshold in the zone config.
 
-**Q: Why is occupancy sometimes negative?**  
-A: If exit is detected without a corresponding entry (e.g., false trigger), the net count may go below zero.
+**Q: How does it recover from a freeze?**  
+The sensor auto-resets using the XSHUT pin if available.
+
+**Q: Can I reset counters manually?**  
+Yes, using ESPHome's `number` control entities or through Home Assistant.
 
 ---
 
 ## 💬 Support
 
-Get help or contribute:  
-🗨️ [Join Discord](https://discord.gg/hU9SvSXMHs)
+Questions or improvements?  
+Join the community: [Discord](https://discord.gg/hU9SvSXMHs)
 
 ---
 

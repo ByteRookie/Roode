@@ -99,7 +99,12 @@ async def to_code(config: Dict):
 
     cg.add(roode.set_orientation(config[CONF_ORIENTATION]))
     cg.add(roode.set_sampling_size(config[CONF_FILTER_WINDOW]))
-    cg.add(roode.set_filter_mode(config[CONF_FILTER_MODE] == "median" and roode_ns.FilterMode.MEDIAN or roode_ns.FilterMode.MINIMUM))
+    mode = (
+        "roode::FilterMode::MEDIAN"
+        if config[CONF_FILTER_MODE] == "median"
+        else "roode::FilterMode::MINIMUM"
+    )
+    cg.add(roode.set_filter_mode(cg.RawExpression(mode)))
     cg.add(roode.set_calibration_persistence(config[CONF_CALIBRATION_PERSISTENCE]))
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)

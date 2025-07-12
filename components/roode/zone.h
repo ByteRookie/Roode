@@ -47,6 +47,7 @@ class Zone {
   void set_max_samples(uint8_t max) {
     max_samples = max;
     samples.clear();
+    samples.shrink_to_fit();
   };
 
  protected:

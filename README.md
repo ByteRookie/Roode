@@ -165,6 +165,13 @@ roode:
     # min: 50mm
     # max: 234cm
 
+  # Persist calibration data so thresholds survive restarts
+  calibration_persistence: true
+
+  # Jitter reduction options
+  filter_mode: median
+  filter_window: 5
+
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
   # This allows for detecting whether a crossing is an entry or exit based on which zones was crossed first.
   zones:

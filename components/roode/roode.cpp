@@ -128,41 +128,7 @@ void Roode::loop() {
   unsigned long delta = end - start;
   loop_time_sum_ += delta;
   loop_count_++;
-
-  uint32_t now = millis();
-  if (now - loop_window_start_ >= 30000) {
-    float cpu = 0.0f;
-    if (loop_count_ > 0) {
-      float avg_ms = (float) loop_time_sum_ / loop_count_ / 1000.0f;
-      if (loop_time_sensor != nullptr)
-        loop_time_sensor->publish_state(avg_ms);
-      cpu = ((float) loop_time_sum_ / ((now - loop_window_start_) * 1000.0f)) * 100.0f;
-      if (cpu_usage_sensor != nullptr)
-        cpu_usage_sensor->publish_state(cpu);
-    }
-    if (ram_free_sensor != nullptr) {
-      uint32_t total_heap = ESP.getHeapSize();
-      float used_percent = 0;
-      if (total_heap > 0) {
-        uint32_t used = total_heap - ESP.getFreeHeap();
-        used_percent = ((float) used / (float) total_heap) * 100.0f;
-      }
-      ram_free_sensor->publish_state(used_percent);
-    }
-    if (flash_free_sensor != nullptr) {
-      uint32_t total_flash = ESP.getFlashChipSize();
-      float used_percent = 0;
-      if (total_flash > 0) {
-        uint32_t used = total_flash - ESP.getFreeSketchSpace();
-        used_percent = ((float) used / (float) total_flash) * 100.0f;
-      }
-      flash_free_sensor->publish_state(used_percent);
-    }
-    apply_cpu_optimizations(cpu);
-    loop_time_sum_ = 0;
-    loop_count_ = 0;
-    loop_window_start_ = now;
-  }
+  update_metrics();
   delay(polling_interval_ms_);
 }
 
@@ -366,6 +332,43 @@ void Roode::apply_cpu_optimizations(float cpu) {
   cpu_optimizations_active_ = true;
 }
 
+void Roode::update_metrics() {
+  uint32_t now = millis();
+  if (now - loop_window_start_ < 30000)
+    return;
+  float cpu = 0.0f;
+  if (loop_count_ > 0) {
+    float avg_ms = (float) loop_time_sum_ / loop_count_ / 1000.0f;
+    if (loop_time_sensor != nullptr)
+      loop_time_sensor->publish_state(avg_ms);
+    cpu = ((float) loop_time_sum_ / ((now - loop_window_start_) * 1000.0f)) * 100.0f;
+    if (cpu_usage_sensor != nullptr)
+      cpu_usage_sensor->publish_state(cpu);
+  }
+  if (ram_free_sensor != nullptr) {
+    uint32_t total_heap = ESP.getHeapSize();
+    float used_percent = 0;
+    if (total_heap > 0) {
+      uint32_t used = total_heap - ESP.getFreeHeap();
+      used_percent = ((float) used / (float) total_heap) * 100.0f;
+    }
+    ram_free_sensor->publish_state(used_percent);
+  }
+  if (flash_free_sensor != nullptr) {
+    uint32_t total_flash = ESP.getFlashChipSize();
+    float used_percent = 0;
+    if (total_flash > 0) {
+      uint32_t used = total_flash - ESP.getFreeSketchSpace();
+      used_percent = ((float) used / (float) total_flash) * 100.0f;
+    }
+    flash_free_sensor->publish_state(used_percent);
+  }
+  apply_cpu_optimizations(cpu);
+  loop_time_sum_ = 0;
+  loop_count_ = 0;
+  loop_window_start_ = now;
+}
+
 const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_distance,
                                                 uint16_t average_exit_zone_distance) {
   uint16_t min = average_entry_zone_distance < average_exit_zone_distance ? average_entry_zone_distance
@@ -477,6 +480,7 @@ void Roode::sensor_task(void *param) {
     unsigned long delta = end - start;
     self->loop_time_sum_ += delta;
     self->loop_count_++;
+    self->update_metrics();
     vTaskDelay(pdMS_TO_TICKS(self->polling_interval_ms_));
   }
 }

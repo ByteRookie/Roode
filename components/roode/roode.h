@@ -118,6 +118,7 @@ class Roode : public PollingComponent {
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
   void apply_cpu_optimizations(float cpu);
+  void update_metrics();
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
 

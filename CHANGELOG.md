@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.5.1
+- Add diagnostic sensors reporting loop time, CPU usage, and RAM and flash usage percentages
 
 
 

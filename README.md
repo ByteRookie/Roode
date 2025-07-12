@@ -2,7 +2,7 @@
 
 [![GitHub release](https://img.shields.io/github/v/tag/Lyr3x/Roode?style=flat-square)](https://GitHub.com/Lyr3x/Roode/releases/)
 [![Build](https://img.shields.io/github/workflow/status/Lyr3x/Roode/CI?style=flat-square)](https://github.com/Lyr3x/Roode/blob/master/.github/workflows/ci.yml)
-[![Maintenance](https://img.shields.io/maintenance/yes/2023?style=flat-square)](https://GitHub.com/Lyr3x/Roode/graphs/commit-activity)
+[![Maintenance](https://img.shields.io/maintenance/yes/2025?style=flat-square)](https://GitHub.com/Lyr3x/Roode/graphs/commit-activity)
 
 [![Roode community](https://img.shields.io/discord/879407995837087804.svg?label=Discord&logo=Discord&colorB=7289da&style=for-the-badge)](https://discord.gg/hU9SvSXMHs)
 
@@ -26,7 +26,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Startup check that logs whether the xshut and interrupt pins are functional
 - If a pin test fails at boot the feature is automatically disabled so the sensor continues operating
 - Xshut and interrupt pins use internal pull-ups so no extra resistors are needed
-- Optional sensors report loop time, CPU usage, free RAM and flash space
+- Optional sensors report loop time, CPU usage, RAM and flash usage percentages
 
 ## Hardware Recommendation
 
@@ -240,9 +240,9 @@ sensor:
     cpu_usage:
       name: $friendly_name CPU usage
     ram_free:
-      name: $friendly_name free RAM
+      name: $friendly_name RAM usage
     flash_free:
-      name: $friendly_name free flash
+      name: $friendly_name flash usage
 
 text_sensor:
   - platform: roode
@@ -257,9 +257,9 @@ text_sensor:
 
 Another crucial choice is the one corresponding to the threshold. Indeed a movement is detected whenever the distance read by the sensor is below this value. The code contains a vector as threshold, as one (as myself) might need a different threshold for each zone.
 
-The threshold is automatically calculated by the sensor. To do so it is necessary to position the sensor and, after turning it on, wait for 10 seconds without passing under it. After this time, the average of the measures for each zone will be computed and the thereshold for each ROI will correspond to 80% of the average value. Also the value of 80% can be modified in the code, by editing the variable `max_threshold_percentage` and `min_threshold_percentage`.
+The threshold is automatically calculated by the sensor. To do so it is necessary to position the sensor and, after turning it on, wait for 10 seconds without passing under it. After this time, the average of the measures for each zone will be computed and the threshold for each ROI will correspond to 80% of the average value. Also the value of 80% can be modified in the code, by editing the variable `max_threshold_percentage` and `min_threshold_percentage`.
 
-If you install the sensor e.g 20cm over a door you dont want to count the door open and closing. In this case you should set the `min_threshold_percentage` to about `10`.
+If you install the sensor e.g 20cm over a door you don't want to count the door open and closing. In this case you should set the `min_threshold_percentage` to about `10`.
 
 Example:
 

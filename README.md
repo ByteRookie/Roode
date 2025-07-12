@@ -231,18 +231,32 @@ binary_sensor:
 sensor:
   - platform: roode
     id: hallway
-    distance_sensor:
-      name: $friendly_name distance
+    distance_entry:
+      name: $friendly_name distance zone 0
       filters:
         - delta: 100.0
-    threshold_entry:
-      name: $friendly_name Zone 0
-    threshold_exit:
-      name: $friendly_name Zone 1
-    roi_height:
-      name: $friendly_name ROI height
-    roi_width:
-      name: $friendly_name ROI width
+    distance_exit:
+      name: $friendly_name distance zone 1
+      filters:
+        - delta: 100.0
+    max_threshold_entry:
+      name: $friendly_name max zone 0
+    max_threshold_exit:
+      name: $friendly_name max zone 1
+    min_threshold_entry:
+      name: $friendly_name min zone 0
+    min_threshold_exit:
+      name: $friendly_name min zone 1
+    roi_height_entry:
+      name: $friendly_name ROI height zone 0
+    roi_width_entry:
+      name: $friendly_name ROI width zone 0
+    roi_height_exit:
+      name: $friendly_name ROI height zone 1
+    roi_width_exit:
+      name: $friendly_name ROI width zone 1
+    sensor_status:
+      name: $friendly_name sensor status
     loop_time:
       name: $friendly_name loop time
     cpu_usage:

@@ -30,12 +30,14 @@ void VL53L1X::setup() {
   ESP_LOGD(TAG, "Beginning setup");
 
   if (this->xshut_pin.has_value()) {
+    this->xshut_pin.value()->pin_mode(gpio::FLAG_OUTPUT | gpio::FLAG_PULLUP);
     this->xshut_pin.value()->setup();
     this->xshut_pin.value()->digital_write(true);
     delay(2);
   }
 
   if (this->interrupt_pin.has_value()) {
+    this->interrupt_pin.value()->pin_mode(gpio::FLAG_INPUT | gpio::FLAG_PULLUP);
     this->interrupt_pin.value()->setup();
   }
 

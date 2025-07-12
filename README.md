@@ -25,6 +25,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Cleaner memory management and sensor shutdown on reboot
 - Startup check that logs whether the xshut and interrupt pins are functional
 - If a pin test fails at boot the feature is automatically disabled so the sensor continues operating
+- Xshut and interrupt pins use internal pull-ups so no extra resistors are needed
 
 ## Hardware Recommendation
 
@@ -121,10 +122,14 @@ vl53l1x:
   # Hardware pins
   pins:
     # Shutdown/Enable pin used to change the I2C address and recover the sensor if needed.
-    xshut: GPIO3
-    # Interrupt pin. Use to notify us when a measurement is ready. This feature is WIP.
-    # This needs to be an internal pin.
-    interrupt: GPIO1
+    xshut:
+      number: GPIO3
+      mode: OUTPUT_PULLUP
+      ignore_strapping_warning: true
+    # Interrupt pin with internal pull-up for the data ready signal
+    interrupt:
+      number: GPIO1
+      mode: INPUT_PULLUP
 
   # When an xshut pin is provided the library will power cycle the sensor
   # automatically if a measurement times out.

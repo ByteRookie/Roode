@@ -62,6 +62,8 @@ void VL53L1X::setup() {
     }
   }
 
+  this->check_features();
+
   ESP_LOGI(TAG, "Setup complete");
 }
 
@@ -236,6 +238,38 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
 
   ESP_LOGV(TAG, "Finished distance read: %d", distance);
   return {distance};
+}
+
+void VL53L1X::check_features() {
+  bool xshut_ok = !this->xshut_pin.has_value();
+  bool int_ok = !this->interrupt_pin.has_value();
+
+  if (this->xshut_pin.has_value()) {
+    this->xshut_pin.value()->digital_write(false);
+    delay(10);
+    this->xshut_pin.value()->digital_write(true);
+    xshut_ok = (this->wait_for_boot() == VL53L1_ERROR_NONE);
+  }
+
+  if (this->interrupt_pin.has_value()) {
+    bool initial = this->interrupt_pin.value()->digital_read();
+    auto status = this->sensor.StartRanging();
+    if (status == VL53L1_ERROR_NONE) {
+      auto start = millis();
+      while ((millis() - start) < this->timeout) {
+        if (this->interrupt_pin.value()->digital_read() != initial) {
+          int_ok = true;
+          break;
+        }
+        App.feed_wdt();
+      }
+      this->sensor.ClearInterrupt();
+      this->sensor.StopRanging();
+    }
+  }
+
+  ESP_LOGI(TAG, "XShut %s", xshut_ok ? "working" : "failed");
+  ESP_LOGI(TAG, "Interrupt %s", int_ok ? "working" : "failed or missing");
 }
 
 }  // namespace vl53l1x

@@ -15,9 +15,15 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - [Configuration](#configuration)
   - [Platform Setup](#platform-setup)
   - [Sensors](#sensors)
-  - [Threshold distance](#threshold-distance)
+- [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
 - [FAQ/Troubleshoot](#faqtroubleshoot)
+
+## Features
+
+- Automatic sensor restart using the xshut pin when a measurement times out
+- Cleaner memory management and sensor shutdown on reboot
+- Startup check that logs whether the xshut and interrupt pins are functional
 
 ## Hardware Recommendation
 
@@ -121,6 +127,8 @@ vl53l1x:
 
   # When an xshut pin is provided the library will power cycle the sensor
   # automatically if a measurement times out.
+  # On boot the driver checks that the xshut and interrupt pins work and
+  # prints the result to the log.
 
 # Roode people counting algorithm
 roode:

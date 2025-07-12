@@ -27,6 +27,7 @@ namespace roode {
 static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
+constexpr uint32_t ESP8266_HEAP_SIZE = 81920;
 
 /*
 Use the VL53L1X_SetTimingBudget function to set the TB in milliseconds. The TB

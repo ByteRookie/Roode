@@ -83,16 +83,16 @@ void Roode::update() {
 #ifdef ESP32
     total = ESP.getHeapSize();
 #else
-    total = 81920;
+    total = ESP8266_HEAP_SIZE;
 #endif
     uint32_t used = total - ESP.getFreeHeap();
-    float pct = ((float)(total - used) * 100.0f) / (float) total;
+    float pct = ((float) (total - used) * 100.0f) / (float) total;
     ram_free_sensor->publish_state(pct);
   }
   if (flash_free_sensor != nullptr) {
     uint32_t total = ESP.getFlashChipSize();
     uint32_t used = ESP.getSketchSize();
-    float pct = ((float)(total - used) * 100.0f) / (float) total;
+    float pct = ((float) (total - used) * 100.0f) / (float) total;
     flash_free_sensor->publish_state(pct);
   }
 }

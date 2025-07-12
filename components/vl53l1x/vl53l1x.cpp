@@ -255,8 +255,8 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
 }
 
 bool VL53L1X::check_features() {
-  bool xshut_ok = !this->xshut_pin.has_value();
-  bool int_ok = !this->interrupt_pin.has_value();
+  bool xshut_ok = false;
+  bool int_ok = false;
 
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->digital_write(false);
@@ -271,6 +271,10 @@ bool VL53L1X::check_features() {
         return false;
       }
     }
+  }
+
+  if (!this->xshut_pin.has_value()) {
+    ESP_LOGI(TAG, "XShut disabled");
   }
 
   if (this->interrupt_pin.has_value()) {
@@ -294,8 +298,16 @@ bool VL53L1X::check_features() {
     }
   }
 
-  ESP_LOGI(TAG, "XShut %s", xshut_ok ? "working" : "disabled");
-  ESP_LOGI(TAG, "Interrupt %s", int_ok ? "working" : "disabled");
+  if (!this->interrupt_pin.has_value()) {
+    ESP_LOGI(TAG, "Interrupt disabled");
+  }
+
+  if (this->xshut_pin.has_value()) {
+    ESP_LOGI(TAG, "XShut %s", xshut_ok ? "working" : "disabled");
+  }
+  if (this->interrupt_pin.has_value()) {
+    ESP_LOGI(TAG, "Interrupt %s", int_ok ? "working" : "disabled");
+  }
 
   return !this->is_failed();
 }

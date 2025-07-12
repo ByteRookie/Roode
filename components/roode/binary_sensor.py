@@ -17,7 +17,9 @@ TYPES = [CONF_PRESENCE]
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
-        cv.Optional(CONF_PRESENCE): binary_sensor.binary_sensor_schema().extend(
+        cv.Optional(CONF_PRESENCE): binary_sensor.binary_sensor_schema(
+            binary_sensor.BinarySensor
+        ).extend(
             {
                 cv.GenerateID(): cv.declare_id(binary_sensor.BinarySensor),
             }

@@ -6,6 +6,7 @@ namespace vl53l1x {
 VL53L1X::~VL53L1X() {
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->digital_write(false);
+    ESP_LOGD(TAG, "XShut pin set LOW - powering down sensor");
   }
   this->sensor.StopRanging();
 }
@@ -32,13 +33,16 @@ void VL53L1X::setup() {
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->pin_mode(gpio::FLAG_OUTPUT | gpio::FLAG_PULLUP);
     this->xshut_pin.value()->setup();
+    ESP_LOGD(TAG, "XShut pin configured");
     this->xshut_pin.value()->digital_write(true);
+    ESP_LOGD(TAG, "XShut pin set HIGH - sensor powered on");
     delay(2);
   }
 
   if (this->interrupt_pin.has_value()) {
     this->interrupt_pin.value()->pin_mode(gpio::FLAG_INPUT | gpio::FLAG_PULLUP);
     this->interrupt_pin.value()->setup();
+    ESP_LOGD(TAG, "Interrupt pin configured");
   }
 
   // TODO use xshut_pin, if given, to change address
@@ -223,8 +227,10 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     this->sensor.StopRanging();
     if (this->xshut_pin.has_value()) {
       this->xshut_pin.value()->digital_write(false);
+      ESP_LOGW(TAG, "XShut pin set LOW - resetting sensor");
       delay(10);
       this->xshut_pin.value()->digital_write(true);
+      ESP_LOGD(TAG, "XShut pin set HIGH - reset complete");
       this->wait_for_boot();
     }
     return {};
@@ -261,12 +267,15 @@ bool VL53L1X::check_features() {
 
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->digital_write(false);
+    ESP_LOGD(TAG, "XShut pin set LOW - validating pin");
     delay(10);
     this->xshut_pin.value()->digital_write(true);
+    ESP_LOGD(TAG, "XShut pin set HIGH - validation reset complete");
     xshut_ok = (this->wait_for_boot() == VL53L1_ERROR_NONE);
     if (!xshut_ok) {
       ESP_LOGE(TAG, "XShut pin validation failed, disabling power cycle support");
       this->xshut_pin.reset();
+      ESP_LOGW(TAG, "XShut pin disabled due to validation failure");
       if (this->wait_for_boot() != VL53L1_ERROR_NONE) {
         this->mark_failed();
         return false;
@@ -282,22 +291,27 @@ bool VL53L1X::check_features() {
 
   if (this->interrupt_pin.has_value()) {
     bool initial = this->interrupt_pin.value()->digital_read();
+    ESP_LOGD(TAG, "Interrupt pin initial state: %d", initial);
     auto status = this->sensor.StartRanging();
     if (status == VL53L1_ERROR_NONE) {
       auto start = millis();
       while ((millis() - start) < this->timeout) {
         if (this->interrupt_pin.value()->digital_read() != initial) {
+          ESP_LOGD(TAG, "Interrupt pin state changed - measurement ready");
           int_ok = true;
           break;
         }
         App.feed_wdt();
       }
+      if (!int_ok)
+        ESP_LOGD(TAG, "Interrupt pin did not change state during validation");
       this->sensor.ClearInterrupt();
       this->sensor.StopRanging();
     }
     if (!int_ok) {
       ESP_LOGE(TAG, "Interrupt pin validation failed, falling back to polling");
       this->interrupt_pin.reset();
+      ESP_LOGW(TAG, "Interrupt pin disabled due to validation failure");
     } else {
       ESP_LOGI(TAG, "Interrupt pin working");
     }
@@ -319,4 +333,3 @@ bool VL53L1X::check_features() {
 
 }  // namespace vl53l1x
 }  // namespace esphome
-

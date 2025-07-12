@@ -51,8 +51,6 @@ void VL53L1X::setup() {
     this->interrupt_pin.value()->pin_mode(gpio::FLAG_INPUT | gpio::FLAG_PULLUP);
     this->interrupt_pin.value()->setup();
     ESP_LOGD(TAG, "Interrupt pin configured");
-    attachInterrupt(digitalPinToInterrupt(this->interrupt_pin.value()->get_pin()), isr_vl53_ready, FALLING);
-    ESP_LOGI(TAG, "Interrupt handler attached");
   }
 
   // TODO use xshut_pin, if given, to change address
@@ -86,6 +84,18 @@ void VL53L1X::setup() {
   if (!this->check_features()) {
     ESP_LOGE(TAG, "Feature check failed. Sensor disabled");
     return;
+  }
+
+  if (this->interrupt_pin.has_value()) {
+    auto intr = digitalPinToInterrupt(this->interrupt_pin.value()->get_pin());
+    if (intr >= 0) {
+      attachInterrupt(intr, isr_vl53_ready, FALLING);
+      ESP_LOGI(TAG, "Interrupt handler attached");
+    } else {
+      ESP_LOGW(TAG, "Pin %d does not support interrupts, falling back to polling",
+               this->interrupt_pin.value()->get_pin());
+      this->interrupt_pin.reset();
+    }
   }
 
   ESP_LOGI(TAG, "Setup complete");
@@ -223,10 +233,16 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   auto start_time = millis();
   if (this->interrupt_pin.has_value()) {
     new_sample_ready_ = false;
-    while (!new_sample_ready_ && (millis() - start_time) < this->timeout) {
+    while (!new_sample_ready_ && !dataReady && (millis() - start_time) < this->timeout) {
+      status = this->sensor.CheckForDataReady(&dataReady);
+      if (status != VL53L1_ERROR_NONE) {
+        ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
+        return {};
+      }
+      delay(1);
       App.feed_wdt();
     }
-    dataReady = new_sample_ready_;
+    dataReady = dataReady || new_sample_ready_;
   } else {
     while (!dataReady && (millis() - start_time) < this->timeout) {
       status = this->sensor.CheckForDataReady(&dataReady);

@@ -29,6 +29,13 @@ void Roode::setup() {
     return;
   }
 
+  // Initialize filtering options before calibrating so threshold sampling uses
+  // the configured window and mode
+  entry->set_filter_window(filter_window_);
+  entry->set_filter_mode(filter_mode_);
+  exit->set_filter_window(filter_window_);
+  exit->set_filter_mode(filter_mode_);
+
   if (calibration_persistence_) {
     calibration_prefs_[0] = global_preferences->make_preference<CalibrationPrefs>(0xA0);
     calibration_prefs_[1] = global_preferences->make_preference<CalibrationPrefs>(0xA1);
@@ -78,10 +85,6 @@ void Roode::setup() {
   loop_window_start_ = millis();
   loop_time_sum_ = 0;
   loop_count_ = 0;
-  entry->set_filter_window(filter_window_);
-  entry->set_filter_mode(filter_mode_);
-  exit->set_filter_window(filter_window_);
-  exit->set_filter_mode(filter_mode_);
 }
 
 void Roode::update() {

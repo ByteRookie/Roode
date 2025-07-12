@@ -95,10 +95,10 @@ void Roode::update() {
 }
 
 void Roode::loop() {
-  uint32_t start = micros();
+  uint32_t start_us = micros();
 #ifdef ESP32
   ZoneMsg msg;
-  if (xQueueReceive(zone_queue_, &msg, pdMS_TO_TICKS(10)) == pdTRUE) {
+  while (xQueueReceive(zone_queue_, &msg, 0) == pdTRUE) {
     path_tracking();
     handle_sensor_status();
     check_fail_safe(msg.zone);
@@ -110,16 +110,17 @@ void Roode::loop() {
   check_fail_safe(current_zone);
   current_zone = current_zone == entry ? exit : entry;
 #endif
-  uint32_t end = micros();
-  float loop_ms = (end - start) / 1000.0f;
+  uint32_t end_us = micros();
+  float loop_ms = (end_us - start_us) / 1000.0f;
   float cpu = 0;
-  if (last_loop_end_ != 0) {
-    uint32_t cycle = end - last_loop_end_;
+  uint32_t now_ms = millis();
+  if (last_loop_ts_ != 0) {
+    uint32_t cycle = now_ms - last_loop_ts_;
     if (cycle > 0) {
-      cpu = ((end - start) * 100.0f) / cycle;
+      cpu = (loop_ms * 100.0f) / cycle;
     }
   }
-  last_loop_end_ = end;
+  last_loop_ts_ = now_ms;
 
   loop_time_accum_ += loop_ms;
   cpu_usage_accum_ += cpu;

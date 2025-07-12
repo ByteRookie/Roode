@@ -173,7 +173,7 @@ class Roode : public PollingComponent {
   bool fail_safe_triggered{false};
   float loop_time_ms_{0};
   float cpu_usage_{0};
-  uint32_t last_loop_end_{0};
+  uint32_t last_loop_ts_{0};
   float loop_time_accum_{0};
   float cpu_usage_accum_{0};
   uint16_t diag_sample_count_{0};

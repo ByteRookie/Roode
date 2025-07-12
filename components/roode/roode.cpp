@@ -112,26 +112,17 @@ void Roode::loop() {
 #endif
   uint32_t end_us = micros();
   float loop_ms = (end_us - start_us) / 1000.0f;
-  float cpu = 0;
-  uint32_t now_ms = millis();
-  if (last_loop_ts_ != 0) {
-    uint32_t cycle = now_ms - last_loop_ts_;
-    if (cycle > 0) {
-      cpu = (loop_ms * 100.0f) / cycle;
-    }
-  }
-  last_loop_ts_ = now_ms;
-
   loop_time_accum_ += loop_ms;
-  cpu_usage_accum_ += cpu;
+  busy_us_accum_ += end_us - start_us;
   diag_sample_count_++;
-  if (millis() - diag_last_ts_ >= 30000 && diag_sample_count_ > 0) {
+  uint32_t now_ms = millis();
+  if (now_ms - diag_last_ts_ >= 30000 && diag_sample_count_ > 0) {
     loop_time_ms_ = loop_time_accum_ / diag_sample_count_;
-    cpu_usage_ = cpu_usage_accum_ / diag_sample_count_;
+    cpu_usage_ = ((float) busy_us_accum_ / ((now_ms - diag_last_ts_) * 1000.0f)) * 100.0f;
     loop_time_accum_ = 0;
-    cpu_usage_accum_ = 0;
+    busy_us_accum_ = 0;
     diag_sample_count_ = 0;
-    diag_last_ts_ = millis();
+    diag_last_ts_ = now_ms;
   }
 }
 

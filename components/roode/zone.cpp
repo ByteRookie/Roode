@@ -78,15 +78,14 @@ void Zone::save_calibration() {
 
 void Zone::run_zone_calibration(TofSensor *distanceSensor, Orientation orientation) {
   reset_roi(orientation == Parallel ? (id == 0U ? 167 : 231) : (id == 0U ? 195 : 60));
-  std::vector<uint16_t> vals;
-  for (int i = 0; i < 50; i++) {
-    this->readDistance(distanceSensor);
-    vals.push_back(this->getDistance());
-  }
+  std::array<uint16_t, CAL_SAMPLE_SIZE> vals{};
   uint32_t sum = 0;
-  for (auto v : vals)
-    sum += v;
-  uint16_t average = sum / vals.size();
+  for (uint8_t i = 0; i < CAL_SAMPLE_SIZE; i++) {
+    this->readDistance(distanceSensor);
+    vals[i] = this->getDistance();
+    sum += vals[i];
+  }
+  uint16_t average = sum / CAL_SAMPLE_SIZE;
   threshold->idle = average;
   threshold->max = average * 0.8;
   threshold->min = average * 0.15;
@@ -108,7 +107,9 @@ void Zone::reset_roi(uint8_t default_center) {
 
 void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   ESP_LOGD(CALIBRATION, "Beginning. zoneId: %d", id);
-  std::vector<int> zone_distances(number_attempts);
+  std::vector<int> zone_distances;
+  zone_distances.reserve(number_attempts);
+  zone_distances.resize(number_attempts);
   int sum = 0;
   for (int i = 0; i < number_attempts; i++) {
     this->readDistance(distanceSensor);

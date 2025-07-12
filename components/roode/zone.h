@@ -3,6 +3,7 @@
 
 #include "esphome/core/application.h"
 #include <array>
+#include <algorithm>
 #include "esphome/core/log.h"
 #include "esphome/core/optional.h"
 #include "../vl53l1x/vl53l1x.h"
@@ -31,6 +32,7 @@ struct Threshold {
 enum class FilterMode { MINIMUM, MEDIAN };
 
 constexpr uint8_t MAX_SAMPLE_SIZE = 16;
+constexpr uint8_t CAL_SAMPLE_SIZE = 50;
 
 class Zone {
  public:
@@ -55,6 +57,7 @@ class Zone {
     max_samples = max > MAX_SAMPLE_SIZE ? MAX_SAMPLE_SIZE : max;
     sample_index = 0;
     sample_count = 0;
+    std::fill(samples.begin(), samples.end(), 0);
   };
   void set_filter_mode(FilterMode mode) { filter_mode = mode; };
   void init_pref(uint32_t base_key);

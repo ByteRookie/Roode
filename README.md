@@ -16,6 +16,18 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Automatic fail-safe recalibration when zones get stuck
 - State machine tracking with timeout resets
 
+### Phase 1 Reliability Features
+
+| Feature | Implemented |
+|---------|-------------|
+| Fail-safe recalibration | ✅ |
+| Persistent calibration storage | ✅ |
+| Zone-specific calibration routine | ✅ |
+| Dual-core sensor task | ✅ |
+| Sliding window / median filtering | ✅ |
+| State machine timeout resets | ✅ |
+| Memory leak cleanup | ✅ |
+
 - [Hardware Recommendation](#hardware-recommendation)
 - [Wiring](#wiring)
   - [ESP32](#esp32)

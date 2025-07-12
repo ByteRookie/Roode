@@ -37,6 +37,11 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   void set_xtalk(uint16_t val) { this->xtalk = val; }
   void set_timeout(uint16_t val) { this->timeout = val; }
 
+  /**
+   * Signal that a new sample is ready from the interrupt service routine.
+   */
+  void signal_sample_ready() { new_sample_ready_ = true; }
+
  protected:
   VL53L1X_ULD sensor;
   optional<GPIOPin *> xshut_pin{};

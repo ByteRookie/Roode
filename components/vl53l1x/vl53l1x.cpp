@@ -4,7 +4,7 @@
 static esphome::vl53l1x::VL53L1X *g_vl53_instance = nullptr;
 static void IRAM_ATTR isr_vl53_ready() {
   if (g_vl53_instance != nullptr)
-    g_vl53_instance->new_sample_ready_ = true;
+    g_vl53_instance->signal_sample_ready();
 }
 
 namespace esphome {

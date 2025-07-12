@@ -11,7 +11,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 ### What's new in 1.5.1
 
 - Optional persistent zone calibration storage
-- Dual core sensor task for smoother measurements
+- Dual core sensor task for smoother measurements (falls back to the main loop on single-core boards)
 - Median filtering with configurable window size
 - Automatic fail-safe recalibration when zones get stuck
 - State machine tracking with timeout resets
@@ -23,7 +23,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 | Fail-safe recalibration | ✅ |
 | Persistent calibration storage | ✅ |
 | Zone-specific calibration routine | ✅ |
-| Dual-core sensor task | ✅ |
+| Dual-core sensor task (auto single-core fallback) | ✅ |
 | Sliding window / median filtering | ✅ |
 | State machine timeout resets | ✅ |
 | Memory leak cleanup | ✅ |

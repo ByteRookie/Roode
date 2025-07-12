@@ -11,12 +11,14 @@ void Roode::dump_config() {
 }
 
 Roode::~Roode() {
+#ifdef ESP32
   if (sensor_task_handle_ != nullptr) {
     vTaskDelete(sensor_task_handle_);
   }
   if (zone_queue_ != nullptr) {
     vQueueDelete(zone_queue_);
   }
+#endif
   delete entry;
   delete exit;
 }
@@ -37,8 +39,14 @@ void Roode::setup() {
   entry->init_pref(0xA0);
   exit->init_pref(0xA1);
 
+#ifdef ESP32
   zone_queue_ = xQueueCreate(2, sizeof(ZoneMsg));
+#if CONFIG_FREERTOS_UNICORE
+  xTaskCreatePinnedToCore(Roode::sensor_task, "SensorTask", 4096, this, 1, &sensor_task_handle_, 0);
+#else
   xTaskCreatePinnedToCore(Roode::sensor_task, "SensorTask", 4096, this, 1, &sensor_task_handle_, 1);
+#endif
+#endif
 
   bool loaded = false;
   if (calibration_persistence_) {
@@ -65,12 +73,20 @@ void Roode::update() {
 }
 
 void Roode::loop() {
+#ifdef ESP32
   ZoneMsg msg;
   if (xQueueReceive(zone_queue_, &msg, pdMS_TO_TICKS(50)) == pdTRUE) {
     path_tracking();
     handle_sensor_status();
     check_fail_safe(msg.zone);
   }
+#else
+  current_zone->readDistance(distanceSensor);
+  path_tracking();
+  handle_sensor_status();
+  check_fail_safe(current_zone);
+  current_zone = current_zone == entry ? exit : entry;
+#endif
 }
 
 bool Roode::handle_sensor_status() {
@@ -262,6 +278,7 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
   }
 }
 
+#ifdef ESP32
 void Roode::sensor_task(void *param) {
   auto *self = static_cast<Roode *>(param);
   for (;;) {
@@ -272,5 +289,6 @@ void Roode::sensor_task(void *param) {
     vTaskDelay(0);
   }
 }
+#endif
 }  // namespace roode
 }  // namespace esphome

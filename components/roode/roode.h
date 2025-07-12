@@ -8,9 +8,11 @@
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
 #include "../vl53l1x/vl53l1x.h"
+#ifdef ESP32
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#endif
 #include "orientation.h"
 #include "zone.h"
 
@@ -146,9 +148,11 @@ class Roode : public PollingComponent {
   void publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax);
   void updateCounter(int delta);
   void check_fail_safe(Zone *zone);
+#ifdef ESP32
   static void sensor_task(void *param);
   QueueHandle_t zone_queue_{nullptr};
   TaskHandle_t sensor_task_handle_{nullptr};
+#endif
   FSMState fsm_state_{FSMState::IDLE};
   Zone *fsm_start_zone_{nullptr};
   uint32_t fsm_state_ts_{0};

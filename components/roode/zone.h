@@ -2,6 +2,7 @@
 #include <math.h>
 
 #include "esphome/core/application.h"
+#include <vector>
 #include "esphome/core/log.h"
 #include "esphome/core/optional.h"
 #include "../vl53l1x/vl53l1x.h"

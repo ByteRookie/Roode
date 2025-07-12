@@ -1,4 +1,5 @@
 #include "zone.h"
+#include <algorithm>
 
 namespace esphome {
 namespace roode {

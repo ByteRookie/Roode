@@ -22,6 +22,7 @@ class VL53L1X : public i2c::I2CDevice, public Component {
  public:
   void setup() override;
   void dump_config() override;
+  ~VL53L1X();
   /** This connects directly to a sensor */
   float get_setup_priority() const override { return setup_priority::DATA; };
 
@@ -51,7 +52,14 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   VL53L1_Error init();
   VL53L1_Error wait_for_boot();
   VL53L1_Error get_device_state(uint8_t *device_state);
+  /**
+   * Validate optional pins and log their status.
+   *
+   * @return false when the sensor becomes unresponsive while testing pins.
+   */
+  bool check_features();
 };
 
 }  // namespace vl53l1x
 }  // namespace esphome
+

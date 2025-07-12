@@ -1,5 +1,7 @@
 #pragma once
 #include <math.h>
+#include <deque>
+#include <vector>
 
 #include "esphome/core/application.h"
 #include "esphome/core/log.h"
@@ -30,6 +32,7 @@ struct Threshold {
 class Zone {
  public:
   explicit Zone(uint8_t id) : id{id} {};
+  ~Zone();
   void dump_config() const;
   VL53L1_Error readDistance(TofSensor *distanceSensor);
   void reset_roi(uint8_t default_center);
@@ -41,16 +44,21 @@ class Zone {
   ROI *roi = new ROI();
   ROI *roi_override = new ROI();
   Threshold *threshold = new Threshold();
-  void set_max_samples(uint8_t max) { max_samples = max; };
+  void set_max_samples(uint8_t max) {
+    max_samples = max;
+    samples.clear();
+    samples.shrink_to_fit();
+  };
 
  protected:
-  int getOptimizedValues(int *values, int sum, int size);
+  int getOptimizedValues(const std::vector<int> &values, int sum) const;
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
   uint16_t last_distance;
   uint16_t min_distance;
-  std::vector<uint16_t> samples;
+  std::deque<uint16_t> samples;
   uint8_t max_samples;
 };
 }  // namespace roode
 }  // namespace esphome
+

@@ -3,6 +3,13 @@
 namespace esphome {
 namespace vl53l1x {
 
+VL53L1X::~VL53L1X() {
+  if (this->xshut_pin.has_value()) {
+    this->xshut_pin.value()->digital_write(false);
+  }
+  this->sensor.StopRanging();
+}
+
 void VL53L1X::dump_config() {
   ESP_LOGCONFIG(TAG, "VL53L1X:");
   LOG_I2C_DEVICE(this);
@@ -21,6 +28,18 @@ void VL53L1X::dump_config() {
 
 void VL53L1X::setup() {
   ESP_LOGD(TAG, "Beginning setup");
+
+  if (this->xshut_pin.has_value()) {
+    this->xshut_pin.value()->pin_mode(gpio::FLAG_OUTPUT | gpio::FLAG_PULLUP);
+    this->xshut_pin.value()->setup();
+    this->xshut_pin.value()->digital_write(true);
+    delay(2);
+  }
+
+  if (this->interrupt_pin.has_value()) {
+    this->interrupt_pin.value()->pin_mode(gpio::FLAG_INPUT | gpio::FLAG_PULLUP);
+    this->interrupt_pin.value()->setup();
+  }
 
   // TODO use xshut_pin, if given, to change address
   auto status = this->init();
@@ -48,6 +67,11 @@ void VL53L1X::setup() {
       this->mark_failed();
       return;
     }
+  }
+
+  if (!this->check_features()) {
+    ESP_LOGE(TAG, "Feature check failed. Sensor disabled");
+    return;
   }
 
   ESP_LOGI(TAG, "Setup complete");
@@ -175,11 +199,16 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   }
 
   status = this->sensor.StartRanging();
+  if (status != VL53L1_ERROR_NONE) {
+    ESP_LOGE(TAG, "Failed to start ranging, error code: %d", status);
+    return {};
+  }
 
   // Wait for the measurement to be ready
   // TODO use interrupt_pin, if given, to await data ready instead of polling
   uint8_t dataReady = false;
-  while (!dataReady) {
+  auto start_time = millis();
+  while (!dataReady && (millis() - start_time) < this->timeout) {
     status = this->sensor.CheckForDataReady(&dataReady);
     if (status != VL53L1_ERROR_NONE) {
       ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
@@ -187,6 +216,18 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     }
     delay(1);
     App.feed_wdt();
+  }
+  if (!dataReady) {
+    ESP_LOGW(TAG, "Timed out waiting for measurement ready");
+    status = VL53L1_ERROR_TIME_OUT;
+    this->sensor.StopRanging();
+    if (this->xshut_pin.has_value()) {
+      this->xshut_pin.value()->digital_write(false);
+      delay(10);
+      this->xshut_pin.value()->digital_write(true);
+      this->wait_for_boot();
+    }
+    return {};
   }
 
   // Get the results
@@ -213,5 +254,69 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   return {distance};
 }
 
+bool VL53L1X::check_features() {
+  ESP_LOGI(TAG, "Validating optional pins");
+  bool xshut_ok = false;
+  bool int_ok = false;
+
+  if (this->xshut_pin.has_value()) {
+    this->xshut_pin.value()->digital_write(false);
+    delay(10);
+    this->xshut_pin.value()->digital_write(true);
+    xshut_ok = (this->wait_for_boot() == VL53L1_ERROR_NONE);
+    if (!xshut_ok) {
+      ESP_LOGE(TAG, "XShut pin validation failed, disabling power cycle support");
+      this->xshut_pin.reset();
+      if (this->wait_for_boot() != VL53L1_ERROR_NONE) {
+        this->mark_failed();
+        return false;
+      }
+    } else {
+      ESP_LOGI(TAG, "XShut pin working");
+    }
+  }
+
+  if (!this->xshut_pin.has_value()) {
+    ESP_LOGI(TAG, "XShut disabled");
+  }
+
+  if (this->interrupt_pin.has_value()) {
+    bool initial = this->interrupt_pin.value()->digital_read();
+    auto status = this->sensor.StartRanging();
+    if (status == VL53L1_ERROR_NONE) {
+      auto start = millis();
+      while ((millis() - start) < this->timeout) {
+        if (this->interrupt_pin.value()->digital_read() != initial) {
+          int_ok = true;
+          break;
+        }
+        App.feed_wdt();
+      }
+      this->sensor.ClearInterrupt();
+      this->sensor.StopRanging();
+    }
+    if (!int_ok) {
+      ESP_LOGE(TAG, "Interrupt pin validation failed, falling back to polling");
+      this->interrupt_pin.reset();
+    } else {
+      ESP_LOGI(TAG, "Interrupt pin working");
+    }
+  }
+
+  if (!this->interrupt_pin.has_value()) {
+    ESP_LOGI(TAG, "Interrupt disabled");
+  }
+
+  if (this->xshut_pin.has_value()) {
+    ESP_LOGI(TAG, "XShut %s", xshut_ok ? "working" : "disabled");
+  }
+  if (this->interrupt_pin.has_value()) {
+    ESP_LOGI(TAG, "Interrupt %s", int_ok ? "working" : "disabled");
+  }
+
+  return !this->is_failed();
+}
+
 }  // namespace vl53l1x
 }  // namespace esphome
+

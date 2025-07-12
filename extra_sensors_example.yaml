@@ -1,0 +1,21 @@
+external_components:
+  - source: github://Lyr3x/Roode
+    refresh: always
+
+vl53l1x:
+  timeout: 2s
+
+roode:
+  sampling: 2
+
+sensor:
+  - platform: roode
+    id: roode_metrics
+    loop_time:
+      name: Roode loop time
+    cpu_usage:
+      name: Roode cpu usage
+    ram_free:
+      name: Roode free ram
+    flash_free:
+      name: Roode free flash

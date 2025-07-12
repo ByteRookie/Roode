@@ -15,26 +15,28 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - [Configuration](#configuration)
   - [Platform Setup](#platform-setup)
   - [Sensors](#sensors)
-  - [Threshold distance](#threshold-distance)
+- [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
 - [FAQ/Troubleshoot](#faqtroubleshoot)
 
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| **Automatic xshut restart** | The sensor is power-cycled if a measurement times out |
+| **Clean shutdown** | Resources are released and the sensor powers off on reboot |
+| **Startup pin test** | Logs whether the xshut and interrupt pins are working and disables them if not |
+| **Internal pull-ups** | Uses MCU pull-ups so no extra resistors are required |
+| **Diagnostic sensors** | Optional metrics for loop time, CPU usage, free RAM and flash |
+
 ## Hardware Recommendation
 
-- ESP8266 or ESP32
-  - **Wemos D1 Mini ESP32** <-- Recommended
-  - Wemos D1 mini (ESP8266)
-  - NodeMCU V2
-- 1x VL53L1X
-  - **Pololu** <-- Recommended
-  - GY-53
-  - Black PCB chinese sensor
-  - Pimoroni
-- 1A Power Supply **Do not use an USB port of your computer!**
-- Encolsure (see .stl files) - will be updated soon!
-  Pins:
-  SDA_PIN 4 (ESP8266) or 21 (ESP32)
-  SCL_PIN 5 (ESP8266) or 22 (ESP32)
+| Component | Options | Notes |
+|-----------|---------|-------|
+| **MCU** | Wemos D1 Mini ESP32 (recommended), Wemos D1 mini (ESP8266), NodeMCU V2 | Requires 1A power supply |
+| **Distance sensor** | Pololu VL53L1X (recommended), GY-53, black PCB variant, Pimoroni | Connect VIN to 3.3V or 5V depending on board |
+| **Pins** | SDA GPIO4/21, SCL GPIO5/22 | Xshut and interrupt pins use internal pull-ups |
+| **Enclosure** | 3D printed STL files | Keep sensor stable above the doorway |
 
 ## Wiring
 
@@ -97,6 +99,8 @@ external_components:
 vl53l1x:
   # A non-standard I2C address
   address:
+  # How long to wait for boot and measurements before giving up
+  timeout: 2s
 
   # Sensor calibration options
   calibration:
@@ -111,11 +115,20 @@ vl53l1x:
 
   # Hardware pins
   pins:
-    # Shutdown/Enable pin, which is needed to change the I2C address. Required with multiple sensors.
-    xshut: GPIO3
-    # Interrupt pin. Use to notify us when a measurement is ready. This feature is WIP.
-    # This needs to be an internal pin.
-    interrupt: GPIO1
+    # Shutdown/Enable pin used to change the I2C address and recover the sensor if needed.
+    xshut:
+      number: GPIO3
+      mode: OUTPUT_PULLUP
+      ignore_strapping_warning: true
+    # Interrupt pin with internal pull-up for the data ready signal
+    interrupt:
+      number: GPIO1
+      mode: INPUT_PULLUP
+
+  # When an xshut pin is provided the library will power cycle the sensor
+  # automatically if a measurement times out.
+  # On boot the driver checks that the xshut and interrupt pins work and
+  # prints the result to the log.
 
 # Roode people counting algorithm
 roode:
@@ -174,6 +187,7 @@ roode:
 Also feel free to check out running examples for:
 - [Wemos D1 mini with ESP32](peopleCounter32.yaml)
 - [Wemos D1 mini with ESP8266](peopleCounter8266.yaml)
+- [Extra diagnostic sensors](extra_sensors_example.yaml)
 
 ### Sensors
 
@@ -214,6 +228,14 @@ sensor:
       name: $friendly_name ROI height
     roi_width:
       name: $friendly_name ROI width
+    loop_time:
+      name: $friendly_name loop time
+    cpu_usage:
+      name: $friendly_name CPU usage
+    ram_free:
+      name: $friendly_name free RAM
+    flash_free:
+      name: $friendly_name free flash
 
 text_sensor:
   - platform: roode
@@ -255,6 +277,13 @@ The concept of path tracking is the detecion of a human:
 - In no zone
 
 That way we can ensure the direction of movement.
+
+```
++-------+-------+
+| Entry | Exit  |
++-------+-------+
+  ^ person walks under sensor
+```
 
 The sensor creates a 16x16 grid and the final distance is computed by taking the average of the distance of the values of the grid.
 We are defining two different Region of Interest (ROI) inside this grid. Then the sensor will measure the two distances in the two zones and will detect any presence and tracks the path to receive the direction.
@@ -335,3 +364,4 @@ lower right.
 Thank you very much for you sponsorship!
 
 - sunshine-hass
+

@@ -58,6 +58,7 @@ class Roode : public PollingComponent {
   void update() override;
   void loop() override;
   void dump_config() override;
+  ~Roode();
   /** Roode uses data from sensors */
   float get_setup_priority() const override { return setup_priority::PROCESSOR; };
 
@@ -90,6 +91,10 @@ class Roode : public PollingComponent {
   void set_exit_roi_height_sensor(sensor::Sensor *roi_height_sensor_) { exit_roi_height_sensor = roi_height_sensor_; }
   void set_exit_roi_width_sensor(sensor::Sensor *roi_width_sensor_) { exit_roi_width_sensor = roi_width_sensor_; }
   void set_sensor_status_sensor(sensor::Sensor *status_sensor_) { status_sensor = status_sensor_; }
+  void set_loop_time_sensor(sensor::Sensor *sens) { loop_time_sensor = sens; }
+  void set_cpu_usage_sensor(sensor::Sensor *sens) { cpu_usage_sensor = sens; }
+  void set_ram_free_sensor(sensor::Sensor *sens) { ram_free_sensor = sens; }
+  void set_flash_free_sensor(sensor::Sensor *sens) { flash_free_sensor = sens; }
   void set_presence_sensor_binary_sensor(binary_sensor::BinarySensor *presence_sensor_) {
     presence_sensor = presence_sensor_;
   }
@@ -112,13 +117,17 @@ class Roode : public PollingComponent {
   sensor::Sensor *min_threshold_entry_sensor;
   sensor::Sensor *min_threshold_exit_sensor;
   sensor::Sensor *exit_roi_height_sensor;
-  sensor::Sensor *exit_roi_width_sensor;
-  sensor::Sensor *entry_roi_height_sensor;
-  sensor::Sensor *entry_roi_width_sensor;
-  sensor::Sensor *status_sensor;
-  binary_sensor::BinarySensor *presence_sensor;
-  text_sensor::TextSensor *version_sensor;
-  text_sensor::TextSensor *entry_exit_event_sensor;
+  sensor::Sensor *exit_roi_width_sensor{nullptr};
+  sensor::Sensor *entry_roi_height_sensor{nullptr};
+  sensor::Sensor *entry_roi_width_sensor{nullptr};
+  sensor::Sensor *status_sensor{nullptr};
+  sensor::Sensor *loop_time_sensor{nullptr};
+  sensor::Sensor *cpu_usage_sensor{nullptr};
+  sensor::Sensor *ram_free_sensor{nullptr};
+  sensor::Sensor *flash_free_sensor{nullptr};
+  binary_sensor::BinarySensor *presence_sensor{nullptr};
+  text_sensor::TextSensor *version_sensor{nullptr};
+  text_sensor::TextSensor *entry_exit_event_sensor{nullptr};
 
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
@@ -137,7 +146,11 @@ class Roode : public PollingComponent {
   int medium_distance_threshold = 2000;
   int medium_long_distance_threshold = 2700;
   int long_distance_threshold = 3400;
+  uint32_t loop_window_start_{0};
+  uint64_t loop_time_sum_{0};
+  uint32_t loop_count_{0};
 };
 
 }  // namespace roode
 }  // namespace esphome
+

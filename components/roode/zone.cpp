@@ -3,6 +3,12 @@
 namespace esphome {
 namespace roode {
 
+Zone::~Zone() {
+  delete roi;
+  delete roi_override;
+  delete threshold;
+}
+
 void Zone::dump_config() const {
   ESP_LOGCONFIG(TAG, "   %s", id == 0U ? "Entry" : "Exit");
   ESP_LOGCONFIG(TAG, "     ROI: { width: %d, height: %d, center: %d }", roi->width, roi->height, roi->center);
@@ -20,9 +26,9 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
   }
 
   last_distance = result.value();
-  samples.insert(samples.begin(), result.value());
+  samples.push_back(result.value());
   if (samples.size() > max_samples) {
-    samples.pop_back();
+    samples.pop_front();
   };
   min_distance = *std::min_element(samples.begin(), samples.end());
 
@@ -43,14 +49,24 @@ void Zone::reset_roi(uint8_t default_center) {
 
 void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   ESP_LOGD(CALIBRATION, "Beginning. zoneId: %d", id);
-  int *zone_distances = new int[number_attempts];
+  std::vector<int> zone_distances;
+  zone_distances.reserve(number_attempts);
   int sum = 0;
   for (int i = 0; i < number_attempts; i++) {
     this->readDistance(distanceSensor);
-    zone_distances[i] = this->getDistance();
-    sum += zone_distances[i];
+    if (sensor_status != VL53L1_ERROR_NONE) {
+      ESP_LOGW(CALIBRATION, "Distance read failed during calibration. status: %d", sensor_status);
+      break;
+    }
+    zone_distances.push_back(this->getDistance());
+    sum += zone_distances.back();
   };
-  threshold->idle = this->getOptimizedValues(zone_distances, sum, number_attempts);
+  if (zone_distances.empty()) {
+    threshold->idle = 0;
+    ESP_LOGW(CALIBRATION, "Calibration failed: no valid distances recorded");
+  } else {
+    threshold->idle = this->getOptimizedValues(zone_distances, sum);
+  }
 
   if (threshold->max_percentage.has_value()) {
     threshold->max = (threshold->idle * threshold->max_percentage.value()) / 100;
@@ -109,7 +125,8 @@ void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Or
            roi->height, roi->center);
 }
 
-int Zone::getOptimizedValues(int *values, int sum, int size) {
+int Zone::getOptimizedValues(const std::vector<int> &values, int sum) const {
+  int size = values.size();
   int sum_squared = 0;
   int variance = 0;
   int sd = 0;
@@ -130,3 +147,4 @@ uint16_t Zone::getDistance() const { return this->last_distance; }
 uint16_t Zone::getMinDistance() const { return this->min_distance; }
 }  // namespace roode
 }  // namespace esphome
+

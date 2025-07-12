@@ -140,6 +140,7 @@ vl53l1x:
 # Roode people counting algorithm
 roode:
   # Smooth out measurements by using the minimum distance from this number of readings
+  # A higher value filters noise but increases reaction time
   sampling: 2
 
   # The orientation of the two sensor pads in relation to the entryway being tracked.
@@ -273,6 +274,8 @@ min_threshold_percentage: 10% = 200
 All distances smaller than 200mm and greater than 1760mm will be ignored.
 ```
 
+The min and max thresholds therefore form a window around the expected person distance. Values outside that window are discarded so occasional door movements or objects that are too near or too far away do not cause a count.
+
 ## Algorithm
 
 The implemented Algorithm is an improved version of my own implementation which checks the direction of a movement through two defined zones. ST implemented a nice and efficient way to track the path from one to the other direction. I migrated the algorithm with some changes into the Roode project.
@@ -283,15 +286,28 @@ The concept of path tracking is the detection of a human:
 - In the second zone only
 - In no zone
 
-That way we can ensure the direction of movement.
+That way we can ensure the direction of movement. To avoid false positives each zone keeps a history of the last few distance measurements. The minimum value from this sampling window is used so quick spikes from reflections or other noise do not cause a detection.
+
+The overall sequence that forms an entry or exit looks like this:
+
+```text
+ Entry sequence: ROI0 -> ROI0+ROI1 -> ROI1 -> none
+ Exit sequence:  ROI1 -> ROI0+ROI1 -> ROI0 -> none
+```
+
+Below is an illustration of the movement path.
 
 ```
-         Movement sequence
+       Entry movement
     +---------+     +---------+
     |  ROI0   | --> |  ROI1   |
     +---------+     +---------+
-         Entry        Exit
+         |             |
+         +-------------+
+           Exit movement
 ```
+
+
 
 The sensor creates a 16x16 grid and the final distance is computed by taking the average of the distance of the values of the grid.
 We are defining two different Region of Interest (ROI) inside this grid. Then the sensor will measure the two distances in the two zones and will detect any presence and track the path to receive the direction.
@@ -299,14 +315,32 @@ We are defining two different Region of Interest (ROI) inside this grid. Then th
 ### ROI Selection
 
 ```
-16x16 sensor grid
-+--------------+--------------+
-|    ROI0      |     ROI1     |
-|   (entry)    |    (exit)    |
-+--------------+--------------+
+16x16 sensor grid (top view)
++----------+----------+
+|##########|oooooooooo|
+|##########|oooooooooo|  height 16
+|##########|oooooooooo|
+|##########|oooooooooo|
++----------+----------+
+
+# -> ROI0 (entry)
+o -> ROI1 (exit)
 ```
 
-Since version 1.5.0 the center for each zone can be configured manually, allowing fine tuning for different door widths or installations.
+Each ROI is defined by its width, height and a **center SPAD**. The width above would be eight SPADs for each ROI. Adjusting the center shifts the zone left or right within the 16x16 grid so you can align the measurement with an off‑centre doorway.
+
+Since version 1.5.0 the center for each zone can be configured manually, allowing fine tuning for different door widths or installations. By default the entry center is SPAD **167** and the exit center is **231** when the orientation is parallel. If your door is offset you can override these values in the YAML configuration:
+
+```yaml
+roode:
+  zones:
+    entry:
+      roi:
+        center: 160  # shift entry zone a little to the left
+    exit:
+      roi:
+        center: 240  # and move exit to the right
+```
 
 However, the algorithm is very sensitive to the slightest modification of the ROI, regarding both its size and its positioning inside the grid.
 

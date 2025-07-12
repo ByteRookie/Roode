@@ -270,13 +270,13 @@ Person height:      1800mm
 max_threshold_percentage: 80% = 1760
 min_threshold_percentage: 10% = 200
 
-All distances smaller then 200mm and greater then 1760mm will be ignored.
+All distances smaller than 200mm and greater than 1760mm will be ignored.
 ```
 
 ## Algorithm
 
-The implemented Algorithm is an improved version of my own implementation which checks the direction of a movement through two defined zones. ST implemented a nice and efficient way to track the path from one to the other direction. I migrated the algorigthm with some changes into the Roode project.
-The concept of path tracking is the detecion of a human:
+The implemented Algorithm is an improved version of my own implementation which checks the direction of a movement through two defined zones. ST implemented a nice and efficient way to track the path from one to the other direction. I migrated the algorithm with some changes into the Roode project.
+The concept of path tracking is the detection of a human:
 
 - In the first zone only
 - In both zones
@@ -285,8 +285,28 @@ The concept of path tracking is the detecion of a human:
 
 That way we can ensure the direction of movement.
 
+```
+         Movement sequence
+    +---------+     +---------+
+    |  ROI0   | --> |  ROI1   |
+    +---------+     +---------+
+         Entry        Exit
+```
+
 The sensor creates a 16x16 grid and the final distance is computed by taking the average of the distance of the values of the grid.
-We are defining two different Region of Interest (ROI) inside this grid. Then the sensor will measure the two distances in the two zones and will detect any presence and tracks the path to receive the direction.
+We are defining two different Region of Interest (ROI) inside this grid. Then the sensor will measure the two distances in the two zones and will detect any presence and track the path to receive the direction.
+
+### ROI Selection
+
+```
+16x16 sensor grid
++--------------+--------------+
+|    ROI0      |     ROI1     |
+|   (entry)    |    (exit)    |
++--------------+--------------+
+```
+
+Since version 1.5.0 the center for each zone can be configured manually, allowing fine tuning for different door widths or installations.
 
 However, the algorithm is very sensitive to the slightest modification of the ROI, regarding both its size and its positioning inside the grid.
 
@@ -352,7 +372,7 @@ lower right.
 
 **Question:** Why is the Sensor not measuring the correct distances?
 
-**Answer:** This can happen in various scenarios. I try to list causes sorted by likelyhood
+**Answer:** This can happen in various scenarios. I try to list causes sorted by likelihood
 
 1. You did not remove the protection film (most times its yellow)
 2. You did not connect the Sensor properly

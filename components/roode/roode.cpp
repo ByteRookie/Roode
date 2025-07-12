@@ -190,7 +190,8 @@ void Roode::path_tracking(Zone *zone) {
   if (zone_state[0] == SOMEONE || zone_state[1] == SOMEONE) {
     if (presence_sensor != nullptr) {
       presence_sensor->publish_state(true);
-      ESP_LOGD(TAG, "Presence detected");
+      ESP_LOGD(TAG, "Presence detected (zone0=%s zone1=%s)", zone_state[0] == SOMEONE ? "SOMEONE" : "NOBODY",
+               zone_state[1] == SOMEONE ? "SOMEONE" : "NOBODY");
     }
   }
 
@@ -232,7 +233,7 @@ void Roode::path_tracking(Zone *zone) {
   if (presence_sensor != nullptr) {
     if (zone_state[0] == NOBODY && zone_state[1] == NOBODY) {
       presence_sensor->publish_state(false);
-      ESP_LOGD(TAG, "Presence cleared");
+      ESP_LOGD(TAG, "Presence cleared (zone0=NOBODY zone1=NOBODY)");
     }
   }
 }

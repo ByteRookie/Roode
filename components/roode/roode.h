@@ -142,3 +142,4 @@ class Roode : public PollingComponent {
 
 }  // namespace roode
 }  // namespace esphome
+

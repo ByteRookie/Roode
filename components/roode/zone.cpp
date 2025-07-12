@@ -138,3 +138,4 @@ uint16_t Zone::getDistance() const { return this->last_distance; }
 uint16_t Zone::getMinDistance() const { return this->min_distance; }
 }  // namespace roode
 }  // namespace esphome
+

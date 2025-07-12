@@ -60,3 +60,4 @@ class Zone {
 };
 }  // namespace roode
 }  // namespace esphome
+

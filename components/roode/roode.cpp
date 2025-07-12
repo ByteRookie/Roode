@@ -284,3 +284,4 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
 }
 }  // namespace roode
 }  // namespace esphome
+

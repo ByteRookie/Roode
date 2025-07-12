@@ -7,6 +7,7 @@ VL53L1X::~VL53L1X() {
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->digital_write(false);
   }
+  this->sensor.StopRanging();
 }
 
 void VL53L1X::dump_config() {
@@ -32,6 +33,10 @@ void VL53L1X::setup() {
     this->xshut_pin.value()->setup();
     this->xshut_pin.value()->digital_write(true);
     delay(2);
+  }
+
+  if (this->interrupt_pin.has_value()) {
+    this->interrupt_pin.value()->setup();
   }
 
   // TODO use xshut_pin, if given, to change address
@@ -189,6 +194,10 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   }
 
   status = this->sensor.StartRanging();
+  if (status != VL53L1_ERROR_NONE) {
+    ESP_LOGE(TAG, "Failed to start ranging, error code: %d", status);
+    return {};
+  }
 
   // Wait for the measurement to be ready
   // TODO use interrupt_pin, if given, to await data ready instead of polling
@@ -284,3 +293,4 @@ void VL53L1X::check_features() {
 
 }  // namespace vl53l1x
 }  // namespace esphome
+

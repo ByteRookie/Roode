@@ -49,7 +49,10 @@ class Zone {
   ROI *roi = new ROI();
   ROI *roi_override = new ROI();
   Threshold *threshold = new Threshold();
-  void set_max_samples(uint8_t max) { max_samples = max; };
+  void set_max_samples(uint8_t max) {
+    max_samples = max;
+    samples.reserve(max);
+  };
   void set_filter_mode(FilterMode mode) { filter_mode = mode; };
   void init_pref(uint32_t base_key);
   bool load_calibration(TofSensor *distanceSensor);

@@ -21,9 +21,9 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
   }
 
   last_distance = result.value();
-  samples.insert(samples.begin(), result.value());
+  samples.push_back(result.value());
   if (samples.size() > max_samples) {
-    samples.pop_back();
+    samples.erase(samples.begin());
   }
   if (filter_mode == FilterMode::MEDIAN) {
     auto tmp = samples;

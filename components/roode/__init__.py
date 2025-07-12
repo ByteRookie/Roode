@@ -29,7 +29,7 @@ CONF_MAX = "max"
 CONF_MIN = "min"
 CONF_ROI = "roi"
 CONF_FILTER_MODE = "filter_mode"
-CONF_FILTER_WINDOW = "filter_window"
+CONF_SAMPLING = "sampling"
 CONF_CALIBRATION_PERSISTENCE = "calibration_persistence"
 CONF_ZONES = "zones"
 
@@ -74,7 +74,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.declare_id(Roode),
         cv.GenerateID(CONF_SENSOR): cv.use_id(VL53L1X),
         cv.Optional(CONF_ORIENTATION, default="parallel"): cv.enum(ORIENTATION_VALUES),
-        cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
+        cv.Optional(CONF_SAMPLING, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_FILTER_MODE, default="median"): cv.one_of("median", "min"),
         cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=False): cv.boolean,
         cv.Optional(CONF_ROI, default={}): ROI_SCHEMA,
@@ -98,7 +98,7 @@ async def to_code(config: Dict):
     cg.add(roode.set_tof_sensor(sens))
 
     cg.add(roode.set_orientation(config[CONF_ORIENTATION]))
-    cg.add(roode.set_sampling_size(config[CONF_FILTER_WINDOW]))
+    cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
     mode = (
         "roode::FilterMode::MEDIAN"
         if config[CONF_FILTER_MODE] == "median"

@@ -17,7 +17,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - State machine tracking with timeout resets
 - Fixed filter mode enum to resolve compile issues
 - Improved memory cleanup for zones
-- Faster queue handling and smaller default filter window for responsive detection
+- Faster queue handling and smaller default sampling window for responsive detection
 
 ### Phase 1 Reliability Features
 
@@ -142,8 +142,8 @@ vl53l1x:
 
 # Roode people counting algorithm
 roode:
-  # Number of samples to use for filtering raw distance readings
-  filter_window: 5
+  # Number of samples to use for filtering raw distance readings (default: 5)
+  sampling: 5
   # Filtering mode, use 'median' for median filter or 'min' for minimum filter
   filter_mode: median
   # Save calibration data to flash so it persists across reboots

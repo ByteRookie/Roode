@@ -16,6 +16,6 @@ sensor:
     cpu_usage:
       name: Roode cpu usage
     ram_free:
-      name: Roode free ram
+      name: Roode RAM usage
     flash_free:
-      name: Roode free flash
+      name: Roode flash usage

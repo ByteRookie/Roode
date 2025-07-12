@@ -69,10 +69,24 @@ void Roode::loop() {
       if (cpu_usage_sensor != nullptr)
         cpu_usage_sensor->publish_state(cpu);
     }
-    if (ram_free_sensor != nullptr)
-      ram_free_sensor->publish_state(ESP.getFreeHeap());
-    if (flash_free_sensor != nullptr)
-      flash_free_sensor->publish_state(ESP.getFreeSketchSpace());
+    if (ram_free_sensor != nullptr) {
+      uint32_t total_heap = ESP.getHeapSize();
+      float used_percent = 0;
+      if (total_heap > 0) {
+        uint32_t used = total_heap - ESP.getFreeHeap();
+        used_percent = ((float) used / (float) total_heap) * 100.0f;
+      }
+      ram_free_sensor->publish_state(used_percent);
+    }
+    if (flash_free_sensor != nullptr) {
+      uint32_t total_flash = ESP.getFlashChipSize();
+      float used_percent = 0;
+      if (total_flash > 0) {
+        uint32_t used = total_flash - ESP.getFreeSketchSpace();
+        used_percent = ((float) used / (float) total_flash) * 100.0f;
+      }
+      flash_free_sensor->publish_state(used_percent);
+    }
     loop_time_sum_ = 0;
     loop_count_ = 0;
     loop_window_start_ = now;
@@ -309,4 +323,3 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
 }
 }  // namespace roode
 }  // namespace esphome
-

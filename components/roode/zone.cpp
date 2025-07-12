@@ -1,4 +1,5 @@
 #include "zone.h"
+#include <algorithm>
 
 namespace esphome {
 namespace roode {
@@ -26,11 +27,35 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
   }
 
   last_distance = result.value();
-  samples.push_back(result.value());
-  if (samples.size() > max_samples) {
-    samples.pop_front();
-  };
-  min_distance = *std::min_element(samples.begin(), samples.end());
+  if (sensor_status != VL53L1_ERROR_NONE || result.value() == 0 || result.value() > 4000) {
+    return sensor_status;
+  }
+
+  samples[sample_idx_] = result.value();
+  sample_idx_ = (sample_idx_ + 1) % max_samples;
+  if (sample_count_ < max_samples)
+    sample_count_++;
+
+  std::array<uint16_t, MAX_BUFFER_SIZE> tmp;
+  std::copy_n(samples.begin(), sample_count_, tmp.begin());
+  std::sort(tmp.begin(), tmp.begin() + sample_count_);
+
+  switch (filter_mode_) {
+    case FILTER_MEDIAN:
+      min_distance = tmp[sample_count_ / 2];
+      break;
+    case FILTER_PERCENTILE10: {
+      uint8_t idx = (sample_count_ * 10) / 100;
+      if (idx >= sample_count_)
+        idx = sample_count_ - 1;
+      min_distance = tmp[idx];
+      break;
+    }
+    case FILTER_MIN:
+    default:
+      min_distance = tmp[0];
+      break;
+  }
 
   return sensor_status;
 }
@@ -65,15 +90,12 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
     threshold->idle = 0;
     ESP_LOGW(CALIBRATION, "Calibration failed: no valid distances recorded");
   } else {
-    threshold->idle = this->getOptimizedValues(zone_distances, sum);
+    int avg = sum / zone_distances.size();
+    threshold->idle = avg;
+    threshold->max = avg * 0.80;
+    threshold->min = avg * 0.15;
   }
 
-  if (threshold->max_percentage.has_value()) {
-    threshold->max = (threshold->idle * threshold->max_percentage.value()) / 100;
-  }
-  if (threshold->min_percentage.has_value()) {
-    threshold->min = (threshold->idle * threshold->min_percentage.value()) / 100;
-  }
   ESP_LOGI(CALIBRATION, "Calibrated threshold for zone. zoneId: %d, idle: %d, min: %d (%d%%), max: %d (%d%%)", id,
            threshold->idle, threshold->min,
            threshold->min_percentage.value_or((threshold->min * 100) / threshold->idle), threshold->max,

@@ -8,6 +8,7 @@
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
 #include "../vl53l1x/vl53l1x.h"
+#include "esphome/core/preferences.h"
 #include "orientation.h"
 #include "zone.h"
 
@@ -22,6 +23,7 @@ namespace roode {
 static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
+
 
 /*
 Use the VL53L1X_SetTimingBudget function to set the TB in milliseconds. The TB
@@ -102,7 +104,20 @@ class Roode : public PollingComponent {
   void set_entry_exit_event_text_sensor(text_sensor::TextSensor *entry_exit_event_sensor_) {
     entry_exit_event_sensor = entry_exit_event_sensor_;
   }
+  void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
+  void set_filter_mode(FilterMode mode) {
+    filter_mode_ = mode;
+    entry->set_filter_mode(mode);
+    exit->set_filter_mode(mode);
+  }
+  void set_filter_window(uint8_t window) {
+    filter_window_ = window;
+    entry->set_filter_window(window);
+    exit->set_filter_window(window);
+  }
+  void run_zone_calibration(uint8_t zone_id);
   void recalibration();
+  void apply_cpu_optimizations(float cpu);
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
 
@@ -129,6 +144,30 @@ class Roode : public PollingComponent {
   text_sensor::TextSensor *version_sensor{nullptr};
   text_sensor::TextSensor *entry_exit_event_sensor{nullptr};
 
+  struct CalibrationPrefs {
+    uint16_t baseline_mm;
+    uint16_t threshold_min_mm;
+    uint16_t threshold_max_mm;
+    uint32_t last_calibrated_ts;
+  };
+  CalibrationPrefs calibration_data_[2];
+  ESPPreferenceObject calibration_prefs_[2];
+  bool calibration_persistence_{false};
+  bool fail_safe_triggered_{false};
+
+  FilterMode filter_mode_{FILTER_MIN};
+  uint8_t filter_window_{5};
+
+  bool cpu_optimizations_active_{false};
+  uint16_t polling_interval_ms_{10};
+
+  enum FSMState { STATE_IDLE, STATE_ENTRY_ACTIVE, STATE_BOTH_ACTIVE };
+  FSMState state_{STATE_IDLE};
+  uint32_t state_started_ts{0};
+
+  unsigned long last_valid_crossing_ts_{0};
+  unsigned long zone_triggered_start_[2]{0, 0};
+
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
   void path_tracking(Zone *zone);
@@ -149,6 +188,8 @@ class Roode : public PollingComponent {
   uint32_t loop_window_start_{0};
   uint64_t loop_time_sum_{0};
   uint32_t loop_count_{0};
+  static void sensor_task(void *param);
+  bool use_sensor_task_{false};
 };
 
 }  // namespace roode

@@ -188,8 +188,10 @@ void Roode::path_tracking(Zone *zone) {
   }
 
   if (zone_state[0] == SOMEONE || zone_state[1] == SOMEONE) {
-    if (presence_sensor != nullptr)
+    if (presence_sensor != nullptr) {
       presence_sensor->publish_state(true);
+      ESP_LOGD(TAG, "Presence detected");
+    }
   }
 
   if (state_changed) {
@@ -209,14 +211,18 @@ void Roode::path_tracking(Zone *zone) {
           ESP_LOGI("Roode pathTracking", "Exit detected. entry=%d exit=%d", entry->getMinDistance(),
                    exit->getMinDistance());
           this->updateCounter(-1);
-          if (entry_exit_event_sensor != nullptr)
+          if (entry_exit_event_sensor != nullptr) {
             entry_exit_event_sensor->publish_state("Exit");
+            ESP_LOGD(TAG, "Event published: Exit");
+          }
         } else if ((PathTrack[1] == 2) && (PathTrack[2] == 3) && (PathTrack[3] == 1)) {
           ESP_LOGI("Roode pathTracking", "Entry detected. entry=%d exit=%d", entry->getMinDistance(),
                    exit->getMinDistance());
           this->updateCounter(1);
-          if (entry_exit_event_sensor != nullptr)
+          if (entry_exit_event_sensor != nullptr) {
             entry_exit_event_sensor->publish_state("Entry");
+            ESP_LOGD(TAG, "Event published: Entry");
+          }
         }
       }
       PathTrackFillingSize = 1;
@@ -224,8 +230,10 @@ void Roode::path_tracking(Zone *zone) {
   }
 
   if (presence_sensor != nullptr) {
-    if (zone_state[0] == NOBODY && zone_state[1] == NOBODY)
+    if (zone_state[0] == NOBODY && zone_state[1] == NOBODY) {
       presence_sensor->publish_state(false);
+      ESP_LOGD(TAG, "Presence cleared");
+    }
   }
 }
 void Roode::updateCounter(int delta) {

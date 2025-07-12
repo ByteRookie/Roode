@@ -9,11 +9,6 @@
 
 ---
 
-![RooDe Entry/Exit Flow](images/roode-entry-exit-flow.png)  
-*Above: People entering and exiting a doorway tracked by the RooDe sensor.*
-
----
-
 ## 📚 Table of Contents
 - [📌 What is RooDe?](#-what-is-roode)
 - [🚀 Quick Start](#-quick-start)
@@ -32,13 +27,7 @@
 
 ## 📌 What is RooDe?
 
-**RooDe** is a smart people counter built with ESPHome and the VL53L1X time-of-flight sensor. It tracks when people enter or exit a room based on movement patterns through vertical detection zones.
-
-**Use cases**:
-- Room occupancy automation  
-- Energy-saving HVAC control  
-- Crowd flow monitoring  
-- General-purpose foot traffic analytics  
+**RooDe** is a smart people counter built with ESPHome and the VL53L1X time-of-flight sensor. It tracks when people enter or exit a room by detecting motion across vertical zones created by programmable Regions of Interest (ROIs).
 
 ---
 
@@ -52,112 +41,105 @@ vl53l1x:
 roode:
 ```
 
-> ✅ ESP32 and ESP8266 compatible  
-> ✅ Works with MQTT + ESPHome  
-> ✅ YAML examples included
-
 ---
 
 ## 🔧 Features Overview
 
 | Feature                          | Description |
 |----------------------------------|-------------|
-| Directional People Counting      | Distinguishes entry and exit through a defined zone |
-| Multi-Zone ROI Tracking          | Configurable vertical grid zones to track motion paths |
-| Automatic Sensor Recovery        | Detects and restarts hung sensors using `xshut` |
-| Boot-Time Self-Test              | Verifies pin connections and disables unstable features |
-| Persistent Storage               | Maintains count values through device reboots |
-| Interrupt Pin Support            | Reduces CPU usage by waiting for data-ready signal |
-| Visual Debug Grid (Agraerthiom)  | Helps you align and visualize ROI zone positions |
-| Built-in Diagnostics             | Exposes sensors for live debugging in Home Assistant |
-| Low False Positive Rate          | Protection logic filters invalid movement patterns |
-| Async-safe Memory Usage          | Frees memory and gracefully shuts down unused processes |
+| Directional People Counting      | Tracks movement direction (entry vs exit) |
+| Custom ROI Grid                  | Flexible vertical ROI layout |
+| Auto Sensor Recovery             | Uses `xshut` to restart sensor on failure |
+| Interrupt Pin Support            | Uses hardware pin to reduce polling overhead |
+| Boot-Time Safety Checks          | Disables features if pins are missing or unresponsive |
+| Persistence                      | Entry/Exit/Occupancy values survive reboot |
+| Zone Visualization (Agraerthiom)| Diagnostic visual representation of zone layout |
+| Internal Filters                 | Timeout, delay, and distance filtering for accuracy |
 
 ---
 
 ## 🛠️ Hardware Setup
 
-| Component      | Recommended Part                                |
-|----------------|--------------------------------------------------|
-| Sensor         | VL53L1X (Pololu, Adafruit, etc.)                 |
-| Microcontroller | ESP32 (preferred) or ESP8266 (limited support) |
-| Optional       | 3D enclosure (`STL/` folder) for alignment/stability |
+### Recommended Pins for ESP32
 
-### Basic Wiring (ESP32)
-
-| Sensor Pin | ESP32 GPIO | Purpose       |
-|------------|------------|---------------|
-| SDA        | 21         | I²C Data      |
-| SCL        | 22         | I²C Clock     |
-| XSHUT      | 5          | Shutdown control (required) |
-| INTERRUPT  | 4          | Data ready (optional but recommended) |
+| VL53L1X Pin | ESP32 GPIO | Purpose           |
+|-------------|------------|-------------------|
+| SDA         | 21         | I²C Data          |
+| SCL         | 22         | I²C Clock         |
+| XSHUT       | 5          | Sensor reset pin  |
+| INTERRUPT   | 4          | Data-ready signal |
 
 ---
 
 ## 🧬 ROI Zones
 
-![ROI Zones Explained](images/roode-roi-grid.png)  
-*Above: RooDe’s sensor splits a doorway into top and bottom detection zones.*
+### Understanding ROI
+
+The VL53L1X sensor has a 16x16 internal SPAD grid. With RooDe, this grid is divided into vertical rectangular ROIs (Regions of Interest). Each ROI is defined using a coordinate pair: `[x_min, y_min, x_max, y_max]`.
+
+Typical usage splits the sensor vertically like this:
 
 ```yaml
 roode:
   zones:
-    - roi: [8, 0, 15, 15]  # Top half of doorway
+    - roi: [8, 0, 15, 15]  # Right/top side
       name: top_zone
-    - roi: [0, 0, 7, 15]   # Bottom half
+    - roi: [0, 0, 7, 15]   # Left/bottom side
       name: bottom_zone
 ```
 
-```
-+----------------+
-| top_zone       |
-|                |
-|----------------|
-| bottom_zone    |
-+----------------+
-```
+This configuration allows RooDe to detect the order of movement through the zones—critical for determining whether someone is entering or exiting.
 
 ---
 
-## 📈 Detection Algorithm – How It Works
+## 📈 Detection Algorithm
 
-![RooDe Detection Flow](images/roode-algorithm-flow.png)  
-*Above: RooDe determines direction by tracking movement across zones.*
+### Logic Summary
 
-### Entry:
-1. Person triggers `top_zone`
-2. Then triggers `bottom_zone` (within time window)
-3. → Count increases (+1)
+RooDe uses a state machine to analyze movement patterns between zones. The sequence of zone activations is monitored in real time.
 
-### Exit:
-1. Person triggers `bottom_zone`
-2. Then triggers `top_zone`
-3. → Count decreases (−1)
+- **Entry Detected**:  
+  - First, `top_zone` is triggered (person enters field)
+  - Then `bottom_zone` is triggered (they pass fully through)
+  - → Result: `entry_count` increases
+
+- **Exit Detected**:  
+  - First, `bottom_zone` is triggered
+  - Then `top_zone` is triggered
+  - → Result: `exit_count` increases
+
+### Agraerthiom System
+
+Agraerthiom is RooDe’s internal representation of sensor state across zones. It records real-time distance changes and flags transitions, supporting:
+
+- Instant detection of movement direction
+- Optional debug visualization of distance values
+- Time-limited transitions to reduce false positives
 
 ---
 
 ## 🛡️ Protection & Filtering Logic
 
-| Safeguard Type        | Description |
-|-----------------------|-------------|
-| Timeout Guard         | Rejects incomplete crossings |
-| Movement Delay        | Prevents double-counting during slow passage |
-| Distance Thresholds   | Ignores false reflections or pets |
-| Startup Failsafe      | Disables xshut/interrupt if pin test fails |
-| Cooldown Window       | Buffer time between valid transitions |
+| Method               | Purpose                                  |
+|----------------------|------------------------------------------|
+| Timeout Guard        | Ignores transitions that take too long   |
+| Cooldown Delay       | Prevents immediate repeated triggers     |
+| Distance Threshold   | Ignores invalid distance values          |
+| Boot Diagnostics     | Disables features if pin test fails      |
+| Memory Cleanup       | Frees resources from invalid states      |
 
 ---
 
 ## 🧪 Debug & Diagnostics
 
-| Entity                        | Description |
-|-------------------------------|-------------|
-| `sensor.roode_entry_count`    | People entered |
-| `sensor.roode_exit_count`     | People exited |
-| `sensor.roode_occupancy`      | Net count |
-| `sensor.roode_zone_top`       | Distance for top ROI |
-| `sensor.roode_zone_bottom`    | Distance for bottom ROI |
-| `text_sensor.roode_status`    | Current detection status |
+| Entity                         | Description                   |
+|--------------------------------|-------------------------------|
+| `sensor.roode_entry_count`     | People entered                |
+| `sensor.roode_exit_count`      | People exited                 |
+| `sensor.roode_occupancy`       | Entry − Exit count            |
+| `sensor.roode_zone_top`        | Measured mm in top zone       |
+| `sensor.roode_zone_bottom`     | Measured mm in bottom zone    |
+| `text_sensor.roode_status`     | Internal algorithm state      |
 
 ---
 
@@ -171,24 +153,21 @@ roode:
 
 ## ❓ FAQ
 
-**Q: What happens if the xshut or interrupt pin isn't connected properly?**  
-A: RooDe automatically disables features relying on that pin and logs a warning so the sensor can still function.
+**Q: What if my wiring is incorrect?**  
+A: RooDe performs a boot-time check and disables features like `xshut` or `interrupt` automatically if miswired.
 
-**Q: Can I use it without the interrupt pin?**  
-A: Yes, but using interrupts reduces CPU usage by avoiding constant polling.
+**Q: Can I use RooDe with only one zone?**  
+A: Technically yes, but it will not be able to detect direction—only motion.
 
-**Q: I’m getting unexpected counts. What should I check?**  
-A: Increase the ROI threshold or adjust the transition timing. Also verify that your zones are correctly aligned with the physical doorway.
-
-**Q: Is this accurate for fast movements or groups?**  
-A: It works best for one person at a time. Rapid or overlapping movement may cause miscounts without tuning.
+**Q: Why is occupancy sometimes negative?**  
+A: If exit is detected without a corresponding entry (e.g., false trigger), the net count may go below zero.
 
 ---
 
 ## 💬 Support
 
-Need help or want to contribute?  
-👉 [Join our Discord](https://discord.gg/hU9SvSXMHs)
+Get help or contribute:  
+🗨️ [Join Discord](https://discord.gg/hU9SvSXMHs)
 
 ---
 

@@ -28,10 +28,13 @@ CONF_CENTER = "center"
 CONF_MAX = "max"
 CONF_MIN = "min"
 CONF_ROI = "roi"
-CONF_SAMPLING = "sampling"
+CONF_FILTER_MODE = "filter_mode"
+CONF_FILTER_WINDOW = "filter_window"
+CONF_CALIBRATION_PERSISTENCE = "calibration_persistence"
 CONF_ZONES = "zones"
 
 Orientation = roode_ns.enum("Orientation")
+FilterMode = roode_ns.enum("FilterMode")
 ORIENTATION_VALUES = {
     "parallel": Orientation.Parallel,
     "perpendicular": Orientation.Perpendicular,
@@ -71,7 +74,9 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.declare_id(Roode),
         cv.GenerateID(CONF_SENSOR): cv.use_id(VL53L1X),
         cv.Optional(CONF_ORIENTATION, default="parallel"): cv.enum(ORIENTATION_VALUES),
-        cv.Optional(CONF_SAMPLING, default=2): cv.All(cv.uint8_t, cv.Range(min=1)),
+        cv.Optional(CONF_FILTER_WINDOW, default=10): cv.All(cv.uint8_t, cv.Range(min=1)),
+        cv.Optional(CONF_FILTER_MODE, default="median"): cv.one_of("median", "min"),
+        cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=False): cv.boolean,
         cv.Optional(CONF_ROI, default={}): ROI_SCHEMA,
         cv.Optional(CONF_DETECTION_THRESHOLDS, default={}): THRESHOLDS_SCHEMA,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
@@ -93,7 +98,9 @@ async def to_code(config: Dict):
     cg.add(roode.set_tof_sensor(sens))
 
     cg.add(roode.set_orientation(config[CONF_ORIENTATION]))
-    cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
+    cg.add(roode.set_sampling_size(config[CONF_FILTER_WINDOW]))
+    cg.add(roode.set_filter_mode(config[CONF_FILTER_MODE] == "median" and roode_ns.FilterMode.MEDIAN or roode_ns.FilterMode.MINIMUM))
+    cg.add(roode.set_calibration_persistence(config[CONF_CALIBRATION_PERSISTENCE]))
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)

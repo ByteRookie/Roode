@@ -27,9 +27,16 @@ struct Threshold {
   void set_max_percentage(uint8_t max) { this->max_percentage = max; }
 };
 
+enum class FilterMode { MINIMUM, MEDIAN };
+
 class Zone {
  public:
   explicit Zone(uint8_t id) : id{id} {};
+  ~Zone() {
+    delete roi;
+    delete roi_override;
+    delete threshold;
+  }
   void dump_config() const;
   VL53L1_Error readDistance(TofSensor *distanceSensor);
   void reset_roi(uint8_t default_center);
@@ -42,6 +49,13 @@ class Zone {
   ROI *roi_override = new ROI();
   Threshold *threshold = new Threshold();
   void set_max_samples(uint8_t max) { max_samples = max; };
+  void set_filter_mode(FilterMode mode) { filter_mode = mode; };
+  void init_pref(uint32_t base_key);
+  bool load_calibration(TofSensor *distanceSensor);
+  void save_calibration();
+  void run_zone_calibration(TofSensor *distanceSensor, Orientation orientation);
+  uint32_t last_triggered_ts{0};
+  uint32_t last_calibrated_ts{0};
 
  protected:
   int getOptimizedValues(int *values, int sum, int size);
@@ -51,6 +65,14 @@ class Zone {
   uint16_t min_distance;
   std::vector<uint16_t> samples;
   uint8_t max_samples;
+  FilterMode filter_mode{FilterMode::MINIMUM};
+  ESPPreferenceObject pref_;
+  struct CalibrationData {
+    uint16_t baseline_mm;
+    uint16_t threshold_min_mm;
+    uint16_t threshold_max_mm;
+    uint32_t last_calibrated_ts;
+  };
 };
 }  // namespace roode
 }  // namespace esphome

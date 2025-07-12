@@ -8,6 +8,14 @@
 
 People counter working with any smart home system which supports ESPHome/MQTT like Home Assistant. All necessary entities are created automatically.
 
+### What's new in 1.5.1
+
+- Optional persistent zone calibration storage
+- Dual core sensor task for smoother measurements
+- Median filtering with configurable window size
+- Automatic fail-safe recalibration when zones get stuck
+- State machine tracking with timeout resets
+
 - [Hardware Recommendation](#hardware-recommendation)
 - [Wiring](#wiring)
   - [ESP32](#esp32)
@@ -119,8 +127,12 @@ vl53l1x:
 
 # Roode people counting algorithm
 roode:
-  # Smooth out measurements by using the minimum distance from this number of readings
-  sampling: 2
+  # Number of samples to use for filtering raw distance readings
+  filter_window: 10
+  # Filtering mode, use 'median' for median filter or 'min' for minimum filter
+  filter_mode: median
+  # Save calibration data to flash so it persists across reboots
+  calibration_persistence: true
 
   # The orientation of the two sensor pads in relation to the entryway being tracked.
   # The advised orientation is parallel, but if needed this can be changed to perpendicular.

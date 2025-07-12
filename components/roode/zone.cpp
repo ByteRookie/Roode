@@ -23,10 +23,67 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
   samples.insert(samples.begin(), result.value());
   if (samples.size() > max_samples) {
     samples.pop_back();
-  };
-  min_distance = *std::min_element(samples.begin(), samples.end());
+  }
+  if (filter_mode == FilterMode::MEDIAN) {
+    auto tmp = samples;
+    std::nth_element(tmp.begin(), tmp.begin() + tmp.size() / 2, tmp.end());
+    min_distance = tmp[tmp.size() / 2];
+  } else {
+    min_distance = *std::min_element(samples.begin(), samples.end());
+  }
 
   return sensor_status;
+}
+
+void Zone::init_pref(uint32_t base_key) {
+  this->pref_ = global_preferences->make_preference<CalibrationData>(base_key);
+}
+
+bool Zone::load_calibration(TofSensor *distanceSensor) {
+  CalibrationData data{};
+  if (!this->pref_.load(&data)) {
+    return false;
+  }
+  int sum = 0;
+  for (int i = 0; i < 5; i++) {
+    this->readDistance(distanceSensor);
+    sum += this->getDistance();
+  }
+  uint16_t avg = sum / 5;
+  if (abs((int) avg - data.baseline_mm) > data.baseline_mm * 0.1) {
+    ESP_LOGW(TAG, "Stored calibration invalid for zone %d", id);
+    return false;
+  }
+  threshold->idle = data.baseline_mm;
+  threshold->min = data.threshold_min_mm;
+  threshold->max = data.threshold_max_mm;
+  last_calibrated_ts = data.last_calibrated_ts;
+  ESP_LOGI(TAG, "Loaded calibration for zone %d", id);
+  return true;
+}
+
+void Zone::save_calibration() {
+  CalibrationData data{threshold->idle, threshold->min, threshold->max, (uint32_t) millis()};
+  this->pref_.save(&data);
+  last_calibrated_ts = data.last_calibrated_ts;
+}
+
+void Zone::run_zone_calibration(TofSensor *distanceSensor, Orientation orientation) {
+  reset_roi(orientation == Parallel ? (id == 0U ? 167 : 231) : (id == 0U ? 195 : 60));
+  std::vector<uint16_t> vals;
+  for (int i = 0; i < 50; i++) {
+    this->readDistance(distanceSensor);
+    vals.push_back(this->getDistance());
+  }
+  uint32_t sum = 0;
+  for (auto v : vals)
+    sum += v;
+  uint16_t average = sum / vals.size();
+  threshold->idle = average;
+  threshold->max = average * 0.8;
+  threshold->min = average * 0.15;
+  last_calibrated_ts = millis();
+  ESP_LOGI(CALIBRATION, "Fail-safe calibration zone %d avg %d", id, average);
 }
 
 /**
@@ -43,14 +100,14 @@ void Zone::reset_roi(uint8_t default_center) {
 
 void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   ESP_LOGD(CALIBRATION, "Beginning. zoneId: %d", id);
-  int *zone_distances = new int[number_attempts];
+  std::vector<int> zone_distances(number_attempts);
   int sum = 0;
   for (int i = 0; i < number_attempts; i++) {
     this->readDistance(distanceSensor);
     zone_distances[i] = this->getDistance();
     sum += zone_distances[i];
-  };
-  threshold->idle = this->getOptimizedValues(zone_distances, sum, number_attempts);
+  }
+  threshold->idle = this->getOptimizedValues(zone_distances.data(), sum, number_attempts);
 
   if (threshold->max_percentage.has_value()) {
     threshold->max = (threshold->idle * threshold->max_percentage.value()) / 100;

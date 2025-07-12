@@ -1,9 +1,13 @@
 # Changelog
 
 ## 1.5.1
-
-
-
+### Added
+- Median or minimum filtering with configurable window size
+- Optional persistent storage for zone calibration
+- Dual core sensor task with queue messaging
+- Fail-safe recalibration when zones stay active too long
+- State machine with timeout resets to avoid stuck counts
+- Memory leak fixes and general cleanup
 ## 1.5.0
 
 - Manual ROI configuration fixed

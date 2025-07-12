@@ -8,6 +8,9 @@
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
 #include "../vl53l1x/vl53l1x.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
 #include "orientation.h"
 #include "zone.h"
 
@@ -52,12 +55,15 @@ static int time_budget_in_ms_medium_long = 50;
 static int time_budget_in_ms_long = 100;
 static int time_budget_in_ms_max = 200;  // max range: 4m
 
+enum class FSMState { IDLE, ENTRY_STARTED, BOTH_ACTIVE };
+
 class Roode : public PollingComponent {
  public:
   void setup() override;
   void update() override;
   void loop() override;
   void dump_config() override;
+  ~Roode() override;
   /** Roode uses data from sensors */
   float get_setup_priority() const override { return setup_priority::PROCESSOR; };
 
@@ -70,6 +76,12 @@ class Roode : public PollingComponent {
     entry->set_max_samples(size);
     exit->set_max_samples(size);
   }
+  void set_filter_mode(FilterMode mode) {
+    filter_mode_ = mode;
+    entry->set_filter_mode(mode);
+    exit->set_filter_mode(mode);
+  }
+  void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
   void set_distance_entry(sensor::Sensor *distance_entry_) { distance_entry = distance_entry_; }
   void set_distance_exit(sensor::Sensor *distance_exit_) { distance_exit = distance_exit_; }
   void set_people_counter(number::Number *counter) { this->people_counter = counter; }
@@ -101,6 +113,10 @@ class Roode : public PollingComponent {
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
 
+  struct ZoneMsg {
+    Zone *zone;
+  };
+
  protected:
   TofSensor *distanceSensor;
   Zone *current_zone = entry;
@@ -122,16 +138,27 @@ class Roode : public PollingComponent {
 
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
-  void path_tracking(Zone *zone);
+  void path_tracking();
   bool handle_sensor_status();
   void calibrateDistance();
   void calibrate_zones();
   const RangingMode *determine_raning_mode(uint16_t average_entry_zone_distance, uint16_t average_exit_zone_distance);
   void publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax);
   void updateCounter(int delta);
+  void check_fail_safe(Zone *zone);
+  static void sensor_task(void *param);
+  QueueHandle_t zone_queue_{nullptr};
+  TaskHandle_t sensor_task_handle_{nullptr};
+  FSMState fsm_state_{FSMState::IDLE};
+  Zone *fsm_start_zone_{nullptr};
+  uint32_t fsm_state_ts_{0};
   Orientation orientation_{Parallel};
-  uint8_t samples{2};
+  uint8_t samples{10};
+  FilterMode filter_mode_{FilterMode::MEDIAN};
   bool invert_direction_{false};
+  bool calibration_persistence_{false};
+  uint32_t last_person_ts{0};
+  bool fail_safe_triggered{false};
   int number_attempts = 20;  // TO DO: make this configurable
   int short_distance_threshold = 1300;
   int medium_distance_threshold = 2000;

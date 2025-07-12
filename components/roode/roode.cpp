@@ -10,6 +10,17 @@ void Roode::dump_config() {
   exit->dump_config();
 }
 
+Roode::~Roode() {
+  if (sensor_task_handle_ != nullptr) {
+    vTaskDelete(sensor_task_handle_);
+  }
+  if (zone_queue_ != nullptr) {
+    vQueueDelete(zone_queue_);
+  }
+  delete entry;
+  delete exit;
+}
+
 void Roode::setup() {
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
   if (version_sensor != nullptr) {
@@ -23,7 +34,25 @@ void Roode::setup() {
     return;
   }
 
-  calibrate_zones();
+  entry->init_pref(0xA0);
+  exit->init_pref(0xA1);
+
+  zone_queue_ = xQueueCreate(2, sizeof(ZoneMsg));
+  xTaskCreatePinnedToCore(Roode::sensor_task, "SensorTask", 4096, this, 1, &sensor_task_handle_, 1);
+
+  bool loaded = false;
+  if (calibration_persistence_) {
+    loaded = entry->load_calibration(distanceSensor) && exit->load_calibration(distanceSensor);
+  }
+  if (!loaded) {
+    calibrate_zones();
+    if (calibration_persistence_) {
+      entry->save_calibration();
+      exit->save_calibration();
+    }
+  } else {
+    ESP_LOGI(SETUP, "Loaded calibration from storage");
+  }
 }
 
 void Roode::update() {
@@ -36,17 +65,12 @@ void Roode::update() {
 }
 
 void Roode::loop() {
-  // unsigned long start = micros();
-  this->current_zone->readDistance(distanceSensor);
-  // uint16_t samplingDistance = sampling(this->current_zone);
-  path_tracking(this->current_zone);
-  handle_sensor_status();
-  this->current_zone = this->current_zone == this->entry ? this->exit : this->entry;
-  // ESP_LOGI("Experimental", "Entry zone: %d, exit zone: %d",
-  // entry->getDistance(Roode::distanceSensor, Roode::sensor_status),
-  // exit->getDistance(Roode::distanceSensor, Roode::sensor_status)); unsigned
-  // long end = micros(); unsigned long delta = end - start; ESP_LOGI("Roode
-  // loop", "loop took %lu microseconds", delta);
+  ZoneMsg msg;
+  if (xQueueReceive(zone_queue_, &msg, pdMS_TO_TICKS(50)) == pdTRUE) {
+    path_tracking();
+    handle_sensor_status();
+    check_fail_safe(msg.zone);
+  }
 }
 
 bool Roode::handle_sensor_status() {
@@ -68,113 +92,52 @@ bool Roode::handle_sensor_status() {
   return check_status;
 }
 
-void Roode::path_tracking(Zone *zone) {
-  static int PathTrack[] = {0, 0, 0, 0};
-  static int PathTrackFillingSize = 1;  // init this to 1 as we start from state
-                                        // where nobody is any of the zones
-  static int LeftPreviousStatus = NOBODY;
-  static int RightPreviousStatus = NOBODY;
-  int CurrentZoneStatus = NOBODY;
-  int AllZonesCurrentStatus = 0;
-  int AnEventHasOccured = 0;
+void Roode::path_tracking() {
+  bool entry_active =
+      entry->getMinDistance() < entry->threshold->max && entry->getMinDistance() > entry->threshold->min;
+  bool exit_active = exit->getMinDistance() < exit->threshold->max && exit->getMinDistance() > exit->threshold->min;
 
-  // PathTrack algorithm
-  if (zone->getMinDistance() < zone->threshold->max && zone->getMinDistance() > zone->threshold->min) {
-    // Someone is in the sensing area
-    CurrentZoneStatus = SOMEONE;
-    if (presence_sensor != nullptr) {
-      presence_sensor->publish_state(true);
-    }
-  }
-
-  // left zone
-  if (zone == (this->invert_direction_ ? this->exit : this->entry)) {
-    if (CurrentZoneStatus != LeftPreviousStatus) {
-      // event in left zone has occured
-      AnEventHasOccured = 1;
-
-      if (CurrentZoneStatus == SOMEONE) {
-        AllZonesCurrentStatus += 1;
-      }
-      // need to check right zone as well ...
-      if (RightPreviousStatus == SOMEONE) {
-        // event in right zone has occured
-        AllZonesCurrentStatus += 2;
-      }
-      // remember for next time
-      LeftPreviousStatus = CurrentZoneStatus;
-    }
-  }
-  // right zone
-  else {
-    if (CurrentZoneStatus != RightPreviousStatus) {
-      // event in right zone has occured
-      AnEventHasOccured = 1;
-      if (CurrentZoneStatus == SOMEONE) {
-        AllZonesCurrentStatus += 2;
-      }
-      // need to check left zone as well ...
-      if (LeftPreviousStatus == SOMEONE) {
-        // event in left zone has occured
-        AllZonesCurrentStatus += 1;
-      }
-      // remember for next time
-      RightPreviousStatus = CurrentZoneStatus;
-    }
-  }
-
-  // if an event has occured
-  if (AnEventHasOccured) {
-    ESP_LOGD(TAG, "Event has occured, AllZonesCurrentStatus: %d", AllZonesCurrentStatus);
-    if (PathTrackFillingSize < 4) {
-      PathTrackFillingSize++;
-    }
-
-    // if nobody anywhere lets check if an exit or entry has happened
-    if ((LeftPreviousStatus == NOBODY) && (RightPreviousStatus == NOBODY)) {
-      ESP_LOGD(TAG, "Nobody anywhere, AllZonesCurrentStatus: %d", AllZonesCurrentStatus);
-      // check exit or entry only if PathTrackFillingSize is 4 (for example 0 1
-      // 3 2) and last event is 0 (nobobdy anywhere)
-      if (PathTrackFillingSize == 4) {
-        // check exit or entry. no need to check PathTrack[0] == 0 , it is
-        // always the case
-
-        if ((PathTrack[1] == 1) && (PathTrack[2] == 3) && (PathTrack[3] == 2)) {
-          // This an exit
-          ESP_LOGI("Roode pathTracking", "Exit detected.");
-
-          this->updateCounter(-1);
-          if (entry_exit_event_sensor != nullptr) {
-            entry_exit_event_sensor->publish_state("Exit");
-          }
-        } else if ((PathTrack[1] == 2) && (PathTrack[2] == 3) && (PathTrack[3] == 1)) {
-          // This an entry
-          ESP_LOGI("Roode pathTracking", "Entry detected.");
-          this->updateCounter(1);
-          if (entry_exit_event_sensor != nullptr) {
-            entry_exit_event_sensor->publish_state("Entry");
-          }
-        }
-      }
-
-      PathTrackFillingSize = 1;
-    } else {
-      // update PathTrack
-      // example of PathTrack update
-      // 0
-      // 0 1
-      // 0 1 3
-      // 0 1 3 1
-      // 0 1 3 3
-      // 0 1 3 2 ==> if next is 0 : check if exit
-      PathTrack[PathTrackFillingSize - 1] = AllZonesCurrentStatus;
-    }
-  }
   if (presence_sensor != nullptr) {
-    if (CurrentZoneStatus == NOBODY && LeftPreviousStatus == NOBODY && RightPreviousStatus == NOBODY) {
-      // nobody is in the sensing area
-      presence_sensor->publish_state(false);
-    }
+    presence_sensor->publish_state(entry_active || exit_active);
+  }
+
+  uint32_t now = millis();
+  switch (fsm_state_) {
+    case FSMState::IDLE:
+      if (entry_active) {
+        fsm_state_ = FSMState::ENTRY_STARTED;
+        fsm_start_zone_ = entry;
+        fsm_state_ts_ = now;
+      } else if (exit_active) {
+        fsm_state_ = FSMState::ENTRY_STARTED;
+        fsm_start_zone_ = exit;
+        fsm_state_ts_ = now;
+      }
+      break;
+    case FSMState::ENTRY_STARTED:
+      if (entry_active && exit_active) {
+        fsm_state_ = FSMState::BOTH_ACTIVE;
+        fsm_state_ts_ = now;
+      } else if (now - fsm_state_ts_ > 2500) {
+        ESP_LOGW(TAG, "fsm_timeout_reset");
+        fsm_state_ = FSMState::IDLE;
+      }
+      break;
+    case FSMState::BOTH_ACTIVE:
+      if (!entry_active && !exit_active) {
+        int delta = (fsm_start_zone_ == entry) ? 1 : -1;
+        if (invert_direction_)
+          delta = -delta;
+        updateCounter(delta);
+        if (entry_exit_event_sensor != nullptr) {
+          entry_exit_event_sensor->publish_state(delta > 0 ? "Entry" : "Exit");
+        }
+        fsm_state_ = FSMState::IDLE;
+      } else if (now - fsm_state_ts_ > 3500) {
+        ESP_LOGW(TAG, "fsm_timeout_reset");
+        fsm_state_ = FSMState::IDLE;
+      }
+      break;
   }
 }
 void Roode::updateCounter(int delta) {
@@ -186,8 +149,25 @@ void Roode::updateCounter(int delta) {
   auto call = this->people_counter->make_call();
   call.set_value(next);
   call.perform();
+  last_person_ts = millis();
 }
 void Roode::recalibration() { calibrate_zones(); }
+
+void Roode::check_fail_safe(Zone *zone) {
+  if (zone->getMinDistance() < zone->threshold->max && zone->getMinDistance() > zone->threshold->min) {
+    zone->last_triggered_ts = millis();
+  }
+  if (millis() - zone->last_triggered_ts >= 10000 && millis() - last_person_ts >= 120000) {
+    ESP_LOGW(TAG, "Fail-safe recalibration zone %d", zone->id);
+    zone->run_zone_calibration(distanceSensor, orientation_);
+    if (calibration_persistence_) {
+      zone->save_calibration();
+    }
+    fail_safe_triggered = true;
+  } else {
+    fail_safe_triggered = false;
+  }
+}
 
 const RangingMode *Roode::determine_raning_mode(uint16_t average_entry_zone_distance,
                                                 uint16_t average_exit_zone_distance) {
@@ -226,6 +206,10 @@ void Roode::calibrate_zones() {
   publish_sensor_configuration(entry, exit, true);
   App.feed_wdt();
   publish_sensor_configuration(entry, exit, false);
+  if (calibration_persistence_) {
+    entry->save_calibration();
+    exit->save_calibration();
+  }
   ESP_LOGI(SETUP, "Finished calibrating sensor zones");
 }
 
@@ -275,6 +259,17 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
   }
   if (exit_roi_width_sensor != nullptr) {
     exit_roi_width_sensor->publish_state(exit->roi->width);
+  }
+}
+
+void Roode::sensor_task(void *param) {
+  auto *self = static_cast<Roode *>(param);
+  for (;;) {
+    self->current_zone->readDistance(self->distanceSensor);
+    ZoneMsg msg{self->current_zone};
+    xQueueSend(self->zone_queue_, &msg, portMAX_DELAY);
+    self->current_zone = self->current_zone == self->entry ? self->exit : self->entry;
+    vTaskDelay(0);
   }
 }
 }  // namespace roode

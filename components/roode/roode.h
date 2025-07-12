@@ -174,7 +174,8 @@ class Roode : public PollingComponent {
   float loop_time_ms_{0};
   float cpu_usage_{0};
   float loop_time_accum_{0};
-  uint32_t busy_us_accum_{0};
+  float cpu_usage_accum_{0};
+  uint32_t last_loop_ts_{0};
   uint16_t diag_sample_count_{0};
   uint32_t diag_last_ts_{0};
   int number_attempts = 20;  // TO DO: make this configurable

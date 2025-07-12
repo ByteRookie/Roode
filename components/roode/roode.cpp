@@ -79,17 +79,20 @@ void Roode::update() {
     cpu_usage_sensor->publish_state(cpu_usage_);
   }
   if (ram_free_sensor != nullptr) {
-    float pct = 0;
+    uint32_t total = 0;
 #ifdef ESP32
-    pct = (float) ESP.getFreeHeap() * 100.0f / (float) ESP.getHeapSize();
+    total = ESP.getHeapSize();
 #else
-    pct = (float) ESP.getFreeHeap() * 100.0f / 81920.0f;
+    total = 81920;
 #endif
+    uint32_t used = total - ESP.getFreeHeap();
+    float pct = ((float)(total - used) * 100.0f) / (float) total;
     ram_free_sensor->publish_state(pct);
   }
   if (flash_free_sensor != nullptr) {
-    float pct =
-        (float) ESP.getFreeSketchSpace() * 100.0f / (float) ESP.getFlashChipSize();
+    uint32_t total = ESP.getFlashChipSize();
+    uint32_t used = ESP.getSketchSize();
+    float pct = ((float)(total - used) * 100.0f) / (float) total;
     flash_free_sensor->publish_state(pct);
   }
 }
@@ -112,15 +115,24 @@ void Roode::loop() {
 #endif
   uint32_t end_us = micros();
   float loop_ms = (end_us - start_us) / 1000.0f;
-  loop_time_accum_ += loop_ms;
-  busy_us_accum_ += end_us - start_us;
-  diag_sample_count_++;
+  float cpu = 0;
   uint32_t now_ms = millis();
+  if (last_loop_ts_ != 0) {
+    uint32_t cycle = now_ms - last_loop_ts_;
+    if (cycle > 0) {
+      cpu = (loop_ms * 100.0f) / cycle;
+    }
+  }
+  last_loop_ts_ = now_ms;
+
+  loop_time_accum_ += loop_ms;
+  cpu_usage_accum_ += cpu;
+  diag_sample_count_++;
   if (now_ms - diag_last_ts_ >= 30000 && diag_sample_count_ > 0) {
     loop_time_ms_ = loop_time_accum_ / diag_sample_count_;
-    cpu_usage_ = ((float) busy_us_accum_ / ((now_ms - diag_last_ts_) * 1000.0f)) * 100.0f;
+    cpu_usage_ = cpu_usage_accum_ / diag_sample_count_;
     loop_time_accum_ = 0;
-    busy_us_accum_ = 0;
+    cpu_usage_accum_ = 0;
     diag_sample_count_ = 0;
     diag_last_ts_ = now_ms;
   }

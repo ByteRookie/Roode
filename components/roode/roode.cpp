@@ -160,13 +160,13 @@ void Roode::path_tracking(Zone *zone) {
                             : NOBODY;
 
   if (measured_status != zone_candidate[idx]) {
-    ESP_LOGV(TAG, "Guard reset for zone %d: candidate %s -> %s", zone->id,
+    ESP_LOGD(TAG, "Guard reset for zone %d: candidate %s -> %s", zone->id,
              zone_candidate[idx] == SOMEONE ? "SOMEONE" : "NOBODY", measured_status == SOMEONE ? "SOMEONE" : "NOBODY");
     zone_candidate[idx] = measured_status;
     zone_consistency[idx] = 1;
   } else if (zone_state[idx] != measured_status) {
     zone_consistency[idx]++;
-    ESP_LOGV(TAG, "Guard window %d/%d for zone %d (%s)", zone_consistency[idx], fsm_consistency_window_, zone->id,
+    ESP_LOGD(TAG, "Guard window %d/%d for zone %d (%s)", zone_consistency[idx], fsm_consistency_window_, zone->id,
              measured_status == SOMEONE ? "SOMEONE" : "NOBODY");
   }
 
@@ -179,7 +179,7 @@ void Roode::path_tracking(Zone *zone) {
       zone_consistency[idx] = 0;
       state_changed = true;
     } else {
-      ESP_LOGV(TAG, "Zone %d state %s not stable yet (%d/%d)", zone->id,
+      ESP_LOGD(TAG, "Zone %d state %s not stable yet (%d/%d)", zone->id,
                measured_status == SOMEONE ? "SOMEONE" : "NOBODY", zone_consistency[idx], fsm_consistency_window_);
       return;
     }

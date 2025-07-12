@@ -91,11 +91,15 @@ void VL53L1X::setup() {
     if (intr >= 0) {
       attachInterrupt(intr, isr_vl53_ready, FALLING);
       ESP_LOGI(TAG, "Interrupt handler attached");
+      ESP_LOGI(TAG, "Using interrupt based measurement triggers");
     } else {
       ESP_LOGW(TAG, "Pin %d does not support interrupts, falling back to polling",
                this->interrupt_pin.value()->get_pin());
       this->interrupt_pin.reset();
+      ESP_LOGI(TAG, "Using polling based measurement triggers");
     }
+  } else {
+    ESP_LOGI(TAG, "Using polling based measurement triggers");
   }
 
   ESP_LOGI(TAG, "Setup complete");

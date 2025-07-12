@@ -23,7 +23,7 @@ namespace esphome {
 namespace roode {
 #define NOBODY 0
 #define SOMEONE 1
-#define VERSION "1.5.2"
+#define VERSION "1.5.3"
 static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
@@ -157,7 +157,7 @@ class Roode : public PollingComponent {
   Zone *fsm_start_zone_{nullptr};
   uint32_t fsm_state_ts_{0};
   Orientation orientation_{Parallel};
-  uint8_t samples{10};
+  uint8_t samples{5};
   FilterMode filter_mode_{FilterMode::MEDIAN};
   bool invert_direction_{false};
   bool calibration_persistence_{false};

@@ -74,7 +74,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.declare_id(Roode),
         cv.GenerateID(CONF_SENSOR): cv.use_id(VL53L1X),
         cv.Optional(CONF_ORIENTATION, default="parallel"): cv.enum(ORIENTATION_VALUES),
-        cv.Optional(CONF_FILTER_WINDOW, default=10): cv.All(cv.uint8_t, cv.Range(min=1)),
+        cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_FILTER_MODE, default="median"): cv.one_of("median", "min"),
         cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=False): cv.boolean,
         cv.Optional(CONF_ROI, default={}): ROI_SCHEMA,

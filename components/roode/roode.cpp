@@ -40,7 +40,7 @@ void Roode::setup() {
   exit->init_pref(0xA1);
 
 #ifdef ESP32
-  zone_queue_ = xQueueCreate(2, sizeof(ZoneMsg));
+  zone_queue_ = xQueueCreate(4, sizeof(ZoneMsg));
 #if CONFIG_FREERTOS_UNICORE
   xTaskCreatePinnedToCore(Roode::sensor_task, "SensorTask", 4096, this, 1, &sensor_task_handle_, 0);
 #else
@@ -75,7 +75,7 @@ void Roode::update() {
 void Roode::loop() {
 #ifdef ESP32
   ZoneMsg msg;
-  if (xQueueReceive(zone_queue_, &msg, pdMS_TO_TICKS(50)) == pdTRUE) {
+  if (xQueueReceive(zone_queue_, &msg, pdMS_TO_TICKS(10)) == pdTRUE) {
     path_tracking();
     handle_sensor_status();
     check_fail_safe(msg.zone);
@@ -286,7 +286,7 @@ void Roode::sensor_task(void *param) {
     ZoneMsg msg{self->current_zone};
     xQueueSend(self->zone_queue_, &msg, portMAX_DELAY);
     self->current_zone = self->current_zone == self->entry ? self->exit : self->entry;
-    vTaskDelay(0);
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 #endif

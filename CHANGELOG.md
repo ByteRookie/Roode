@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.3
+### Added
+- Faster queue handling and smaller default filter window for more responsive detection
+
 ## 1.5.2
 ### Added
 - Fixed filter mode constants to compile on C++17

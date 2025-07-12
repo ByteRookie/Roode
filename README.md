@@ -19,6 +19,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Improved memory cleanup for zones
 - Faster queue handling and smaller default sampling window for responsive detection
 - Optional diagnostic sensors for loop time, CPU usage, and memory statistics
+  (loop and CPU are reported as a 30s average, memory as free percentage)
 
 ### Phase 1 Reliability Features
 
@@ -226,53 +227,53 @@ This allows the current people count to be adjusted easily via Home Assistant.
 binary_sensor:
   - platform: roode
     presence_sensor:
-      name: $friendly_name presence
+      name: ${sensor_name} presence
 
 sensor:
   - platform: roode
     id: hallway
     distance_entry:
-      name: $friendly_name distance zone 0
+      name: ${sensor_name} distance zone 0
       filters:
         - delta: 100.0
     distance_exit:
-      name: $friendly_name distance zone 1
+      name: ${sensor_name} distance zone 1
       filters:
         - delta: 100.0
     max_threshold_entry:
-      name: $friendly_name max zone 0
+      name: ${sensor_name} max zone 0
     max_threshold_exit:
-      name: $friendly_name max zone 1
+      name: ${sensor_name} max zone 1
     min_threshold_entry:
-      name: $friendly_name min zone 0
+      name: ${sensor_name} min zone 0
     min_threshold_exit:
-      name: $friendly_name min zone 1
+      name: ${sensor_name} min zone 1
     roi_height_entry:
-      name: $friendly_name ROI height zone 0
+      name: ${sensor_name} ROI height zone 0
     roi_width_entry:
-      name: $friendly_name ROI width zone 0
+      name: ${sensor_name} ROI width zone 0
     roi_height_exit:
-      name: $friendly_name ROI height zone 1
+      name: ${sensor_name} ROI height zone 1
     roi_width_exit:
-      name: $friendly_name ROI width zone 1
+      name: ${sensor_name} ROI width zone 1
     sensor_status:
-      name: $friendly_name sensor status
+      name: ${sensor_name} sensor status
     loop_time:
-      name: $friendly_name loop time
+      name: ${sensor_name} loop time
     cpu_usage:
-      name: $friendly_name cpu usage
+      name: ${sensor_name} cpu usage
     ram_free:
-      name: $friendly_name free ram
+      name: ${sensor_name} free ram
     flash_free:
-      name: $friendly_name free flash
+      name: ${sensor_name} free flash
 
 text_sensor:
   - platform: roode
     version:
-      name: $friendly_name version
+      name: ${sensor_name} version
   - platform: roode
     entry_exit_event:
-      name: $friendly_name last direction
+      name: ${sensor_name} last direction
 ```
 
 ### Threshold distance

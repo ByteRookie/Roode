@@ -1,12 +1,12 @@
 substitutions:
-  devicename: roode_diag
+  sensor_name: roode_diag
 
 external_components:
   - source: github://Lyr3x/Roode
     refresh: always
 
 esphome:
-  name: ${devicename}
+  name: ${sensor_name}
 
 esp32:
   board: wemos_d1_mini32
@@ -21,10 +21,10 @@ roode:
 sensor:
   - platform: roode
     loop_time:
-      name: ${devicename} loop time
+      name: ${sensor_name} loop time
     cpu_usage:
-      name: ${devicename} cpu usage
+      name: ${sensor_name} cpu usage
     ram_free:
-      name: ${devicename} free ram
+      name: ${sensor_name} free ram
     flash_free:
-      name: ${devicename} free flash
+      name: ${sensor_name} free flash

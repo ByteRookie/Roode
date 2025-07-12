@@ -3,7 +3,7 @@
 ## 1.5.3
 ### Added
 - Faster queue handling and smaller default filter window for more responsive detection
-- Optional diagnostic sensors for loop time, CPU usage, RAM, and flash statistics
+- Optional diagnostic sensors for loop time, CPU usage, RAM, and flash statistics (30s averages, memory as % free)
 
 ## 1.5.2
 ### Added

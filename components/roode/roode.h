@@ -174,6 +174,10 @@ class Roode : public PollingComponent {
   float loop_time_ms_{0};
   float cpu_usage_{0};
   uint32_t last_loop_end_{0};
+  float loop_time_accum_{0};
+  float cpu_usage_accum_{0};
+  uint16_t diag_sample_count_{0};
+  uint32_t diag_last_ts_{0};
   int number_attempts = 20;  // TO DO: make this configurable
   int short_distance_threshold = 1300;
   int medium_distance_threshold = 2000;

@@ -34,6 +34,21 @@ void Roode::setup() {
   loop_window_start_ = millis();
   loop_time_sum_ = 0;
   loop_count_ = 0;
+
+  // Publish initial states so Home Assistant can create the entities
+  if (presence_sensor != nullptr)
+    presence_sensor->publish_state(false);
+  if (entry_exit_event_sensor != nullptr)
+    entry_exit_event_sensor->publish_state("");
+  if (loop_time_sensor != nullptr)
+    loop_time_sensor->publish_state(0);
+  if (cpu_usage_sensor != nullptr)
+    cpu_usage_sensor->publish_state(0);
+  if (ram_free_sensor != nullptr)
+    ram_free_sensor->publish_state(0);
+  if (flash_free_sensor != nullptr)
+    flash_free_sensor->publish_state(0);
+  this->update();
 }
 
 void Roode::update() {

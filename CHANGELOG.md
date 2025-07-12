@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.2
+### Added
+- Fixed filter mode constants to compile on C++17
+- Improved memory cleanup in zones
+
 ## 1.5.1
 ### Added
 - Median or minimum filtering with configurable window size

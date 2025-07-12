@@ -8,13 +8,15 @@
 
 People counter working with any smart home system which supports ESPHome/MQTT like Home Assistant. All necessary entities are created automatically.
 
-### What's new in 1.5.1
+### What's new in 1.5.2
 
 - Optional persistent zone calibration storage
 - Dual core sensor task for smoother measurements (falls back to the main loop on single-core boards)
 - Median filtering with configurable window size
 - Automatic fail-safe recalibration when zones get stuck
 - State machine tracking with timeout resets
+- Fixed filter mode enum to resolve compile issues
+- Improved memory cleanup for zones
 
 ### Phase 1 Reliability Features
 

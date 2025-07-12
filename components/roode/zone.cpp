@@ -1,5 +1,6 @@
 #include "zone.h"
 #include <algorithm>
+#include <array>
 
 namespace esphome {
 namespace roode {
@@ -21,16 +22,22 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
   }
 
   last_distance = result.value();
-  samples.push_back(result.value());
-  if (samples.size() > max_samples) {
-    samples.erase(samples.begin());
-  }
+  samples[sample_index] = result.value();
+  sample_index = (sample_index + 1) % max_samples;
+  if (sample_count < max_samples)
+    sample_count++;
   if (filter_mode == FilterMode::MEDIAN) {
-    auto tmp = samples;
-    std::nth_element(tmp.begin(), tmp.begin() + tmp.size() / 2, tmp.end());
-    min_distance = tmp[tmp.size() / 2];
+    std::array<uint16_t, MAX_SAMPLE_SIZE> tmp;
+    for (uint8_t i = 0; i < sample_count; i++)
+      tmp[i] = samples[i];
+    std::nth_element(tmp.begin(), tmp.begin() + sample_count / 2, tmp.begin() + sample_count);
+    min_distance = tmp[sample_count / 2];
   } else {
-    min_distance = *std::min_element(samples.begin(), samples.end());
+    uint16_t min = samples[0];
+    for (uint8_t i = 1; i < sample_count; i++)
+      if (samples[i] < min)
+        min = samples[i];
+    min_distance = min;
   }
 
   return sensor_status;

@@ -83,7 +83,7 @@ void Roode::update() {
 #ifdef ESP32
     pct = (float) ESP.getFreeHeap() * 100.0f / (float) ESP.getHeapSize();
 #else
-    pct = (float) ESP.getFreeHeap() * 100.0f / (float) ESP.getHeapSize();
+    pct = (float) ESP.getFreeHeap() * 100.0f / 81920.0f;
 #endif
     ram_free_sensor->publish_state(pct);
   }

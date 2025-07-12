@@ -2,7 +2,7 @@
 #include <math.h>
 
 #include "esphome/core/application.h"
-#include <vector>
+#include <array>
 #include "esphome/core/log.h"
 #include "esphome/core/optional.h"
 #include "../vl53l1x/vl53l1x.h"
@@ -30,6 +30,8 @@ struct Threshold {
 
 enum class FilterMode { MINIMUM, MEDIAN };
 
+constexpr uint8_t MAX_SAMPLE_SIZE = 16;
+
 class Zone {
  public:
   explicit Zone(uint8_t id) : id{id} {};
@@ -50,8 +52,9 @@ class Zone {
   ROI *roi_override = new ROI();
   Threshold *threshold = new Threshold();
   void set_max_samples(uint8_t max) {
-    max_samples = max;
-    samples.reserve(max);
+    max_samples = max > MAX_SAMPLE_SIZE ? MAX_SAMPLE_SIZE : max;
+    sample_index = 0;
+    sample_count = 0;
   };
   void set_filter_mode(FilterMode mode) { filter_mode = mode; };
   void init_pref(uint32_t base_key);
@@ -67,8 +70,10 @@ class Zone {
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
   uint16_t last_distance;
   uint16_t min_distance;
-  std::vector<uint16_t> samples;
-  uint8_t max_samples;
+  std::array<uint16_t, MAX_SAMPLE_SIZE> samples{};
+  uint8_t max_samples{1};
+  uint8_t sample_index{0};
+  uint8_t sample_count{0};
   FilterMode filter_mode{FilterMode::MINIMUM};
   ESPPreferenceObject pref_;
   struct CalibrationData {

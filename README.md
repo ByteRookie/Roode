@@ -24,6 +24,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Automatic sensor restart using the xshut pin when a measurement times out
 - Cleaner memory management and sensor shutdown on reboot
 - Startup check that logs whether the xshut and interrupt pins are functional
+- If a pin test fails at boot the feature is automatically disabled so the sensor continues operating
 
 ## Hardware Recommendation
 

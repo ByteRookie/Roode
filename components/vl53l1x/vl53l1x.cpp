@@ -249,6 +249,12 @@ void VL53L1X::check_features() {
     delay(10);
     this->xshut_pin.value()->digital_write(true);
     xshut_ok = (this->wait_for_boot() == VL53L1_ERROR_NONE);
+    if (!xshut_ok) {
+      ESP_LOGE(TAG, "XShut pin validation failed, disabling power cycle support");
+      this->xshut_pin.reset();
+      // try to continue with sensor powered on
+      this->wait_for_boot();
+    }
   }
 
   if (this->interrupt_pin.has_value()) {
@@ -266,10 +272,14 @@ void VL53L1X::check_features() {
       this->sensor.ClearInterrupt();
       this->sensor.StopRanging();
     }
+    if (!int_ok) {
+      ESP_LOGE(TAG, "Interrupt pin validation failed, falling back to polling");
+      this->interrupt_pin.reset();
+    }
   }
 
-  ESP_LOGI(TAG, "XShut %s", xshut_ok ? "working" : "failed");
-  ESP_LOGI(TAG, "Interrupt %s", int_ok ? "working" : "failed or missing");
+  ESP_LOGI(TAG, "XShut %s", xshut_ok ? "working" : "disabled");
+  ESP_LOGI(TAG, "Interrupt %s", int_ok ? "working" : "disabled");
 }
 
 }  // namespace vl53l1x

@@ -22,6 +22,7 @@ class VL53L1X : public i2c::I2CDevice, public Component {
  public:
   void setup() override;
   void dump_config() override;
+  ~VL53L1X();
   /** This connects directly to a sensor */
   float get_setup_priority() const override { return setup_priority::DATA; };
 

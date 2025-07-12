@@ -2,6 +2,11 @@
 
 namespace esphome {
 namespace roode {
+
+Roode::~Roode() {
+  delete entry;
+  delete exit;
+}
 void Roode::dump_config() {
   ESP_LOGCONFIG(TAG, "Roode:");
   ESP_LOGCONFIG(TAG, "  Sample size: %d", samples);

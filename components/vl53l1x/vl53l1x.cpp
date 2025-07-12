@@ -3,6 +3,12 @@
 namespace esphome {
 namespace vl53l1x {
 
+VL53L1X::~VL53L1X() {
+  if (this->xshut_pin.has_value()) {
+    this->xshut_pin.value()->digital_write(false);
+  }
+}
+
 void VL53L1X::dump_config() {
   ESP_LOGCONFIG(TAG, "VL53L1X:");
   LOG_I2C_DEVICE(this);
@@ -21,6 +27,12 @@ void VL53L1X::dump_config() {
 
 void VL53L1X::setup() {
   ESP_LOGD(TAG, "Beginning setup");
+
+  if (this->xshut_pin.has_value()) {
+    this->xshut_pin.value()->setup();
+    this->xshut_pin.value()->digital_write(true);
+    delay(2);
+  }
 
   // TODO use xshut_pin, if given, to change address
   auto status = this->init();
@@ -179,7 +191,8 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   // Wait for the measurement to be ready
   // TODO use interrupt_pin, if given, to await data ready instead of polling
   uint8_t dataReady = false;
-  while (!dataReady) {
+  auto start_time = millis();
+  while (!dataReady && (millis() - start_time) < this->timeout) {
     status = this->sensor.CheckForDataReady(&dataReady);
     if (status != VL53L1_ERROR_NONE) {
       ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
@@ -187,6 +200,18 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     }
     delay(1);
     App.feed_wdt();
+  }
+  if (!dataReady) {
+    ESP_LOGW(TAG, "Timed out waiting for measurement ready");
+    status = VL53L1_ERROR_TIME_OUT;
+    this->sensor.StopRanging();
+    if (this->xshut_pin.has_value()) {
+      this->xshut_pin.value()->digital_write(false);
+      delay(10);
+      this->xshut_pin.value()->digital_write(true);
+      this->wait_for_boot();
+    }
+    return {};
   }
 
   // Get the results

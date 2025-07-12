@@ -97,6 +97,8 @@ external_components:
 vl53l1x:
   # A non-standard I2C address
   address:
+  # How long to wait for boot and measurements before giving up
+  timeout: 2s
 
   # Sensor calibration options
   calibration:
@@ -111,11 +113,14 @@ vl53l1x:
 
   # Hardware pins
   pins:
-    # Shutdown/Enable pin, which is needed to change the I2C address. Required with multiple sensors.
+    # Shutdown/Enable pin used to change the I2C address and recover the sensor if needed.
     xshut: GPIO3
     # Interrupt pin. Use to notify us when a measurement is ready. This feature is WIP.
     # This needs to be an internal pin.
     interrupt: GPIO1
+
+  # When an xshut pin is provided the library will power cycle the sensor
+  # automatically if a measurement times out.
 
 # Roode people counting algorithm
 roode:

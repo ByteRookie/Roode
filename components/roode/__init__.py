@@ -30,6 +30,10 @@ CONF_MIN = "min"
 CONF_ROI = "roi"
 CONF_SAMPLING = "sampling"
 CONF_ZONES = "zones"
+CONF_IDLE_THROTTLE = "idle_loop_throttle"
+CONF_IDLE_DELAY = "idle_loop_delay_ms"
+CONF_MOTION_THRESHOLD = "zone_motion_threshold_mm"
+CONF_FSM_WINDOW = "fsm_consistency_window"
 
 Orientation = roode_ns.enum("Orientation")
 ORIENTATION_VALUES = {
@@ -81,6 +85,12 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional(CONF_EXIT_ZONE, default={}): ZONE_SCHEMA,
             }
         ),
+        cv.Optional(CONF_IDLE_THROTTLE, default=True): cv.boolean,
+        cv.Optional(CONF_IDLE_DELAY, default=30): cv.All(cv.uint8_t, cv.Range(min=1)),
+        cv.Optional(CONF_MOTION_THRESHOLD, default=15): cv.All(
+            cv.uint8_t, cv.Range(min=1)
+        ),
+        cv.Optional(CONF_FSM_WINDOW, default=3): cv.All(cv.uint8_t, cv.Range(min=1)),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
@@ -95,6 +105,10 @@ async def to_code(config: Dict):
     cg.add(roode.set_orientation(config[CONF_ORIENTATION]))
     cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
+    cg.add(roode.set_idle_loop_throttle(config[CONF_IDLE_THROTTLE]))
+    cg.add(roode.set_idle_loop_delay_ms(config[CONF_IDLE_DELAY]))
+    cg.add(roode.set_zone_motion_threshold_mm(config[CONF_MOTION_THRESHOLD]))
+    cg.add(roode.set_fsm_consistency_window(config[CONF_FSM_WINDOW]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)
 

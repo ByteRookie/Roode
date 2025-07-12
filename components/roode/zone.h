@@ -1,6 +1,6 @@
 #pragma once
 #include <math.h>
-#include <deque>
+#include <array>
 #include <vector>
 
 #include "esphome/core/application.h"
@@ -45,9 +45,11 @@ class Zone {
   ROI *roi_override = new ROI();
   Threshold *threshold = new Threshold();
   void set_max_samples(uint8_t max) {
+    if (max > samples.size())
+      max = samples.size();
     max_samples = max;
-    samples.clear();
-    samples.shrink_to_fit();
+    sample_index = 0;
+    sample_size = 0;
   };
 
  protected:
@@ -56,9 +58,10 @@ class Zone {
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
   uint16_t last_distance;
   uint16_t min_distance;
-  std::deque<uint16_t> samples;
-  uint8_t max_samples;
+  std::array<uint16_t, 32> samples{};
+  uint8_t max_samples{2};
+  uint8_t sample_index{0};
+  uint8_t sample_size{0};
 };
 }  // namespace roode
 }  // namespace esphome
-

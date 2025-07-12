@@ -4,6 +4,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include <array>
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
@@ -102,6 +103,10 @@ class Roode : public PollingComponent {
   void set_entry_exit_event_text_sensor(text_sensor::TextSensor *entry_exit_event_sensor_) {
     entry_exit_event_sensor = entry_exit_event_sensor_;
   }
+  void set_idle_loop_throttle(bool val) { idle_loop_throttle_ = val; }
+  void set_idle_loop_delay_ms(uint8_t val) { idle_loop_delay_ms_ = val; }
+  void set_zone_motion_threshold_mm(uint8_t val) { zone_motion_threshold_mm_ = val; }
+  void set_fsm_consistency_window(uint8_t val) { fsm_consistency_window_ = val; }
   void recalibration();
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
@@ -149,8 +154,14 @@ class Roode : public PollingComponent {
   uint32_t loop_window_start_{0};
   uint64_t loop_time_sum_{0};
   uint32_t loop_count_{0};
+
+  std::array<uint16_t, 2> last_zone_reading_{{0, 0}};
+  std::array<bool, 2> zone_first_reading_{{true, true}};
+  bool idle_loop_throttle_{true};
+  uint8_t idle_loop_delay_ms_{30};
+  uint8_t zone_motion_threshold_mm_{15};
+  uint8_t fsm_consistency_window_{3};
 };
 
 }  // namespace roode
 }  // namespace esphome
-

@@ -1,4 +1,11 @@
 #include "vl53l1x.h"
+#include "Arduino.h"
+
+static esphome::vl53l1x::VL53L1X *g_vl53_instance = nullptr;
+static void IRAM_ATTR isr_vl53_ready() {
+  if (g_vl53_instance != nullptr)
+    g_vl53_instance->new_sample_ready_ = true;
+}
 
 namespace esphome {
 namespace vl53l1x {
@@ -29,6 +36,7 @@ void VL53L1X::dump_config() {
 
 void VL53L1X::setup() {
   ESP_LOGD(TAG, "Beginning setup");
+  g_vl53_instance = this;
 
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->pin_mode(gpio::FLAG_OUTPUT | gpio::FLAG_PULLUP);
@@ -43,6 +51,8 @@ void VL53L1X::setup() {
     this->interrupt_pin.value()->pin_mode(gpio::FLAG_INPUT | gpio::FLAG_PULLUP);
     this->interrupt_pin.value()->setup();
     ESP_LOGD(TAG, "Interrupt pin configured");
+    attachInterrupt(digitalPinToInterrupt(this->interrupt_pin.value()->get_pin()), isr_vl53_ready, FALLING);
+    ESP_LOGI(TAG, "Interrupt handler attached");
   }
 
   // TODO use xshut_pin, if given, to change address
@@ -209,17 +219,24 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   }
 
   // Wait for the measurement to be ready
-  // TODO use interrupt_pin, if given, to await data ready instead of polling
   uint8_t dataReady = false;
   auto start_time = millis();
-  while (!dataReady && (millis() - start_time) < this->timeout) {
-    status = this->sensor.CheckForDataReady(&dataReady);
-    if (status != VL53L1_ERROR_NONE) {
-      ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
-      return {};
+  if (this->interrupt_pin.has_value()) {
+    new_sample_ready_ = false;
+    while (!new_sample_ready_ && (millis() - start_time) < this->timeout) {
+      App.feed_wdt();
     }
-    delay(1);
-    App.feed_wdt();
+    dataReady = new_sample_ready_;
+  } else {
+    while (!dataReady && (millis() - start_time) < this->timeout) {
+      status = this->sensor.CheckForDataReady(&dataReady);
+      if (status != VL53L1_ERROR_NONE) {
+        ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
+        return {};
+      }
+      delay(1);
+      App.feed_wdt();
+    }
   }
   if (!dataReady) {
     ESP_LOGW(TAG, "Timed out waiting for measurement ready");
@@ -250,6 +267,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     ESP_LOGE(TAG, "Could not clear interrupt, error code: %d", status);
     return {};
   }
+  new_sample_ready_ = false;
   status = this->sensor.StopRanging();
   if (status != VL53L1_ERROR_NONE) {
     ESP_LOGE(TAG, "Could not stop ranging, error code: %d", status);

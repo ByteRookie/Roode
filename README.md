@@ -27,6 +27,12 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - If a pin test fails at boot the feature is automatically disabled so the sensor continues operating
 - Xshut and interrupt pins use internal pull-ups so no extra resistors are needed
 - Optional sensors report loop time, CPU usage, RAM and flash usage percentages
+- Fail-safe recalibration restores thresholds if a zone stays active
+- Calibration data can persist in flash across reboots
+- Dual-core tasking keeps distance polling responsive on ESP32
+- Median/percentile filtering smooths jitter with a configurable window
+- State machine timeouts reset the FSM if a transition stalls
+- Optional CPU optimizations kick in automatically above 90% usage
 
 ## Hardware Recommendation
 

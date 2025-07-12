@@ -66,7 +66,7 @@ void Roode::setup() {
       exit->reset_roi(orientation_ == Parallel ? 231 : 60);
       entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
       exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-      auto *mode = determine_raning_mode(entry->threshold->idle, exit->threshold->idle);
+      auto *mode = determine_ranging_mode(entry->threshold->idle, exit->threshold->idle);
       distanceSensor->set_ranging_mode(mode);
       publish_sensor_configuration(entry, exit, true);
       publish_sensor_configuration(entry, exit, false);
@@ -350,7 +350,7 @@ void Roode::apply_cpu_optimizations(float cpu) {
   cpu_optimizations_active_ = true;
 }
 
-const RangingMode *Roode::determine_raning_mode(uint16_t average_entry_zone_distance,
+const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_distance,
                                                 uint16_t average_exit_zone_distance) {
   uint16_t min = average_entry_zone_distance < average_exit_zone_distance ? average_entry_zone_distance
                                                                           : average_exit_zone_distance;
@@ -406,7 +406,7 @@ void Roode::calibrateDistance() {
   if (distanceSensor->get_ranging_mode_override().has_value()) {
     return;
   }
-  auto *mode = determine_raning_mode(entry->threshold->idle, exit->threshold->idle);
+  auto *mode = determine_ranging_mode(entry->threshold->idle, exit->threshold->idle);
   if (mode != initial) {
     distanceSensor->set_ranging_mode(mode);
   }

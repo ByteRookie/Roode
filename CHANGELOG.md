@@ -4,6 +4,7 @@
 ### Added
 - Faster queue handling and smaller default filter window for more responsive detection
 - Optional diagnostic sensors for loop time, CPU usage, RAM, and flash statistics (30s averages, memory as % free)
+- `sensor_invert` option as an alias for `zones.invert`
 
 ## 1.5.2
 ### Added

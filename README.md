@@ -178,6 +178,7 @@ roode:
   # This allows for detecting whether a crossing is an entry or exit based on which zones was crossed first.
   zones:
     # Flip the entry/exit zones. If Roode seems to be counting backwards, set this to true.
+    # You can also use 'sensor_invert: true' for backwards compatibility.
     invert: false
 
     # Entry/Exit zones can set overrides for individual ROI & detection thresholds here.

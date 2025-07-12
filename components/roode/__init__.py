@@ -36,6 +36,7 @@ CONF_LOOP_TIME = "loop_time"
 CONF_CPU_USAGE = "cpu_usage"
 CONF_RAM_FREE = "ram_free"
 CONF_FLASH_FREE = "flash_free"
+CONF_SENSOR_INVERT = "sensor_invert"
 
 Orientation = roode_ns.enum("Orientation")
 FilterMode = roode_ns.enum("FilterMode")
@@ -81,6 +82,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_SAMPLING, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_FILTER_MODE, default="median"): cv.one_of("median", "min"),
         cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=False): cv.boolean,
+        cv.Optional(CONF_SENSOR_INVERT): cv.boolean,
         cv.Optional(CONF_ROI, default={}): ROI_SCHEMA,
         cv.Optional(CONF_DETECTION_THRESHOLDS, default={}): THRESHOLDS_SCHEMA,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
@@ -110,7 +112,10 @@ async def to_code(config: Dict):
     )
     cg.add(roode.set_filter_mode(cg.RawExpression(mode)))
     cg.add(roode.set_calibration_persistence(config[CONF_CALIBRATION_PERSISTENCE]))
-    cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
+    invert_dir = config[CONF_ZONES][CONF_INVERT]
+    if CONF_SENSOR_INVERT in config:
+        invert_dir = config[CONF_SENSOR_INVERT]
+    cg.add(roode.set_invert_direction(invert_dir))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)
 

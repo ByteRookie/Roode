@@ -70,9 +70,22 @@ void Roode::update() {
   if (distance_exit != nullptr) {
     distance_exit->publish_state(exit->getDistance());
   }
+  if (loop_time_sensor != nullptr) {
+    loop_time_sensor->publish_state(loop_time_ms_);
+  }
+  if (cpu_usage_sensor != nullptr) {
+    cpu_usage_sensor->publish_state(cpu_usage_);
+  }
+  if (ram_free_sensor != nullptr) {
+    ram_free_sensor->publish_state(ESP.getFreeHeap());
+  }
+  if (flash_free_sensor != nullptr) {
+    flash_free_sensor->publish_state(ESP.getFreeSketchSpace());
+  }
 }
 
 void Roode::loop() {
+  uint32_t start = micros();
 #ifdef ESP32
   ZoneMsg msg;
   if (xQueueReceive(zone_queue_, &msg, pdMS_TO_TICKS(10)) == pdTRUE) {
@@ -87,6 +100,15 @@ void Roode::loop() {
   check_fail_safe(current_zone);
   current_zone = current_zone == entry ? exit : entry;
 #endif
+  uint32_t end = micros();
+  loop_time_ms_ = (end - start) / 1000.0f;
+  if (last_loop_end_ != 0) {
+    uint32_t cycle = end - last_loop_end_;
+    if (cycle > 0) {
+      cpu_usage_ = ((end - start) * 100.0f) / cycle;
+    }
+  }
+  last_loop_end_ = end;
 }
 
 bool Roode::handle_sensor_status() {

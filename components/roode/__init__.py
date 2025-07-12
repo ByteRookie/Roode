@@ -32,6 +32,10 @@ CONF_FILTER_MODE = "filter_mode"
 CONF_SAMPLING = "sampling"
 CONF_CALIBRATION_PERSISTENCE = "calibration_persistence"
 CONF_ZONES = "zones"
+CONF_LOOP_TIME = "loop_time"
+CONF_CPU_USAGE = "cpu_usage"
+CONF_RAM_FREE = "ram_free"
+CONF_FLASH_FREE = "flash_free"
 
 Orientation = roode_ns.enum("Orientation")
 FilterMode = roode_ns.enum("FilterMode")

@@ -24,6 +24,10 @@ CONF_ROI_WIDTH_entry = "roi_width_entry"
 CONF_ROI_HEIGHT_exit = "roi_height_exit"
 CONF_ROI_WIDTH_exit = "roi_width_exit"
 SENSOR_STATUS = "sensor_status"
+CONF_LOOP_TIME = "loop_time"
+CONF_CPU_USAGE = "cpu_usage"
+CONF_RAM_FREE = "ram_free"
+CONF_FLASH_FREE = "flash_free"
 
 CONFIG_SCHEMA = sensor.sensor_schema().extend(
     {
@@ -102,6 +106,34 @@ CONFIG_SCHEMA = sensor.sensor_schema().extend(
             accuracy_decimals=0,
             entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
+        cv.Optional(CONF_LOOP_TIME): sensor.sensor_schema(
+            icon="mdi:clock-outline",
+            unit_of_measurement="ms",
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_CPU_USAGE): sensor.sensor_schema(
+            icon="mdi:cpu-64-bit",
+            unit_of_measurement="%",
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_RAM_FREE): sensor.sensor_schema(
+            icon="mdi:memory",
+            unit_of_measurement="B",
+            accuracy_decimals=0,
+            state_class=STATE_CLASS_MEASUREMENT,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_FLASH_FREE): sensor.sensor_schema(
+            icon="mdi:chip",
+            unit_of_measurement="B",
+            accuracy_decimals=0,
+            state_class=STATE_CLASS_MEASUREMENT,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
         cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
     }
 )
@@ -142,3 +174,15 @@ async def to_code(config):
     if SENSOR_STATUS in config:
         count = await sensor.new_sensor(config[SENSOR_STATUS])
         cg.add(var.set_sensor_status_sensor(count))
+    if CONF_LOOP_TIME in config:
+        sens = await sensor.new_sensor(config[CONF_LOOP_TIME])
+        cg.add(var.set_loop_time_sensor(sens))
+    if CONF_CPU_USAGE in config:
+        sens = await sensor.new_sensor(config[CONF_CPU_USAGE])
+        cg.add(var.set_cpu_usage_sensor(sens))
+    if CONF_RAM_FREE in config:
+        sens = await sensor.new_sensor(config[CONF_RAM_FREE])
+        cg.add(var.set_ram_free_sensor(sens))
+    if CONF_FLASH_FREE in config:
+        sens = await sensor.new_sensor(config[CONF_FLASH_FREE])
+        cg.add(var.set_flash_free_sensor(sens))

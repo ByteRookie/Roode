@@ -1,0 +1,30 @@
+substitutions:
+  devicename: roode_diag
+
+external_components:
+  - source: github://Lyr3x/Roode
+    refresh: always
+
+esphome:
+  name: ${devicename}
+
+esp32:
+  board: wemos_d1_mini32
+
+i2c:
+
+vl53l1x:
+
+roode:
+  id: roode_platform
+
+sensor:
+  - platform: roode
+    loop_time:
+      name: ${devicename} loop time
+    cpu_usage:
+      name: ${devicename} cpu usage
+    ram_free:
+      name: ${devicename} free ram
+    flash_free:
+      name: ${devicename} free flash

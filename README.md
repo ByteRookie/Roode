@@ -18,6 +18,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Fixed filter mode enum to resolve compile issues
 - Improved memory cleanup for zones
 - Faster queue handling and smaller default sampling window for responsive detection
+- Optional diagnostic sensors for loop time, CPU usage, and memory statistics
 
 ### Phase 1 Reliability Features
 
@@ -201,6 +202,7 @@ roode:
 Also feel free to check out running examples for:
 - [Wemos D1 mini with ESP32](peopleCounter32.yaml)
 - [Wemos D1 mini with ESP8266](peopleCounter8266.yaml)
+- [Diagnostic sensors](diagnostic_sensors.yaml)
 
 ### Sensors
 
@@ -241,6 +243,14 @@ sensor:
       name: $friendly_name ROI height
     roi_width:
       name: $friendly_name ROI width
+    loop_time:
+      name: $friendly_name loop time
+    cpu_usage:
+      name: $friendly_name cpu usage
+    ram_free:
+      name: $friendly_name free ram
+    flash_free:
+      name: $friendly_name free flash
 
 text_sensor:
   - platform: roode

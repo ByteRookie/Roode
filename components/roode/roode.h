@@ -104,6 +104,10 @@ class Roode : public PollingComponent {
   void set_exit_roi_height_sensor(sensor::Sensor *roi_height_sensor_) { exit_roi_height_sensor = roi_height_sensor_; }
   void set_exit_roi_width_sensor(sensor::Sensor *roi_width_sensor_) { exit_roi_width_sensor = roi_width_sensor_; }
   void set_sensor_status_sensor(sensor::Sensor *status_sensor_) { status_sensor = status_sensor_; }
+  void set_loop_time_sensor(sensor::Sensor *sensor_) { loop_time_sensor = sensor_; }
+  void set_cpu_usage_sensor(sensor::Sensor *sensor_) { cpu_usage_sensor = sensor_; }
+  void set_ram_free_sensor(sensor::Sensor *sensor_) { ram_free_sensor = sensor_; }
+  void set_flash_free_sensor(sensor::Sensor *sensor_) { flash_free_sensor = sensor_; }
   void set_presence_sensor_binary_sensor(binary_sensor::BinarySensor *presence_sensor_) {
     presence_sensor = presence_sensor_;
   }
@@ -134,6 +138,10 @@ class Roode : public PollingComponent {
   sensor::Sensor *entry_roi_height_sensor;
   sensor::Sensor *entry_roi_width_sensor;
   sensor::Sensor *status_sensor;
+  sensor::Sensor *loop_time_sensor;
+  sensor::Sensor *cpu_usage_sensor;
+  sensor::Sensor *ram_free_sensor;
+  sensor::Sensor *flash_free_sensor;
   binary_sensor::BinarySensor *presence_sensor;
   text_sensor::TextSensor *version_sensor;
   text_sensor::TextSensor *entry_exit_event_sensor;
@@ -163,6 +171,9 @@ class Roode : public PollingComponent {
   bool calibration_persistence_{false};
   uint32_t last_person_ts{0};
   bool fail_safe_triggered{false};
+  float loop_time_ms_{0};
+  float cpu_usage_{0};
+  uint32_t last_loop_end_{0};
   int number_attempts = 20;  // TO DO: make this configurable
   int short_distance_threshold = 1300;
   int medium_distance_threshold = 2000;

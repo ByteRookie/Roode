@@ -308,6 +308,12 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195)
                              : (orientation_ == Parallel ? 231 : 60));
   z->calibrateThreshold(distanceSensor, 50);
+  // Recalculate ROI sizes so thresholds remain consistent
+  entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
+  exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
+  auto *mode = determine_ranging_mode(entry->threshold->idle, exit->threshold->idle);
+  distanceSensor->set_ranging_mode(mode);
+
   calibration_data_[zone_id].baseline_mm = z->threshold->idle;
   calibration_data_[zone_id].threshold_min_mm = z->threshold->min;
   calibration_data_[zone_id].threshold_max_mm = z->threshold->max;

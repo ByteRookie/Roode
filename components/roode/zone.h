@@ -50,6 +50,7 @@ class Zone {
     max_samples = std::min<uint8_t>(window, MAX_BUFFER_SIZE);
     sample_idx_ = 0;
     sample_count_ = 0;
+    samples.fill(0);
   }
   void set_max_samples(uint8_t max) { set_filter_window(max); };
 

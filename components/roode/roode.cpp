@@ -167,6 +167,9 @@ void Roode::path_tracking(Zone *zone) {
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
 
+  ESP_LOGV(TAG, "Zone %d distance %u (min=%u max=%u)", zone->id, zone->getMinDistance(),
+           zone->threshold->min, zone->threshold->max);
+
   // PathTrack algorithm
   if (zone->getMinDistance() < zone->threshold->max && zone->getMinDistance() > zone->threshold->min) {
     // Someone is in the sensing area
@@ -358,7 +361,7 @@ void Roode::reset_cpu_optimizations(float cpu) {
 
 void Roode::update_metrics() {
   uint32_t now = millis();
-  if (now - loop_window_start_ < 30000)
+  if (now - loop_window_start_ < 10000)
     return;
   float cpu = 0.0f;
   if (loop_count_ > 0) {

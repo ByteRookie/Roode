@@ -107,17 +107,20 @@ class Roode : public PollingComponent {
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
   void set_filter_mode(FilterMode mode) {
     filter_mode_ = mode;
+    default_filter_mode_ = mode;
     entry->set_filter_mode(mode);
     exit->set_filter_mode(mode);
   }
   void set_filter_window(uint8_t window) {
     filter_window_ = window;
+    default_filter_window_ = window;
     entry->set_filter_window(window);
     exit->set_filter_window(window);
   }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
   void apply_cpu_optimizations(float cpu);
+  void reset_cpu_optimizations(float cpu);
   void update_metrics();
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
@@ -158,6 +161,8 @@ class Roode : public PollingComponent {
 
   FilterMode filter_mode_{FILTER_MIN};
   uint8_t filter_window_{5};
+  FilterMode default_filter_mode_{FILTER_MIN};
+  uint8_t default_filter_window_{5};
 
   bool cpu_optimizations_active_{false};
   uint16_t polling_interval_ms_{10};

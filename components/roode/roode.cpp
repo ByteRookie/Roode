@@ -333,9 +333,27 @@ void Roode::apply_cpu_optimizations(float cpu) {
     return;
   ESP_LOGW(TAG, "CPU usage %.1f%% exceeded threshold, applying optimizations", cpu);
   polling_interval_ms_ = 30;
-  set_filter_window(3);
-  set_filter_mode(FILTER_PERCENTILE10);
+  filter_window_ = 3;
+  entry->set_filter_window(3);
+  exit->set_filter_window(3);
+  filter_mode_ = FILTER_PERCENTILE10;
+  entry->set_filter_mode(FILTER_PERCENTILE10);
+  exit->set_filter_mode(FILTER_PERCENTILE10);
   cpu_optimizations_active_ = true;
+}
+
+void Roode::reset_cpu_optimizations(float cpu) {
+  if (!cpu_optimizations_active_ || cpu > 50.0f)
+    return;
+  ESP_LOGI(TAG, "CPU usage %.1f%% stable, reverting optimizations", cpu);
+  polling_interval_ms_ = 10;
+  filter_window_ = default_filter_window_;
+  entry->set_filter_window(default_filter_window_);
+  exit->set_filter_window(default_filter_window_);
+  filter_mode_ = default_filter_mode_;
+  entry->set_filter_mode(default_filter_mode_);
+  exit->set_filter_mode(default_filter_mode_);
+  cpu_optimizations_active_ = false;
 }
 
 void Roode::update_metrics() {
@@ -370,6 +388,7 @@ void Roode::update_metrics() {
     flash_free_sensor->publish_state(used_percent);
   }
   apply_cpu_optimizations(cpu);
+  reset_cpu_optimizations(cpu);
   loop_time_sum_ = 0;
   loop_count_ = 0;
   loop_window_start_ = now;

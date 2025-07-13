@@ -32,7 +32,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Dual-core tasking keeps distance polling responsive on ESP32
 - Median/percentile filtering smooths jitter with a configurable window
 - State machine timeouts reset the FSM if a transition stalls
-- Optional CPU optimizations kick in automatically above 90% usage
+- Optional CPU optimizations kick in automatically above 90% usage and revert once load drops
 
 ## Hardware Recommendation
 

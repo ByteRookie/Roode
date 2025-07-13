@@ -147,24 +147,6 @@ void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Or
            roi->height, roi->center);
 }
 
-int Zone::getOptimizedValues(const std::vector<int> &values, int sum) const {
-  int size = values.size();
-  int sum_squared = 0;
-  int variance = 0;
-  int sd = 0;
-  int avg = sum / size;
-
-  for (int i = 0; i < size; i++) {
-    sum_squared = sum_squared + (values[i] * values[i]);
-    App.feed_wdt();
-  }
-  variance = sum_squared / size - (avg * avg);
-  sd = sqrt(variance);
-  ESP_LOGD(CALIBRATION, "Zone AVG: %d", avg);
-  ESP_LOGD(CALIBRATION, "Zone SD: %d", sd);
-  return avg - sd;
-}
-
 uint16_t Zone::getDistance() const { return this->last_distance; }
 uint16_t Zone::getMinDistance() const { return this->min_distance; }
 }  // namespace roode

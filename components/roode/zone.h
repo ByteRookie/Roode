@@ -54,7 +54,6 @@ class Zone {
   void set_max_samples(uint8_t max) { set_filter_window(max); };
 
  protected:
-  int getOptimizedValues(const std::vector<int> &values, int sum) const;
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
   uint16_t last_distance{0};

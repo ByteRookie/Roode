@@ -160,14 +160,16 @@ void Roode::path_tracking(Zone *zone) {
                             : NOBODY;
 
   if (measured_status != zone_candidate[idx]) {
-    ESP_LOGD(TAG, "Guard reset for zone %d: candidate %s -> %s", zone->id,
-             zone_candidate[idx] == SOMEONE ? "SOMEONE" : "NOBODY", measured_status == SOMEONE ? "SOMEONE" : "NOBODY");
+    ESP_LOGD(TAG, "Guard reset for zone %d: candidate %s -> %s due to distance %dmm", zone->id,
+             zone_candidate[idx] == SOMEONE ? "SOMEONE" : "NOBODY", measured_status == SOMEONE ? "SOMEONE" : "NOBODY",
+             zone->getMinDistance());
     zone_candidate[idx] = measured_status;
     zone_consistency[idx] = 1;
   } else if (zone_state[idx] != measured_status) {
     zone_consistency[idx]++;
-    ESP_LOGD(TAG, "Guard window %d/%d for zone %d (%s)", zone_consistency[idx], fsm_consistency_window_, zone->id,
-             measured_status == SOMEONE ? "SOMEONE" : "NOBODY");
+    ESP_LOGD(TAG, "Guard window %d/%d for zone %d (%s) with distance %dmm", zone_consistency[idx],
+             fsm_consistency_window_, zone->id, measured_status == SOMEONE ? "SOMEONE" : "NOBODY",
+             zone->getMinDistance());
   }
 
   bool state_changed = false;
@@ -203,7 +205,9 @@ void Roode::path_tracking(Zone *zone) {
       AllZonesCurrentStatus += 1;
     if (zone_state[1] == SOMEONE)
       AllZonesCurrentStatus += 2;
-    ESP_LOGD(TAG, "Event has occured, AllZonesCurrentStatus: %d", AllZonesCurrentStatus);
+    ESP_LOGD(TAG, "Event occurred, zone0=%s zone1=%s -> AllZonesCurrentStatus=%d",
+             zone_state[0] == SOMEONE ? "SOMEONE" : "NOBODY", zone_state[1] == SOMEONE ? "SOMEONE" : "NOBODY",
+             AllZonesCurrentStatus);
     PathTrack[PathTrackFillingSize - 1] = AllZonesCurrentStatus;
 
     if (zone_state[0] == NOBODY && zone_state[1] == NOBODY) {

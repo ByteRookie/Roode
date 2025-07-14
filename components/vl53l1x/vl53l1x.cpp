@@ -13,6 +13,7 @@ VL53L1X::~VL53L1X() {
     ESP_LOGD(TAG, "XShut pin set LOW - powering down sensor");
     roode::Roode::log_event("xshut_sensor_" + std::to_string(sensor_id_) + "_off");
     roode::Roode::log_event("xshut_toggled_off");
+    roode::Roode::log_event("xshut_toggled");
   }
   this->sensor.StopRanging();
 }
@@ -42,6 +43,7 @@ void VL53L1X::setup() {
       s->xshut_pin.value()->digital_write(false);
       roode::Roode::log_event("xshut_sensor_" + std::to_string(s->sensor_id_) + "_off");
       roode::Roode::log_event("xshut_toggled_off");
+      roode::Roode::log_event("xshut_toggled");
     }
   }
 
@@ -53,6 +55,7 @@ void VL53L1X::setup() {
     ESP_LOGD(TAG, "XShut pin set HIGH - sensor powered on");
     roode::Roode::log_event("xshut_sensor_" + std::to_string(sensor_id_) + "_on");
     roode::Roode::log_event("xshut_toggled_on");
+    roode::Roode::log_event("xshut_toggled");
     delay(2);
   }
 
@@ -109,6 +112,7 @@ void VL53L1X::setup() {
       s->xshut_pin.value()->digital_write(true);
       roode::Roode::log_event("xshut_sensor_" + std::to_string(s->sensor_id_) + "_on");
       roode::Roode::log_event("xshut_toggled_on");
+      roode::Roode::log_event("xshut_toggled");
       delay(2);
     }
   }
@@ -249,6 +253,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   bool initial_state = false;
   if (use_int) {
     initial_state = this->interrupt_pin.value()->digital_read();
+    roode::Roode::log_event("use_interrupt_mode");
     roode::Roode::log_event("use_interrupt_mode_" + std::string(initial_state ? "high" : "low"));
   }
   auto start_time = millis();
@@ -269,7 +274,8 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   }
   if (use_int && !dataReady) {
     roode::Roode::log_event("int_pin_missed_sensor_" + std::to_string(sensor_id_));
-    roode::Roode::log_event("interrupt_fallback_polling");
+    roode::Roode::log_event("int_pin_missed");
+    roode::Roode::log_event("interrupt_fallback");
     // Fallback to polling for this measurement
     start_time = millis();
     while (!dataReady && (millis() - start_time) < this->timeout) {
@@ -289,13 +295,16 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     if (this->xshut_pin.has_value()) {
       this->xshut_pin.value()->digital_write(false);
       roode::Roode::log_event("xshut_pulse_off_sensor_" + std::to_string(sensor_id_));
+      roode::Roode::log_event("xshut_pulse_off");
       ESP_LOGW(TAG, "XShut pin set LOW - resetting sensor");
       delay(100);
       this->xshut_pin.value()->digital_write(true);
       roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
+      roode::Roode::log_event("xshut_reinitialize");
       ESP_LOGD(TAG, "XShut pin set HIGH - reset complete");
       this->wait_for_boot();
       roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
+      roode::Roode::log_event("sensor.recovered_via_xshut");
       recovery_count_++;
     }
     return {};

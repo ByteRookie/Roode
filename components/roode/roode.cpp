@@ -15,6 +15,8 @@ void Roode::log_event(const std::string &msg) {
       return;
     if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0)
       return;
+    if (msg == "xshut_toggled" || msg == "xshut_pulse_off" || msg == "xshut_reinitialize" || msg == "sensor.recovered_via_xshut")
+      return;
   }
 
   std::string out = msg;
@@ -40,12 +42,18 @@ void Roode::log_event(const std::string &msg) {
     out += " - XSHUT pin HIGH";
   else if (msg == "xshut_toggled_off")
     out += " - XSHUT pin LOW";
+  else if (msg == "xshut_toggled")
+    out += " - XSHUT pin toggled";
   else if (msg.rfind("xshut_pulse_off_sensor_", 0) == 0) {
     std::string id = msg.substr(sizeof("xshut_pulse_off_sensor_") - 1);
     out += " - pulsing LOW for sensor " + id;
+  } else if (msg == "xshut_pulse_off") {
+    out += " - pulsing LOW";
   } else if (msg.rfind("xshut_reinitialize_sensor_", 0) == 0) {
     std::string id = msg.substr(sizeof("xshut_reinitialize_sensor_") - 1);
     out += " - reinitializing sensor " + id;
+  } else if (msg == "xshut_reinitialize") {
+    out += " - reinitializing";
   } else if (msg.rfind("sensor_", 0) == 0 && msg.find("_addr") != std::string::npos) {
     size_t start = sizeof("sensor_") - 1;
     size_t end = msg.find('_', start);
@@ -55,11 +63,17 @@ void Roode::log_event(const std::string &msg) {
   } else if (msg.rfind("sensor_", 0) == 0 && msg.find(".recovered_via_xshut") != std::string::npos) {
     std::string id = msg.substr(sizeof("sensor_") - 1, msg.find('.') - (sizeof("sensor_") - 1));
     out += " - sensor " + id + " recovered via XSHUT";
+  } else if (msg == "sensor.recovered_via_xshut") {
+    out += " - sensor recovered via XSHUT";
   } else if (msg.rfind("use_interrupt_mode_", 0) == 0) {
     std::string level = msg.substr(sizeof("use_interrupt_mode_") - 1);
     out += " - INT pin initial " + level;
-  } else if (msg == "interrupt_fallback_polling")
+  } else if (msg == "use_interrupt_mode") {
+    out += " - using interrupt mode";
+  } else if (msg == "interrupt_fallback_polling" || msg == "interrupt_fallback")
     out += " - INT pin timeout, polling";
+  else if (msg == "int_pin_missed")
+    out += " - INT miss";
   else if (msg.rfind("int_pin_missed_sensor_", 0) == 0) {
     std::string id = msg.substr(sizeof("int_pin_missed_sensor_") - 1);
     out += " - INT miss sensor " + id;

@@ -162,7 +162,7 @@ void Roode::update() {
       manual_adjustment_sensor->publish_state(manual_adjustment_count_);
     if (diff != 0) {
       std::string sign = diff > 0 ? "+" : "";
-      log_event("manual_adjust " + sign + std::to_string(diff));
+      log_event("manual_adjust " + sign + std::to_string(diff) + " total=" + std::to_string(manual_adjustment_count_));
     }
   }
 }

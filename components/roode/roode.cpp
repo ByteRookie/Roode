@@ -287,11 +287,18 @@ void Roode::update() {
   if (lux_sensor_ != nullptr) {
     uint32_t now = millis();
     if (now - last_lux_sample_ts_ >= lux_sample_interval_ms_) {
-      lux_samples_.push_back(lux_sensor_->state);
+      lux_samples_.push_back({now, lux_sensor_->state});
       last_lux_sample_ts_ = now;
+      if (lux_samples_.size() < 60 && !lux_bootstrap_logged_) {
+        lux_bootstrap_logged_ = true;
+        log_event("lux_model_bootstrapping");
+      } else if (lux_samples_.size() == 60 && !lux_learning_complete_logged_) {
+        lux_learning_complete_logged_ = true;
+        log_event("lux_learning_complete");
+      }
     }
     while (!lux_samples_.empty() &&
-           now - last_lux_sample_ts_ > lux_learning_window_ms_) {
+           now - lux_samples_.front().first > lux_learning_window_ms_) {
       lux_samples_.erase(lux_samples_.begin());
     }
   }
@@ -306,10 +313,13 @@ void Roode::update() {
     if (manual_adjust_timestamps_.size() > 5 && lux_sensor_ != nullptr) {
       float lux = lux_sensor_->state;
       float pct95 = 0;
-      if (lux_samples_.size() >= 1) {
-        auto samples = lux_samples_;
-        std::sort(samples.begin(), samples.end());
-        pct95 = samples[(size_t) (samples.size() * 0.95f)];
+      if (!lux_samples_.empty()) {
+        std::vector<float> vals;
+        vals.reserve(lux_samples_.size());
+        for (auto &p : lux_samples_)
+          vals.push_back(p.second);
+        std::sort(vals.begin(), vals.end());
+        pct95 = vals[(size_t) (vals.size() * 0.95f)];
       }
       if (lux > pct95 && now - last_recalibration_ts_ > recalibrate_cooldown_ms_) {
         log_event("manual_recalibrate_triggered");
@@ -342,23 +352,30 @@ void Roode::loop() {
   this->current_zone->readDistance(distanceSensor);
   bool zone_trig = current_zone->getMinDistance() < current_zone->threshold->max &&
                    current_zone->getMinDistance() > current_zone->threshold->min;
+  if (zone_trig)
+    record_motion_event();
   if (use_light_sensor_ && lux_sensor_ != nullptr && !lux_samples_.empty()) {
-    auto samples = lux_samples_;
-    std::sort(samples.begin(), samples.end());
-    float pct95 = samples[(size_t)(samples.size() * 0.95f)];
+    std::vector<float> vals;
+    vals.reserve(lux_samples_.size());
+    for (auto &p : lux_samples_)
+      vals.push_back(p.second);
+    std::sort(vals.begin(), vals.end());
+    float pct95 = vals[(size_t)(vals.size() * 0.95f)];
     float lux = lux_sensor_->state;
     float dynamic_multiplier = 1 + alpha_ * ((lux - pct95) / pct95);
     if (dynamic_multiplier < base_multiplier_)
       dynamic_multiplier = base_multiplier_;
     if (dynamic_multiplier > max_multiplier_)
       dynamic_multiplier = max_multiplier_;
-    if (lux > pct95 && millis() < sunlight_suppressed_until_ + suppression_window_ms_) {
-      zone_trig = false;
-      log_event("sunlight_suppressed_event");
-    } else if (lux > pct95) {
+    if (lux > pct95 * dynamic_multiplier) {
       log_event("lux_outlier_detected");
       sunlight_suppressed_until_ = millis();
+      zone_trig = false;
+    } else if (lux > pct95 && millis() < sunlight_suppressed_until_ + suppression_window_ms_) {
+      zone_trig = false;
+      log_event("sunlight_suppressed_event");
     }
+    apply_adaptive_filtering(lux, pct95);
   }
   if (!cpu_optimizations_active_ || zone_trig)
     path_tracking(this->current_zone);
@@ -797,6 +814,35 @@ void Roode::record_int_fallback() {
   }
 }
 
+void Roode::record_motion_event() {
+  uint32_t now = millis();
+  motion_events_.push_back(now);
+  while (!motion_events_.empty() && now - motion_events_.front() > 60000) {
+    motion_events_.erase(motion_events_.begin());
+  }
+}
+
+void Roode::apply_adaptive_filtering(float lux, float pct95) {
+  uint8_t new_window = default_filter_window_;
+  if (lux_samples_.size() >= 60) {
+    if (lux > pct95 * 6)
+      new_window = std::min<uint8_t>(default_filter_window_ + 4, Zone::MAX_BUFFER_SIZE);
+    else if (lux > pct95 * 4)
+      new_window = std::min<uint8_t>(default_filter_window_ + 2, Zone::MAX_BUFFER_SIZE);
+  }
+  size_t freq = motion_events_.size();
+  if (freq > 20)
+    new_window = std::min<uint8_t>(new_window + 2, Zone::MAX_BUFFER_SIZE);
+  else if (freq > 10)
+    new_window = std::min<uint8_t>(new_window + 1, Zone::MAX_BUFFER_SIZE);
+  if (new_window != filter_window_) {
+    filter_window_ = new_window;
+    entry->set_filter_window(new_window);
+    exit->set_filter_window(new_window);
+    log_event("filter_window_changed");
+  }
+}
+
 void Roode::sensor_task(void *param) {
   auto *self = static_cast<Roode *>(param);
   for (;;) {
@@ -805,23 +851,30 @@ void Roode::sensor_task(void *param) {
     self->current_zone->readDistance(self->distanceSensor);
     bool zone_trig = self->current_zone->getMinDistance() < self->current_zone->threshold->max &&
                      self->current_zone->getMinDistance() > self->current_zone->threshold->min;
+    if (zone_trig)
+      self->record_motion_event();
     if (self->use_light_sensor_ && self->lux_sensor_ != nullptr && !self->lux_samples_.empty()) {
-      auto samples = self->lux_samples_;
-      std::sort(samples.begin(), samples.end());
-      float pct95 = samples[(size_t)(samples.size() * 0.95f)];
+      std::vector<float> vals;
+      vals.reserve(self->lux_samples_.size());
+      for (auto &p : self->lux_samples_)
+        vals.push_back(p.second);
+      std::sort(vals.begin(), vals.end());
+      float pct95 = vals[(size_t)(vals.size() * 0.95f)];
       float lux = self->lux_sensor_->state;
       float dynamic_multiplier = 1 + self->alpha_ * ((lux - pct95) / pct95);
       if (dynamic_multiplier < self->base_multiplier_)
         dynamic_multiplier = self->base_multiplier_;
       if (dynamic_multiplier > self->max_multiplier_)
         dynamic_multiplier = self->max_multiplier_;
-      if (lux > pct95 && millis() < self->sunlight_suppressed_until_ + self->suppression_window_ms_) {
-        zone_trig = false;
-        log_event("sunlight_suppressed_event");
-      } else if (lux > pct95) {
+      if (lux > pct95 * dynamic_multiplier) {
         log_event("lux_outlier_detected");
         self->sunlight_suppressed_until_ = millis();
+        zone_trig = false;
+      } else if (lux > pct95 && millis() < self->sunlight_suppressed_until_ + self->suppression_window_ms_) {
+        zone_trig = false;
+        log_event("sunlight_suppressed_event");
       }
+      self->apply_adaptive_filtering(lux, pct95);
     }
     if (!self->cpu_optimizations_active_ || zone_trig)
       self->path_tracking(self->current_zone);

@@ -1,6 +1,7 @@
 #pragma once
 #include <math.h>
 #include <string>
+#include <vector>
 #include "Arduino.h"
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -132,6 +133,8 @@ class Roode : public PollingComponent {
   void reset_cpu_optimizations(float cpu);
   void update_metrics();
   void maybe_auto_recalibrate();
+  void record_motion_event();
+  void apply_adaptive_filtering(float lux, float pct95);
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
   static void log_event(const std::string &msg);
@@ -226,7 +229,9 @@ class Roode : public PollingComponent {
 
   bool use_light_sensor_{false};
   sensor::Sensor *lux_sensor_{nullptr};
-  std::vector<float> lux_samples_;
+  std::vector<std::pair<uint32_t, float>> lux_samples_;
+  bool lux_bootstrap_logged_{false};
+  bool lux_learning_complete_logged_{false};
   uint32_t lux_learning_window_ms_{86400000};
   uint32_t lux_sample_interval_ms_{60000};
   uint32_t last_lux_sample_ts_{0};
@@ -240,6 +245,8 @@ class Roode : public PollingComponent {
   float combined_multiplier_{3.0f};
   uint32_t suppression_window_ms_{1800000};
   uint32_t sunlight_suppressed_until_{0};
+
+  std::vector<uint32_t> motion_events_;
 
   std::vector<uint32_t> manual_adjust_timestamps_;
 

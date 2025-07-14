@@ -31,6 +31,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Calibration data can persist in flash across reboots
 - Dual-core tasking keeps distance polling responsive on ESP32 with automatic retry and fallback
 - Median/percentile filtering smooths jitter with a configurable window
+- Adaptive filtering automatically expands the filter window when bright light or rapid motion is detected
 - State machine timeouts reset the FSM if a transition stalls
 - Optional CPU optimizations kick in automatically above 90% usage and revert once load drops
 - Interrupt pin support avoids polling overhead with automatic fallback; logs show the interrupt pin level and why polling may be used
@@ -42,7 +43,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Event logs detail sensor power cycles, interrupt fallbacks with reasons, manual adjustments, and core mode changes
 - Logs are color-coded: green for normal, yellow for info, and red for failures
 - Scheduled recalibration keeps thresholds accurate over long runtimes
-- Ambient light learning suppresses false counts from sunlight
+- Ambient light learning suppresses false counts from sunlight using a 95th percentile model
 
 ## Hardware Recommendation
 

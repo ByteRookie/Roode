@@ -87,8 +87,16 @@ void Roode::log_event(const std::string &msg) {
     out += " - INT miss sensor " + id;
   } else if (msg.rfind("manual_adjust", 0) == 0)
     out += " - user corrected";
+  const char *color = "\033[32m";  // green by default
+  if (msg.find("fail") != std::string::npos || msg.find("fallback") != std::string::npos ||
+      msg.find("missed") != std::string::npos)
+    color = "\033[31m";  // red for errors
+  else if (msg.find("retry") != std::string::npos || msg.find("manual_adjust") != std::string::npos ||
+           msg.find("reinitialize") != std::string::npos || msg.find("pulse_off") != std::string::npos)
+    color = "\033[33m";  // yellow for informational
 
-  ESP_LOGI(TAG, "%s", out.c_str());
+  std::string colored = std::string(color) + out + "\033[0m";
+  ESP_LOGI(TAG, "%s", colored.c_str());
 }
 
 Roode::~Roode() {

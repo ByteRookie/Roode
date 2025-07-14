@@ -296,6 +296,7 @@ void Roode::loop() {
   loop_time_sum_ += delta;
   loop_count_++;
   update_metrics();
+  maybe_auto_recalibrate();
   delay(polling_interval_ms_);
 }
 
@@ -471,7 +472,11 @@ void Roode::updateCounter(int delta) {
   call.set_value(next);
   call.perform();
 }
-void Roode::recalibration() { calibrate_zones(); }
+void Roode::recalibration() {
+  log_event("manual_recalibrate_triggered");
+  calibrate_zones();
+  last_recalibration_ts_ = millis();
+}
 
 void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone_id);
@@ -609,6 +614,7 @@ void Roode::calibrate_zones() {
     calibration_prefs_[1].save(&calibration_data_[1]);
   }
   ESP_LOGI(SETUP, "Finished calibrating sensor zones");
+  last_recalibration_ts_ = millis();
 }
 
 void Roode::calibrateDistance() {
@@ -660,6 +666,22 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
   }
 }
 
+void Roode::maybe_auto_recalibrate() {
+  if (auto_recalibrate_interval_ms_ == 0)
+    return;
+  uint32_t now = millis();
+  if (now - last_recalibration_ts_ < auto_recalibrate_interval_ms_)
+    return;
+  if (now - last_auto_recalib_ts_ < recalibrate_cooldown_ms_) {
+    log_event("recalibrate_cooldown_active");
+    return;
+  }
+  log_event("auto_recalibrate_interval");
+  calibrate_zones();
+  last_recalibration_ts_ = now;
+  last_auto_recalib_ts_ = now;
+}
+
 void Roode::sensor_task(void *param) {
   auto *self = static_cast<Roode *>(param);
   for (;;) {
@@ -677,6 +699,7 @@ void Roode::sensor_task(void *param) {
     self->loop_time_sum_ += delta;
     self->loop_count_++;
     self->update_metrics();
+    self->maybe_auto_recalibrate();
     vTaskDelay(pdMS_TO_TICKS(self->polling_interval_ms_));
   }
 }

@@ -41,6 +41,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Optional logging of fallback events helps troubleshoot interrupt or XSHUT failures
 - Event logs detail sensor power cycles, interrupt fallbacks with reasons, manual adjustments, and core mode changes
 - Logs are color-coded: green for normal, yellow for info, and red for failures
+- Scheduled recalibration keeps thresholds accurate over long runtimes
 
 ## Hardware Recommendation
 
@@ -189,6 +190,10 @@ roode:
   log_fallback_events: true
   # Disable dual core tasking if needed
   force_single_core: false
+  # Automatically recalibrate after long intervals
+  auto_recalibrate_interval: 6h
+  # Cooldown between automatic recalibrations
+  recalibrate_cooldown: 30min
   # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
 
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.

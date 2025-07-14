@@ -9,8 +9,12 @@ namespace roode {
 bool Roode::log_fallback_events_ = false;
 
 void Roode::log_event(const std::string &msg) {
-  if (!log_fallback_events_ && (msg == "interrupt_fallback" || msg == "int_pin_missed"))
-    return;
+  if (!log_fallback_events_) {
+    if (msg == "interrupt_fallback" || msg == "interrupt_fallback_polling")
+      return;
+    if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0)
+      return;
+  }
   ESP_LOGI(TAG, "%s", msg.c_str());
 }
 

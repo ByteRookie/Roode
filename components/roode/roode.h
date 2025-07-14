@@ -109,6 +109,8 @@ class Roode : public PollingComponent {
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
   void set_interrupt_status_sensor(sensor::Sensor *sens) { interrupt_status_sensor = sens; }
   void set_xshut_state_binary_sensor(binary_sensor::BinarySensor *bin) { xshut_state_sensor = bin; }
+  // Backwards compatibility with earlier config key name
+  void set_sensor_xshut_state_binary_sensor(binary_sensor::BinarySensor *bin) { set_xshut_state_binary_sensor(bin); }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
   void set_filter_mode(FilterMode mode) {

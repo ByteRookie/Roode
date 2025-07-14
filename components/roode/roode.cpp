@@ -68,6 +68,10 @@ void Roode::log_event(const std::string &msg) {
   } else if (msg.rfind("use_interrupt_mode_", 0) == 0) {
     std::string level = msg.substr(sizeof("use_interrupt_mode_") - 1);
     out += " - INT pin initial " + level;
+    if (level == "low")
+      out += "; waiting for HIGH";
+    else
+      out += "; waiting for LOW";
   } else if (msg == "use_interrupt_mode") {
     out += " - using interrupt mode";
   } else if (msg == "interrupt_fallback_polling" || msg == "interrupt_fallback")

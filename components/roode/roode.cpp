@@ -131,15 +131,15 @@ void Roode::update() {
     distance_exit->publish_state(exit->getDistance());
   }
   if (people_counter != nullptr && fabs(people_counter->state - expected_counter_) > 0.001f) {
-    float diff = people_counter->state - expected_counter_;
-    manual_adjustment_count_ += (int) diff;
+    int diff = (int) roundf(people_counter->state - expected_counter_);
+    manual_adjustment_count_ += abs(diff);
     expected_counter_ = people_counter->state;
     if (manual_adjustment_sensor != nullptr)
       manual_adjustment_sensor->publish_state(manual_adjustment_count_);
-    if (diff > 0)
-      log_event("manual_adjust +" + std::to_string((int) diff));
-    else
-      log_event("manual_adjust " + std::to_string((int) diff));
+    if (diff != 0) {
+      std::string sign = diff > 0 ? "+" : "";
+      log_event("manual_adjust " + sign + std::to_string(diff));
+    }
   }
 }
 

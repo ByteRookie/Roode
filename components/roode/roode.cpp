@@ -15,7 +15,11 @@ void Roode::log_event(const std::string &msg) {
       return;
     if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0)
       return;
-    if (msg == "xshut_toggled" || msg == "xshut_pulse_off" || msg == "xshut_reinitialize" || msg == "sensor.recovered_via_xshut")
+    if (msg == "xshut_toggled" || msg == "xshut_toggled_on" || msg == "xshut_toggled_off" ||
+        msg == "xshut_pulse_off" || msg == "xshut_reinitialize" ||
+        msg == "sensor.recovered_via_xshut" || msg.rfind("xshut_sensor_", 0) == 0 ||
+        msg.rfind("xshut_pulse_off_sensor_", 0) == 0 || msg.rfind("xshut_reinitialize_sensor_", 0) == 0 ||
+        (msg.rfind("sensor_", 0) == 0 && msg.find(".recovered_via_xshut") != std::string::npos))
       return;
   }
 

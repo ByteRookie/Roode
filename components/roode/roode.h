@@ -231,7 +231,8 @@ class Roode : public PollingComponent {
 
   bool use_light_sensor_{false};
   sensor::Sensor *lux_sensor_{nullptr};
-  std::vector<std::pair<uint32_t, float>> lux_samples_;
+  struct LuxSample { uint32_t ts; float lux; };
+  std::vector<LuxSample> lux_samples_;
   bool lux_bootstrap_logged_{false};
   bool lux_learning_complete_logged_{false};
   uint32_t lux_learning_window_ms_{86400000};

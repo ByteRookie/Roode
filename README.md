@@ -33,6 +33,10 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Median/percentile filtering smooths jitter with a configurable window
 - State machine timeouts reset the FSM if a transition stalls
 - Optional CPU optimizations kick in automatically above 90% usage and revert once load drops
+- Interrupt pin support avoids polling overhead with automatic fallback
+- Multiple sensors can share the I²C bus using XSHUT multiplexing
+- Diagnostic sensors expose XSHUT state, interrupt pin level and enabled features
+- Manual adjustment counter tracks user corrections to the people count
 
 ## Hardware Recommendation
 
@@ -232,6 +236,8 @@ binary_sensor:
   - platform: roode
     presence_sensor:
       name: $friendly_name presence
+    sensor_xshut_state:
+      name: $friendly_name xshut active
 
 sensor:
   - platform: roode
@@ -268,6 +274,10 @@ sensor:
       name: $friendly_name RAM usage
     flash_free:
       name: $friendly_name flash usage
+    interrupt_status:
+      name: $friendly_name INT status
+    manual_adjustment_count:
+      name: $friendly_name manual adjusts
 
 text_sensor:
   - platform: roode
@@ -276,6 +286,9 @@ text_sensor:
   - platform: roode
     entry_exit_event:
       name: $friendly_name last direction
+  - platform: roode
+    enabled_features:
+      name: $friendly_name enabled features
 ```
 
 ### Threshold distance

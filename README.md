@@ -39,7 +39,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Manual adjustment counter tracks user corrections to the people count
 - Diagnostic sensors report the state of the interrupt and XSHUT pins
 - Optional logging of fallback events helps troubleshoot interrupt or XSHUT failures
-- Event logs specify when sensors are powered on or off and when interrupt mode falls back to polling
+- Event logs detail sensor power cycles, interrupt fallbacks, manual adjustments, and core mode changes
 
 ## Hardware Recommendation
 
@@ -188,7 +188,7 @@ roode:
   log_fallback_events: true
   # Disable dual core tasking if needed
   force_single_core: false
-  # Event logs include xshut ON/OFF and when interrupts fall back to polling
+  # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
 
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
   # This allows for detecting whether a crossing is an entry or exit based on which zones was crossed first.

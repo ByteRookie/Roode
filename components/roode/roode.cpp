@@ -16,7 +16,57 @@ void Roode::log_event(const std::string &msg) {
     if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0)
       return;
   }
-  ESP_LOGI(TAG, "%s", msg.c_str());
+
+  std::string out = msg;
+  if (msg == "use_dual_core")
+    out += " - launching task on core 1";
+  else if (msg.rfind("retry_multicore_", 0) == 0)
+    out += " - retry creating task";
+  else if (msg == "dual_core_success")
+    out += " - task running on core 1";
+  else if (msg == "dual_core_failed")
+    out += " - task creation failed";
+  else if (msg == "fallback_single_core")
+    out += " - switching to single core";
+  else if (msg == "force_single_core")
+    out += " - single core forced by config";
+  else if (msg.rfind("xshut_sensor_", 0) == 0) {
+    bool on = msg.find("_on") != std::string::npos;
+    size_t start = sizeof("xshut_sensor_") - 1;
+    size_t end = msg.find('_', start);
+    std::string id = msg.substr(start, end - start);
+    out += on ? " - sensor " + id + " ON" : " - sensor " + id + " OFF";
+  } else if (msg == "xshut_toggled_on")
+    out += " - XSHUT pin HIGH";
+  else if (msg == "xshut_toggled_off")
+    out += " - XSHUT pin LOW";
+  else if (msg.rfind("xshut_pulse_off_sensor_", 0) == 0) {
+    std::string id = msg.substr(sizeof("xshut_pulse_off_sensor_") - 1);
+    out += " - pulsing LOW for sensor " + id;
+  } else if (msg.rfind("xshut_reinitialize_sensor_", 0) == 0) {
+    std::string id = msg.substr(sizeof("xshut_reinitialize_sensor_") - 1);
+    out += " - reinitializing sensor " + id;
+  } else if (msg.rfind("sensor_", 0) == 0 && msg.find("_addr") != std::string::npos) {
+    size_t start = sizeof("sensor_") - 1;
+    size_t end = msg.find('_', start);
+    std::string id = msg.substr(start, end - start);
+    std::string addr = msg.substr(msg.find("0x") + 2);
+    out += " - address 0x" + addr + " for sensor " + id;
+  } else if (msg.rfind("sensor_", 0) == 0 && msg.find(".recovered_via_xshut") != std::string::npos) {
+    std::string id = msg.substr(sizeof("sensor_") - 1, msg.find('.') - (sizeof("sensor_") - 1));
+    out += " - sensor " + id + " recovered via XSHUT";
+  } else if (msg.rfind("use_interrupt_mode_", 0) == 0) {
+    std::string level = msg.substr(sizeof("use_interrupt_mode_") - 1);
+    out += " - INT pin initial " + level;
+  } else if (msg == "interrupt_fallback_polling")
+    out += " - INT pin timeout, polling";
+  else if (msg.rfind("int_pin_missed_sensor_", 0) == 0) {
+    std::string id = msg.substr(sizeof("int_pin_missed_sensor_") - 1);
+    out += " - INT miss sensor " + id;
+  } else if (msg.rfind("manual_adjust", 0) == 0)
+    out += " - user corrected";
+
+  ESP_LOGI(TAG, "%s", out.c_str());
 }
 
 Roode::~Roode() {

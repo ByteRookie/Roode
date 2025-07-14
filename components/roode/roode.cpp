@@ -33,11 +33,14 @@ void Roode::setup() {
   ESP_LOGI(SETUP, "Using sampling with sampling size: %d", samples);
 
   std::string feature_list;
-  if (distanceSensor->get_xshut_state().has_value())
-    feature_list += "xshut,";
-  if (distanceSensor->get_interrupt_state().has_value())
-    feature_list += "interrupt,";
-  if (feature_list.size() > 0)
+#ifdef CONFIG_IDF_TARGET_ESP32
+  feature_list += use_sensor_task_ ? "dual_core," : "single_core,";
+#else
+  feature_list += "single_core,";
+#endif
+  feature_list += distanceSensor->get_xshut_state().has_value() ? "xshut," : "no_xshut,";
+  feature_list += distanceSensor->get_interrupt_state().has_value() ? "interrupt," : "polling,";
+  if (!feature_list.empty())
     feature_list.pop_back();
   if (enabled_features_sensor != nullptr)
     enabled_features_sensor->publish_state(feature_list);
@@ -148,16 +151,6 @@ void Roode::loop() {
     // When running on dual core the sensor loop runs in a separate task
     // Skip execution from main loop
     return;
-  }
-  if (xshut_state_sensor != nullptr) {
-    auto st = distanceSensor->get_xshut_state();
-    if (st.has_value())
-      xshut_state_sensor->publish_state(st.value());
-  }
-  if (interrupt_status_sensor != nullptr) {
-    auto st = distanceSensor->get_interrupt_state();
-    if (st.has_value())
-      interrupt_status_sensor->publish_state(st.value());
   }
   unsigned long start = micros();
   this->current_zone->readDistance(distanceSensor);

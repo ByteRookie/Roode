@@ -12,8 +12,7 @@ from . import Roode, CONF_ROODE_ID
 DEPENDENCIES = ["roode"]
 
 CONF_PRESENCE = "presence_sensor"
-CONF_XSHUT_STATE = "sensor_xshut_state"
-TYPES = [CONF_PRESENCE, CONF_XSHUT_STATE]
+TYPES = [CONF_PRESENCE]
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -24,11 +23,6 @@ CONFIG_SCHEMA = cv.Schema(
             {
                 cv.GenerateID(): cv.declare_id(binary_sensor.BinarySensor),
             }
-        ),
-        cv.Optional(CONF_XSHUT_STATE): binary_sensor.binary_sensor_schema(
-            binary_sensor.BinarySensor
-        ).extend(
-            {cv.GenerateID(): cv.declare_id(binary_sensor.BinarySensor)}
         ),
     }
 )

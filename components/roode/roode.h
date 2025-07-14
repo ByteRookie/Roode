@@ -135,8 +135,26 @@ class Roode : public PollingComponent {
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
   static void log_event(const std::string &msg);
+  static Roode *instance_;
+  void record_int_fallback();
   void set_auto_recalibrate_interval(uint32_t ms) { auto_recalibrate_interval_ms_ = ms; }
   void set_recalibrate_cooldown(uint32_t ms) { recalibrate_cooldown_ms_ = ms; }
+  void set_recalibrate_on_temp_change(bool val) { recalibrate_on_temp_change_ = val; }
+  void set_max_temp_delta_for_recalib(float val) { max_temp_delta_for_recalib_ = val; }
+  void set_use_light_sensor(bool val) { use_light_sensor_ = val; }
+  void set_lux_learning_window(uint32_t ms) { lux_learning_window_ms_ = ms; }
+  void set_lux_sample_interval(uint32_t ms) { lux_sample_interval_ms_ = ms; }
+  void set_use_sunrise_prediction(bool val) { use_sunrise_prediction_ = val; }
+  void set_latitude(float val) { latitude_ = val; }
+  void set_longitude(float val) { longitude_ = val; }
+  void set_alpha(float val) { alpha_ = val; }
+  void set_base_multiplier(float val) { base_multiplier_ = val; }
+  void set_max_multiplier(float val) { max_multiplier_ = val; }
+  void set_time_multiplier(float val) { time_multiplier_ = val; }
+  void set_combined_multiplier(float val) { combined_multiplier_ = val; }
+  void set_suppression_window(uint32_t ms) { suppression_window_ms_ = ms; }
+  void set_temperature_sensor(sensor::Sensor *sens) { temperature_sensor_ = sens; }
+  void set_lux_sensor(sensor::Sensor *sens) { lux_sensor_ = sens; }
 
  protected:
   TofSensor *distanceSensor;
@@ -190,11 +208,40 @@ class Roode : public PollingComponent {
   bool force_single_core_{false};
   TaskHandle_t sensor_task_handle_{nullptr};
   uint8_t multicore_retry_count_{0};
+  bool multicore_failed_{false};
+  uint32_t last_multicore_retry_ts_{0};
+
+  // Interrupt robustness tracking
+  int int_fallback_count_{0};
+  uint32_t int_fallback_window_start_{0};
 
   uint32_t auto_recalibrate_interval_ms_{21600000};
   uint32_t recalibrate_cooldown_ms_{1800000};
   uint32_t last_recalibration_ts_{0};
   uint32_t last_auto_recalib_ts_{0};
+  bool recalibrate_on_temp_change_{true};
+  float max_temp_delta_for_recalib_{8.0};
+  sensor::Sensor *temperature_sensor_{nullptr};
+  float baseline_temp_{0};
+
+  bool use_light_sensor_{false};
+  sensor::Sensor *lux_sensor_{nullptr};
+  std::vector<float> lux_samples_;
+  uint32_t lux_learning_window_ms_{86400000};
+  uint32_t lux_sample_interval_ms_{60000};
+  uint32_t last_lux_sample_ts_{0};
+  bool use_sunrise_prediction_{true};
+  float latitude_{0};
+  float longitude_{0};
+  float alpha_{0.5f};
+  float base_multiplier_{1.0f};
+  float max_multiplier_{4.0f};
+  float time_multiplier_{1.5f};
+  float combined_multiplier_{3.0f};
+  uint32_t suppression_window_ms_{1800000};
+  uint32_t sunlight_suppressed_until_{0};
+
+  std::vector<uint32_t> manual_adjust_timestamps_;
 
   enum FSMState { STATE_IDLE, STATE_ENTRY_ACTIVE, STATE_BOTH_ACTIVE };
   FSMState state_{STATE_IDLE};

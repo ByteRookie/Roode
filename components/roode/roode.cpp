@@ -2,12 +2,14 @@
 #include "Arduino.h"
 #include <string>
 #include <optional>
+#include <algorithm>
 
 namespace esphome {
 namespace roode {
 
 // When disabled, fallback diagnostics are omitted from the log to reduce noise.
 bool Roode::log_fallback_events_ = false;
+Roode *Roode::instance_ = nullptr;
 
 void Roode::log_event(const std::string &msg) {
   if (!log_fallback_events_) {
@@ -112,6 +114,7 @@ void Roode::dump_config() {
 }
 
 void Roode::setup() {
+  instance_ = this;
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
@@ -172,6 +175,8 @@ void Roode::setup() {
   } else {
     calibrate_zones();
   }
+  if (temperature_sensor_ != nullptr)
+    baseline_temp_ = temperature_sensor_->state;
 #ifdef CONFIG_IDF_TARGET_ESP32
   if (!force_single_core_) {
     log_event("use_dual_core");
@@ -187,8 +192,14 @@ void Roode::setup() {
     if (res == pdPASS) {
       use_sensor_task_ = true;
       log_event("dual_core_success");
+      if (multicore_failed_) {
+        log_event("dual_core_recovered");
+        multicore_failed_ = false;
+      }
     } else {
       log_event("dual_core_failed");
+      multicore_failed_ = true;
+      last_multicore_retry_ts_ = millis();
       log_event("fallback_single_core");
       use_sensor_task_ = false;
     }
@@ -270,11 +281,58 @@ void Roode::update() {
     if (diff != 0) {
       std::string sign = diff > 0 ? "+" : "";
       log_event("manual_adjust " + sign + std::to_string(diff) + " total=" + std::to_string(manual_adjustment_count_));
+      manual_adjust_timestamps_.push_back(millis());
+    }
+  }
+  if (lux_sensor_ != nullptr) {
+    uint32_t now = millis();
+    if (now - last_lux_sample_ts_ >= lux_sample_interval_ms_) {
+      lux_samples_.push_back(lux_sensor_->state);
+      last_lux_sample_ts_ = now;
+    }
+    while (!lux_samples_.empty() &&
+           now - last_lux_sample_ts_ > lux_learning_window_ms_) {
+      lux_samples_.erase(lux_samples_.begin());
+    }
+  }
+
+  // context aware calibration
+  if (manual_adjust_timestamps_.size() > 0) {
+    uint32_t now = millis();
+    manual_adjust_timestamps_.erase(
+        std::remove_if(manual_adjust_timestamps_.begin(), manual_adjust_timestamps_.end(),
+                       [now](uint32_t ts) { return now - ts > 3600000; }),
+        manual_adjust_timestamps_.end());
+    if (manual_adjust_timestamps_.size() > 5 && lux_sensor_ != nullptr) {
+      float lux = lux_sensor_->state;
+      float pct95 = 0;
+      if (lux_samples_.size() >= 1) {
+        auto samples = lux_samples_;
+        std::sort(samples.begin(), samples.end());
+        pct95 = samples[(size_t) (samples.size() * 0.95f)];
+      }
+      if (lux > pct95 && now - last_recalibration_ts_ > recalibrate_cooldown_ms_) {
+        log_event("manual_recalibrate_triggered");
+        calibrate_zones();
+        manual_adjust_timestamps_.clear();
+        last_recalibration_ts_ = now;
+      }
     }
   }
 }
 
 void Roode::loop() {
+  if (!use_sensor_task_ && !force_single_core_ && multicore_failed_ &&
+      millis() - last_multicore_retry_ts_ >= 300000) {
+    last_multicore_retry_ts_ = millis();
+    log_event("dual_core_fallback");
+    BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 4096, this, 1, &sensor_task_handle_, 1);
+    if (res == pdPASS) {
+      use_sensor_task_ = true;
+      log_event("dual_core_recovered");
+      multicore_failed_ = false;
+    }
+  }
   if (use_sensor_task_) {
     // When running on dual core the sensor loop runs in a separate task
     // Skip execution from main loop
@@ -284,6 +342,24 @@ void Roode::loop() {
   this->current_zone->readDistance(distanceSensor);
   bool zone_trig = current_zone->getMinDistance() < current_zone->threshold->max &&
                    current_zone->getMinDistance() > current_zone->threshold->min;
+  if (use_light_sensor_ && lux_sensor_ != nullptr && !lux_samples_.empty()) {
+    auto samples = lux_samples_;
+    std::sort(samples.begin(), samples.end());
+    float pct95 = samples[(size_t)(samples.size() * 0.95f)];
+    float lux = lux_sensor_->state;
+    float dynamic_multiplier = 1 + alpha_ * ((lux - pct95) / pct95);
+    if (dynamic_multiplier < base_multiplier_)
+      dynamic_multiplier = base_multiplier_;
+    if (dynamic_multiplier > max_multiplier_)
+      dynamic_multiplier = max_multiplier_;
+    if (lux > pct95 && millis() < sunlight_suppressed_until_ + suppression_window_ms_) {
+      zone_trig = false;
+      log_event("sunlight_suppressed_event");
+    } else if (lux > pct95) {
+      log_event("lux_outlier_detected");
+      sunlight_suppressed_until_ = millis();
+    }
+  }
   if (!cpu_optimizations_active_ || zone_trig)
     path_tracking(this->current_zone);
   handle_sensor_status();
@@ -476,10 +552,13 @@ void Roode::recalibration() {
   log_event("manual_recalibrate_triggered");
   calibrate_zones();
   last_recalibration_ts_ = millis();
+  if (temperature_sensor_ != nullptr)
+    baseline_temp_ = temperature_sensor_->state;
 }
 
 void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone_id);
+  log_event("idle_triggered_recalibration");
   Zone *z = zone_id == 0 ? entry : exit;
   z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195)
                              : (orientation_ == Parallel ? 231 : 60));
@@ -672,6 +751,21 @@ void Roode::maybe_auto_recalibrate() {
   uint32_t now = millis();
   if (now - last_recalibration_ts_ < auto_recalibrate_interval_ms_)
     return;
+  if (recalibrate_on_temp_change_ && temperature_sensor_ != nullptr) {
+    float cur = temperature_sensor_->state;
+    if (!isnan(cur) && fabs(cur - baseline_temp_) >= max_temp_delta_for_recalib_) {
+      if (now - last_auto_recalib_ts_ < recalibrate_cooldown_ms_) {
+        log_event("recalibrate_cooldown_active");
+        return;
+      }
+      log_event("temp_triggered_recalibration");
+      calibrate_zones();
+      baseline_temp_ = cur;
+      last_recalibration_ts_ = now;
+      last_auto_recalib_ts_ = now;
+      return;
+    }
+  }
   if (now - last_auto_recalib_ts_ < recalibrate_cooldown_ms_) {
     log_event("recalibrate_cooldown_active");
     return;
@@ -682,6 +776,19 @@ void Roode::maybe_auto_recalibrate() {
   last_auto_recalib_ts_ = now;
 }
 
+void Roode::record_int_fallback() {
+  uint32_t now = millis();
+  if (int_fallback_window_start_ == 0 || now - int_fallback_window_start_ > 1800000) {
+    int_fallback_window_start_ = now;
+    int_fallback_count_ = 0;
+  }
+  int_fallback_count_++;
+  if (int_fallback_count_ >= 3) {
+    int_fallback_count_ = 0;
+    log_event("interrupt_fallback");
+  }
+}
+
 void Roode::sensor_task(void *param) {
   auto *self = static_cast<Roode *>(param);
   for (;;) {
@@ -690,6 +797,24 @@ void Roode::sensor_task(void *param) {
     self->current_zone->readDistance(self->distanceSensor);
     bool zone_trig = self->current_zone->getMinDistance() < self->current_zone->threshold->max &&
                      self->current_zone->getMinDistance() > self->current_zone->threshold->min;
+    if (self->use_light_sensor_ && self->lux_sensor_ != nullptr && !self->lux_samples_.empty()) {
+      auto samples = self->lux_samples_;
+      std::sort(samples.begin(), samples.end());
+      float pct95 = samples[(size_t)(samples.size() * 0.95f)];
+      float lux = self->lux_sensor_->state;
+      float dynamic_multiplier = 1 + self->alpha_ * ((lux - pct95) / pct95);
+      if (dynamic_multiplier < self->base_multiplier_)
+        dynamic_multiplier = self->base_multiplier_;
+      if (dynamic_multiplier > self->max_multiplier_)
+        dynamic_multiplier = self->max_multiplier_;
+      if (lux > pct95 && millis() < self->sunlight_suppressed_until_ + self->suppression_window_ms_) {
+        zone_trig = false;
+        log_event("sunlight_suppressed_event");
+      } else if (lux > pct95) {
+        log_event("lux_outlier_detected");
+        self->sunlight_suppressed_until_ = millis();
+      }
+    }
     if (!self->cpu_optimizations_active_ || zone_trig)
       self->path_tracking(self->current_zone);
     self->handle_sensor_status();

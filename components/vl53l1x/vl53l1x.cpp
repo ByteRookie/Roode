@@ -276,6 +276,8 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     roode::Roode::log_event("int_pin_missed_sensor_" + std::to_string(sensor_id_));
     roode::Roode::log_event("int_pin_missed");
     roode::Roode::log_event("interrupt_fallback");
+    if (roode::Roode::instance_ != nullptr)
+      roode::Roode::instance_->record_int_fallback();
     // Fallback to polling for this measurement
     start_time = millis();
     while (!dataReady && (millis() - start_time) < this->timeout) {

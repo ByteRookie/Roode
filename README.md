@@ -322,6 +322,19 @@ text_sensor:
       name: $friendly_name enabled features # includes RAM, flash and core count
 ```
 
+### Diagnostic Sensors
+
+Two optional sensors help troubleshoot the counter:
+
+- `manual_adjustment_count` tracks the total number of manual corrections made to
+  the people counter since the device booted. Each increment or decrement adds
+  the absolute change to this value.
+- `enabled_features` publishes a comma-separated list describing which runtime
+  features are active such as `single_core` vs `dual_core`, `xshut` or
+  `interrupt` usage and the hardware RAM/flash size. The list is also printed to
+  the log on startup for quick reference.
+
+
 ### Threshold distance
 
 Another crucial choice is the one corresponding to the threshold. Indeed a movement is detected whenever the distance read by the sensor is below this value. The code contains a vector as threshold, as one (as myself) might need a different threshold for each zone.

@@ -65,7 +65,8 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   optional<uint16_t> xtalk{};
   uint16_t timeout{};
  ROI *last_roi{};
- int recovery_count_{0};
+  int recovery_count_{0};
+  bool interrupt_mode_active_{false};
   uint8_t sensor_id_{0};
   uint8_t desired_address_{0x29};
   static std::vector<VL53L1X *> sensors;

@@ -130,6 +130,7 @@ class Roode : public PollingComponent {
   void update_metrics();
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
+  static void log_event(const std::string &msg);
 
  protected:
   TofSensor *distanceSensor;
@@ -210,7 +211,6 @@ class Roode : public PollingComponent {
   uint32_t loop_count_{0};
   static void sensor_task(void *param);
   bool use_sensor_task_{false};
-  static void log_event(const std::string &msg);
 };
 
 }  // namespace roode

@@ -38,7 +38,6 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Multiple sensors can share the I²C bus using XSHUT multiplexing
 - Text sensor reports enabled features and hardware stats at startup (core mode, XSHUT/INT usage, RAM, flash, cores)
 - Manual adjustment counter accumulates the absolute change whenever the people count is corrected
-- Diagnostic sensors report the state of the interrupt and XSHUT pins
 - Optional logging of fallback events helps troubleshoot interrupt or XSHUT failures
 - Event logs detail sensor power cycles, interrupt fallbacks with reasons, manual adjustments, and core mode changes
 - Logs are color-coded: green for normal, yellow for info, and red for failures
@@ -308,10 +307,6 @@ sensor:
       name: $friendly_name RAM usage
     flash_free:
       name: $friendly_name flash usage
-    interrupt_status:
-      name: $friendly_name interrupt status
-    sensor_xshut_state:
-      name: $friendly_name xshut state
     manual_adjustment_count:
       name: $friendly_name manual adjusts
 

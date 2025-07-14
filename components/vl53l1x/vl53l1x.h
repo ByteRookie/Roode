@@ -40,6 +40,8 @@ class VL53L1X : public i2c::I2CDevice, public Component {
       return this->interrupt_pin.value()->digital_read();
     return {};
   }
+  bool reset_via_xshut();
+  bool recheck_features() { return this->check_features(); }
   int get_recovery_count() const { return recovery_count_; }
   void set_sensor_id(uint8_t id) { sensor_id_ = id; }
   void set_desired_address(uint8_t addr) { desired_address_ = addr; }

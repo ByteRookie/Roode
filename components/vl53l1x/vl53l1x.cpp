@@ -337,6 +337,23 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   return {distance};
 }
 
+bool VL53L1X::reset_via_xshut() {
+  if (!this->xshut_pin.has_value())
+    return false;
+  this->xshut_pin.value()->digital_write(false);
+  roode::Roode::log_event("xshut_pulse_off_sensor_" + std::to_string(sensor_id_));
+  roode::Roode::log_event("xshut_pulse_off");
+  delay(100);
+  this->xshut_pin.value()->digital_write(true);
+  roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
+  roode::Roode::log_event("xshut_reinitialize");
+  this->wait_for_boot();
+  roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
+  roode::Roode::log_event("sensor.recovered_via_xshut");
+  recovery_count_++;
+  return true;
+}
+
 bool VL53L1X::check_features() {
   ESP_LOGI(TAG, "Validating optional pins");
   bool xshut_ok = false;

@@ -786,6 +786,14 @@ void Roode::record_int_fallback() {
   if (int_fallback_count_ >= 3) {
     int_fallback_count_ = 0;
     log_event("interrupt_fallback");
+    if (distanceSensor != nullptr) {
+      distanceSensor->recheck_features();
+      if (!distanceSensor->get_interrupt_state().has_value() &&
+          distanceSensor->get_xshut_state().has_value()) {
+        distanceSensor->reset_via_xshut();
+        distanceSensor->recheck_features();
+      }
+    }
   }
 }
 

@@ -14,10 +14,14 @@ namespace roode {
 bool Roode::log_fallback_events_ = false;
 Roode *Roode::instance_ = nullptr;
 
+struct LuxSample {
+  uint32_t ts;
+  float lux;
+};
 struct LuxPersist {
   uint16_t count;
   uint16_t index;
-  std::array<std::pair<uint32_t, float>, MAX_LUX_SAMPLES> samples;
+  std::array<LuxSample, MAX_LUX_SAMPLES> samples;
 };
 
 void Roode::load_lux_samples() {
@@ -378,7 +382,7 @@ void Roode::update() {
       }
     }
     while (!lux_samples_.empty() &&
-           now - lux_samples_.front().first > lux_learning_window_ms_) {
+           now - lux_samples_.front().ts > lux_learning_window_ms_) {
       lux_samples_.erase(lux_samples_.begin());
     }
     if (lux_samples_.size() > 0)
@@ -399,7 +403,7 @@ void Roode::update() {
         std::vector<float> vals;
         vals.reserve(lux_samples_.size());
         for (auto &p : lux_samples_)
-          vals.push_back(p.second);
+          vals.push_back(p.lux);
         std::sort(vals.begin(), vals.end());
         pct95 = vals[(size_t) (vals.size() * 0.95f)];
       }
@@ -440,7 +444,7 @@ void Roode::loop() {
     std::vector<float> vals;
     vals.reserve(lux_samples_.size());
     for (auto &p : lux_samples_)
-      vals.push_back(p.second);
+      vals.push_back(p.lux);
     std::sort(vals.begin(), vals.end());
     float pct95 = vals[(size_t)(vals.size() * 0.95f)];
     float lux = lux_sensor_->state;
@@ -953,7 +957,7 @@ void Roode::sensor_task(void *param) {
       std::vector<float> vals;
       vals.reserve(self->lux_samples_.size());
       for (auto &p : self->lux_samples_)
-        vals.push_back(p.second);
+        vals.push_back(p.lux);
       std::sort(vals.begin(), vals.end());
       float pct95 = vals[(size_t)(vals.size() * 0.95f)];
       float lux = self->lux_sensor_->state;

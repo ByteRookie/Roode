@@ -32,6 +32,7 @@ struct Threshold {
 
 class Zone {
  public:
+  static const uint8_t MAX_BUFFER_SIZE = 10;
   explicit Zone(uint8_t id) : id{id} {};
   ~Zone();
   void dump_config() const;
@@ -59,7 +60,6 @@ class Zone {
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
   uint16_t last_distance{0};
   uint16_t min_distance{0};
-  static const uint8_t MAX_BUFFER_SIZE = 10;
   std::array<uint16_t, MAX_BUFFER_SIZE> samples{};
   uint8_t sample_idx_{0};
   uint8_t sample_count_{0};

@@ -1,5 +1,6 @@
 #pragma once
 #include <math.h>
+#include <string>
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
@@ -104,6 +105,11 @@ class Roode : public PollingComponent {
   void set_entry_exit_event_text_sensor(text_sensor::TextSensor *entry_exit_event_sensor_) {
     entry_exit_event_sensor = entry_exit_event_sensor_;
   }
+  void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
+  void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
+  void set_interrupt_status_sensor(sensor::Sensor *sens) { interrupt_status_sensor = sens; }
+  void set_xshut_state_binary_sensor(binary_sensor::BinarySensor *bin) { xshut_state_sensor = bin; }
+  void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
   void set_filter_mode(FilterMode mode) {
     filter_mode_ = mode;
@@ -147,6 +153,10 @@ class Roode : public PollingComponent {
   binary_sensor::BinarySensor *presence_sensor{nullptr};
   text_sensor::TextSensor *version_sensor{nullptr};
   text_sensor::TextSensor *entry_exit_event_sensor{nullptr};
+  text_sensor::TextSensor *enabled_features_sensor{nullptr};
+  sensor::Sensor *manual_adjustment_sensor{nullptr};
+  sensor::Sensor *interrupt_status_sensor{nullptr};
+  binary_sensor::BinarySensor *xshut_state_sensor{nullptr};
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;
@@ -166,6 +176,10 @@ class Roode : public PollingComponent {
 
   bool cpu_optimizations_active_{false};
   uint16_t polling_interval_ms_{10};
+
+  static bool log_fallback_events_;
+  int manual_adjustment_count_{0};
+  float expected_counter_{0};
 
   enum FSMState { STATE_IDLE, STATE_ENTRY_ACTIVE, STATE_BOTH_ACTIVE };
   FSMState state_{STATE_IDLE};
@@ -196,6 +210,7 @@ class Roode : public PollingComponent {
   uint32_t loop_count_{0};
   static void sensor_task(void *param);
   bool use_sensor_task_{false};
+  static void log_event(const std::string &msg);
 };
 
 }  // namespace roode

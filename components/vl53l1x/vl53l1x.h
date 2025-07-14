@@ -2,6 +2,7 @@
 #include <math.h>
 
 #include "VL53L1X_ULD.h"
+#include <vector>
 #include "esphome/components/i2c/i2c.h"
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
@@ -29,6 +30,20 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   optional<uint16_t> read_distance(ROI *roi, VL53L1_Error &error);
   void set_ranging_mode(const RangingMode *mode);
 
+  optional<bool> get_xshut_state() {
+    if (this->xshut_pin.has_value())
+      return this->xshut_pin.value()->digital_read();
+    return {};
+  }
+  optional<bool> get_interrupt_state() {
+    if (this->interrupt_pin.has_value())
+      return this->interrupt_pin.value()->digital_read();
+    return {};
+  }
+  int get_recovery_count() const { return recovery_count_; }
+  void set_sensor_id(uint8_t id) { sensor_id_ = id; }
+  void set_desired_address(uint8_t addr) { desired_address_ = addr; }
+
   void set_xshut_pin(GPIOPin *pin) { this->xshut_pin = pin; }
   void set_interrupt_pin(InternalGPIOPin *pin) { this->interrupt_pin = pin; }
   optional<const RangingMode *> get_ranging_mode_override() { return this->ranging_mode_override; }
@@ -47,7 +62,11 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   optional<int16_t> offset{};
   optional<uint16_t> xtalk{};
   uint16_t timeout{};
-  ROI *last_roi{};
+ ROI *last_roi{};
+ int recovery_count_{0};
+  uint8_t sensor_id_{0};
+  uint8_t desired_address_{0x29};
+  static std::vector<VL53L1X *> sensors;
 
   VL53L1_Error init();
   VL53L1_Error wait_for_boot();

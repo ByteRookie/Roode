@@ -1,8 +1,17 @@
 #include "roode.h"
 #include "Arduino.h"
+#include <string>
 
 namespace esphome {
 namespace roode {
+
+bool Roode::log_fallback_events_ = false;
+
+void Roode::log_event(const std::string &msg) {
+  if (!log_fallback_events_ && (msg == "interrupt_fallback" || msg == "int_pin_missed"))
+    return;
+  ESP_LOGI(TAG, "%s", msg.c_str());
+}
 
 Roode::~Roode() {
   delete entry;
@@ -22,6 +31,17 @@ void Roode::setup() {
     version_sensor->publish_state(VERSION);
   }
   ESP_LOGI(SETUP, "Using sampling with sampling size: %d", samples);
+
+  std::string feature_list;
+  if (distanceSensor->get_xshut_state().has_value())
+    feature_list += "xshut,";
+  if (distanceSensor->get_interrupt_state().has_value())
+    feature_list += "interrupt,";
+  if (feature_list.size() > 0)
+    feature_list.pop_back();
+  if (enabled_features_sensor != nullptr)
+    enabled_features_sensor->publish_state(feature_list);
+  log_event(std::string("features_enabled: ") + feature_list);
 
   if (this->distanceSensor->is_failed()) {
     this->mark_failed();
@@ -96,6 +116,11 @@ void Roode::setup() {
     ram_free_sensor->publish_state(0);
   if (flash_free_sensor != nullptr)
     flash_free_sensor->publish_state(0);
+  manual_adjustment_count_ = 0;
+  if (manual_adjustment_sensor != nullptr)
+    manual_adjustment_sensor->publish_state(0);
+  if (people_counter != nullptr)
+    expected_counter_ = people_counter->state;
 }
 
 void Roode::update() {
@@ -105,6 +130,17 @@ void Roode::update() {
   if (distance_exit != nullptr) {
     distance_exit->publish_state(exit->getDistance());
   }
+  if (people_counter != nullptr && fabs(people_counter->state - expected_counter_) > 0.001f) {
+    float diff = people_counter->state - expected_counter_;
+    manual_adjustment_count_ += (int) diff;
+    expected_counter_ = people_counter->state;
+    if (manual_adjustment_sensor != nullptr)
+      manual_adjustment_sensor->publish_state(manual_adjustment_count_);
+    if (diff > 0)
+      log_event("manual_adjust +" + std::to_string((int) diff));
+    else
+      log_event("manual_adjust " + std::to_string((int) diff));
+  }
 }
 
 void Roode::loop() {
@@ -112,6 +148,16 @@ void Roode::loop() {
     // When running on dual core the sensor loop runs in a separate task
     // Skip execution from main loop
     return;
+  }
+  if (xshut_state_sensor != nullptr) {
+    auto st = distanceSensor->get_xshut_state();
+    if (st.has_value())
+      xshut_state_sensor->publish_state(st.value());
+  }
+  if (interrupt_status_sensor != nullptr) {
+    auto st = distanceSensor->get_interrupt_state();
+    if (st.has_value())
+      interrupt_status_sensor->publish_state(st.value());
   }
   unsigned long start = micros();
   this->current_zone->readDistance(distanceSensor);
@@ -299,6 +345,7 @@ void Roode::updateCounter(int delta) {
   }
   auto next = this->people_counter->state + (float) delta;
   ESP_LOGI(TAG, "Updating people count: %d", (int) next);
+  expected_counter_ = next;
   auto call = this->people_counter->make_call();
   call.set_value(next);
   call.perform();

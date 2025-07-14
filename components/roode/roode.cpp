@@ -1,6 +1,7 @@
 #include "roode.h"
 #include "Arduino.h"
 #include <string>
+#include <optional>
 
 namespace esphome {
 namespace roode {
@@ -122,6 +123,16 @@ void Roode::setup() {
   manual_adjustment_count_ = 0;
   if (manual_adjustment_sensor != nullptr)
     manual_adjustment_sensor->publish_state(0);
+  if (xshut_state_binary_sensor != nullptr) {
+    auto val = distanceSensor->get_xshut_state();
+    if (val.has_value())
+      xshut_state_binary_sensor->publish_state(*val);
+  }
+  if (interrupt_status_sensor != nullptr) {
+    auto val = distanceSensor->get_interrupt_state();
+    if (val.has_value())
+      interrupt_status_sensor->publish_state(*val ? 1 : 0);
+  }
   if (people_counter != nullptr)
     expected_counter_ = people_counter->state;
 }
@@ -132,6 +143,16 @@ void Roode::update() {
   }
   if (distance_exit != nullptr) {
     distance_exit->publish_state(exit->getDistance());
+  }
+  if (xshut_state_binary_sensor != nullptr) {
+    auto val = distanceSensor->get_xshut_state();
+    if (val.has_value())
+      xshut_state_binary_sensor->publish_state(*val);
+  }
+  if (interrupt_status_sensor != nullptr) {
+    auto val = distanceSensor->get_interrupt_state();
+    if (val.has_value())
+      interrupt_status_sensor->publish_state(*val ? 1 : 0);
   }
   if (people_counter != nullptr && fabs(people_counter->state - expected_counter_) > 0.001f) {
     int diff = (int) roundf(people_counter->state - expected_counter_);

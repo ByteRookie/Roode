@@ -37,6 +37,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Multiple sensors can share the I²C bus using XSHUT multiplexing
 - Text sensor reports the list of enabled and fallback features
 - Manual adjustment counter tracks user corrections to the people count
+- Diagnostic sensors report the state of the interrupt and XSHUT pins
 
 ## Hardware Recommendation
 
@@ -272,6 +273,10 @@ sensor:
       name: $friendly_name RAM usage
     flash_free:
       name: $friendly_name flash usage
+    interrupt_status:
+      name: $friendly_name interrupt status
+    sensor_xshut_state:
+      name: $friendly_name xshut state
     manual_adjustment_count:
       name: $friendly_name manual adjusts
 

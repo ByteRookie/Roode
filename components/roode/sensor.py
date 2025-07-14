@@ -29,6 +29,7 @@ CONF_CPU_USAGE = "cpu_usage"
 CONF_RAM_FREE = "ram_free"
 CONF_FLASH_FREE = "flash_free"
 CONF_MANUAL_ADJUST = "manual_adjustment_count"
+CONF_INTERRUPT_STATUS = "interrupt_status"
 
 CONFIG_SCHEMA = sensor.sensor_schema().extend(
     {
@@ -135,6 +136,11 @@ CONFIG_SCHEMA = sensor.sensor_schema().extend(
             state_class=STATE_CLASS_MEASUREMENT,
             entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
+        cv.Optional(CONF_INTERRUPT_STATUS): sensor.sensor_schema(
+            icon="mdi:lightning-bolt",
+            accuracy_decimals=0,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
         cv.Optional(CONF_MANUAL_ADJUST): sensor.sensor_schema(
             icon="mdi:counter",
             accuracy_decimals=0,
@@ -192,6 +198,9 @@ async def to_code(config):
     if CONF_FLASH_FREE in config:
         count = await sensor.new_sensor(config[CONF_FLASH_FREE])
         cg.add(var.set_flash_free_sensor(count))
+    if CONF_INTERRUPT_STATUS in config:
+        count = await sensor.new_sensor(config[CONF_INTERRUPT_STATUS])
+        cg.add(var.set_interrupt_status_sensor(count))
     if CONF_MANUAL_ADJUST in config:
         count = await sensor.new_sensor(config[CONF_MANUAL_ADJUST])
         cg.add(var.set_manual_adjustment_sensor(count))

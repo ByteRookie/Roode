@@ -6,6 +6,7 @@
 namespace esphome {
 namespace roode {
 
+// When disabled, fallback diagnostics are omitted from the log to reduce noise.
 bool Roode::log_fallback_events_ = false;
 
 void Roode::log_event(const std::string &msg) {

@@ -29,7 +29,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Optional sensors report loop time, CPU usage, RAM and flash usage percentages
 - Fail-safe recalibration restores thresholds if a zone stays active
 - Calibration data can persist in flash across reboots
-- Dual-core tasking keeps distance polling responsive on ESP32
+- Dual-core tasking keeps distance polling responsive on ESP32 with automatic retry and fallback
 - Median/percentile filtering smooths jitter with a configurable window
 - State machine timeouts reset the FSM if a transition stalls
 - Optional CPU optimizations kick in automatically above 90% usage and revert once load drops
@@ -186,6 +186,8 @@ roode:
   filter_window: 5
   # Log interrupt fallback events and XSHUT recoveries
   log_fallback_events: true
+  # Disable dual core tasking if needed
+  force_single_core: false
   # Event logs include xshut ON/OFF and when interrupts fall back to polling
 
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.

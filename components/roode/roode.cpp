@@ -37,19 +37,6 @@ void Roode::setup() {
   }
   ESP_LOGI(SETUP, "Using sampling with sampling size: %d", samples);
 
-  std::string feature_list;
-#ifdef CONFIG_IDF_TARGET_ESP32
-  feature_list += use_sensor_task_ ? "dual_core," : "single_core,";
-#else
-  feature_list += "single_core,";
-#endif
-  feature_list += distanceSensor->get_xshut_state().has_value() ? "xshut," : "no_xshut,";
-  feature_list += distanceSensor->get_interrupt_state().has_value() ? "interrupt," : "polling,";
-  if (!feature_list.empty())
-    feature_list.pop_back();
-  if (enabled_features_sensor != nullptr)
-    enabled_features_sensor->publish_state(feature_list);
-  log_event(std::string("features_enabled: ") + feature_list);
 
   if (this->distanceSensor->is_failed()) {
     this->mark_failed();
@@ -105,8 +92,29 @@ void Roode::setup() {
     calibrate_zones();
   }
 #ifdef CONFIG_IDF_TARGET_ESP32
-  xTaskCreatePinnedToCore(sensor_task, "SensorTask", 4096, this, 1, NULL, 1);
-  use_sensor_task_ = true;
+  if (!force_single_core_) {
+    log_event("use_dual_core");
+    vTaskDelay(pdMS_TO_TICKS(200));
+    BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 4096, this, 1, &sensor_task_handle_, 1);
+    multicore_retry_count_ = 0;
+    while (res != pdPASS && multicore_retry_count_ < 2) {
+      multicore_retry_count_++;
+      log_event(std::string("retry_multicore_") + std::to_string(multicore_retry_count_));
+      vTaskDelay(pdMS_TO_TICKS(200));
+      res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 4096, this, 1, &sensor_task_handle_, 1);
+    }
+    if (res == pdPASS) {
+      use_sensor_task_ = true;
+      log_event("dual_core_success");
+    } else {
+      log_event("dual_core_failed");
+      log_event("fallback_single_core");
+      use_sensor_task_ = false;
+    }
+  } else {
+    use_sensor_task_ = false;
+    log_event("force_single_core");
+  }
 #else
   use_sensor_task_ = false;
 #endif
@@ -139,6 +147,20 @@ void Roode::setup() {
   }
   if (people_counter != nullptr)
     expected_counter_ = people_counter->state;
+
+  std::string feature_list;
+#ifdef CONFIG_IDF_TARGET_ESP32
+  feature_list += use_sensor_task_ ? "dual_core," : "single_core,";
+#else
+  feature_list += "single_core,";
+#endif
+  feature_list += distanceSensor->get_xshut_state().has_value() ? "xshut," : "no_xshut,";
+  feature_list += distanceSensor->get_interrupt_state().has_value() ? "interrupt," : "polling,";
+  if (!feature_list.empty())
+    feature_list.pop_back();
+  if (enabled_features_sensor != nullptr)
+    enabled_features_sensor->publish_state(feature_list);
+  log_event(std::string("features_enabled: ") + feature_list);
 }
 
 void Roode::update() {

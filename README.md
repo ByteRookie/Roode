@@ -21,24 +21,32 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 
 ## Features
 
+### Hardware management
+
 - Automatic sensor restart using the xshut pin when a measurement times out
 - Cleaner memory management and sensor shutdown on reboot
 - Startup check that logs whether the xshut and interrupt pins are functional
 - If a pin test fails at boot the feature is automatically disabled so the sensor continues operating
 - Xshut and interrupt pins use internal pull-ups so no extra resistors are needed
-- Optional sensors report loop time, CPU usage, RAM and flash usage percentages
+- Multiple sensors can share the I²C bus using XSHUT multiplexing
+- Interrupt pin support avoids polling overhead with automatic fallback; logs show the interrupt pin level and why polling may be used
+
+### Sensor and algorithm
+
 - Fail-safe recalibration restores thresholds if a zone stays active
 - Calibration data can persist in flash across reboots
 - Dual-core tasking keeps distance polling responsive on ESP32 with automatic retry and fallback
 - Median/percentile filtering smooths jitter with a configurable window
 - State machine timeouts reset the FSM if a transition stalls
 - Optional CPU optimizations kick in automatically above 90% usage and revert once load drops
-- Interrupt pin support avoids polling overhead with automatic fallback; logs show the interrupt pin level and why polling may be used
-- Multiple sensors can share the I²C bus using XSHUT multiplexing
-- Text sensor reports the list of enabled and fallback features
-- Features text sensor reports XSHUT and refresh status, CPU details, memory sizes with units and the last calibration time
+
+### Diagnostics and logging
+
+- Optional sensors report loop time, CPU usage, RAM and flash usage percentages
 - Manual adjustment counter tracks user corrections to the people count
 - Diagnostic sensors report the state of the interrupt and XSHUT pins
+- Text sensor reports the list of enabled and fallback features
+- Features text sensor reports XSHUT and refresh status, CPU details, memory sizes with units and the last calibration time
 - Optional logging of fallback events helps troubleshoot interrupt or XSHUT failures
 - Event logs detail sensor power cycles, interrupt fallbacks with reasons, manual adjustments, and core mode changes
 - Interrupt mode logs only report errors

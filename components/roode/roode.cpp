@@ -324,9 +324,6 @@ void Roode::setup() {
 #endif
   feature_list += distanceSensor->get_xshut_state().has_value() ? "xshut," : "no_xshut,";
   feature_list += distanceSensor->get_interrupt_state().has_value() ? "interrupt," : "polling,";
-  feature_list += "Ram " + std::to_string(ESP.getHeapSize() / 1024) + "k,";
-  feature_list += "Flash " + std::to_string(ESP.getFlashChipSize() / 1024 / 1024) + "M,";
-  feature_list += "Cores " + std::to_string(ESP.getChipCores()) + ",";
   if (!feature_list.empty())
     feature_list.pop_back();
   if (enabled_features_sensor != nullptr)

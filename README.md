@@ -36,7 +36,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Optional CPU optimizations kick in automatically above 90% usage and revert once load drops
 - Interrupt pin support avoids polling overhead with automatic fallback; logs show the interrupt pin level and why polling may be used
 - Multiple sensors can share the I²C bus using XSHUT multiplexing
-- Text sensor reports enabled features and hardware stats at startup (core mode, XSHUT/INT usage, RAM, flash, cores)
+- Text sensor reports the list of enabled and fallback features at startup
 - Manual adjustment counter accumulates the absolute change whenever the people count is corrected
 - Diagnostic sensors report the state of the interrupt and XSHUT pins
 - Optional logging of fallback events helps troubleshoot interrupt or XSHUT failures
@@ -324,7 +324,7 @@ text_sensor:
       name: $friendly_name last direction
   - platform: roode
     enabled_features:
-      name: $friendly_name enabled features # includes RAM, flash and core count
+      name: $friendly_name enabled features
 ```
 
 ### Threshold distance

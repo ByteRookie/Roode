@@ -276,13 +276,13 @@ void Roode::setup() {
   if (!force_single_core_) {
     log_event("use_dual_core");
     vTaskDelay(pdMS_TO_TICKS(200));
-    BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 12288, this, 1, &sensor_task_handle_, 1);
+    BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 8192, this, 1, &sensor_task_handle_, 1);
     multicore_retry_count_ = 0;
     while (res != pdPASS && multicore_retry_count_ < 2) {
       multicore_retry_count_++;
       log_event(std::string("retry_multicore_") + std::to_string(multicore_retry_count_));
       vTaskDelay(pdMS_TO_TICKS(200));
-      res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 12288, this, 1, &sensor_task_handle_, 1);
+      res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 8192, this, 1, &sensor_task_handle_, 1);
     }
     if (res == pdPASS) {
       use_sensor_task_ = true;
@@ -440,7 +440,7 @@ void Roode::loop() {
       millis() - last_multicore_retry_ts_ >= 300000) {
     last_multicore_retry_ts_ = millis();
     log_event("dual_core_fallback");
-    BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 12288, this, 1, &sensor_task_handle_, 1);
+    BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 8192, this, 1, &sensor_task_handle_, 1);
     if (res == pdPASS) {
       use_sensor_task_ = true;
       log_event("dual_core_recovered");

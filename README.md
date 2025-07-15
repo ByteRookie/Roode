@@ -151,11 +151,17 @@ vl53l1x:
 
 Roode prefers the interrupt pin for efficient updates when it is defined and
 validated. When `interrupt` is present the sensor notifies the MCU whenever a
-sample is ready, avoiding constant I²C traffic. If the INT pin is missing or
-stops working, Roode quietly falls back to a 10&nbsp;ms polling loop and retries
-enabling interrupts every 30&nbsp;minutes. Polling is also used as a safety net
+sample is ready, avoiding constant I\u00b2C traffic. If the INT pin is missing or
+stops working, Roode quietly falls back to a 10\u00a0ms polling loop and retries
+enabling interrupts every 30\u00a0minutes. Polling is also used as a safety net
 in case an interrupt is missed during startup or because of noise so distance
 readings remain reliable.
+
+| Condition | Mode used |
+| --- | --- |
+| Interrupt pin defined and working | Hardware interrupt for every sample |
+| Interrupt pin missing or failing | 10&nbsp;ms polling with interrupt retries |
+| Single missed interrupts/noise | Polling continues as backup to ensure a reading |
 
 # Roode people counting algorithm
 roode:
@@ -236,6 +242,12 @@ Roode smooths measurements by buffering several readings.  `filter_mode`
 controls how the sample window is combined: `min` uses the smallest value,
 `median` picks the middle value and `percentile10` selects the 10th percentile.
 `filter_window` sets how many samples are stored.
+
+| Mode | When to use | Pros | Cons |
+| --- | --- | --- | --- |
+| `min` | Very clean environments or quick response needed | Reacts instantly to changes | Sensitive to noise and outliers |
+| `median` | General use when noise is moderate | Ignores spikes for stable readings | Can lag behind fast motion |
+| `percentile10` | Noisy locations where some jitter must be ignored | Balances responsiveness and noise rejection | Slightly less stable than median |
 
 Also feel free to check out running examples for:
 - [Wemos D1 mini with ESP32](peopleCounter32.yaml)

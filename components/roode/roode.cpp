@@ -221,26 +221,12 @@ void Roode::setup() {
 
   std::string feature_list;
 #ifdef CONFIG_IDF_TARGET_ESP32
-  feature_list += std::string("core_mode:") + (use_sensor_task_ ? "dual_core," : "single_core,");
+  feature_list += use_sensor_task_ ? "dual_core," : "single_core,";
 #else
-  feature_list += "core_mode:single_core,";
+  feature_list += "single_core,";
 #endif
-  feature_list += std::string("xshut:") + (distanceSensor->get_xshut_state().has_value() ? "enabled," : "disabled,");
-  feature_list += std::string("interrupt:") + (distanceSensor->is_interrupt_enabled() ? "enabled," : "polling,");
-  auto fmt_mem = [](uint32_t kb) {
-    if (kb >= 1024)
-      return std::to_string(kb / 1024) + "MB";
-    return std::to_string(kb) + "KB";
-  };
-  uint32_t total_heap_kb = ESP.getHeapSize() / 1024;
-  uint32_t total_flash_kb = ESP.getFlashChipSize() / 1024;
-  feature_list += "ram:" + fmt_mem(total_heap_kb) + ',';
-  feature_list += "flash:" + fmt_mem(total_flash_kb) + ',';
-#ifdef CONFIG_IDF_TARGET_ESP32
-  feature_list += "cpu_cores:" + std::to_string(ESP.getChipCores()) + ',';
-#else
-  feature_list += "cpu_cores:1,";
-#endif
+  feature_list += distanceSensor->get_xshut_state().has_value() ? "xshut," : "no_xshut,";
+  feature_list += distanceSensor->is_interrupt_enabled() ? "interrupt," : "polling,";
   if (!feature_list.empty())
     feature_list.pop_back();
   if (enabled_features_sensor != nullptr)

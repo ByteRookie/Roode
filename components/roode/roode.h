@@ -226,6 +226,16 @@ class Roode : public PollingComponent {
   sensor::Sensor *temperature_sensor_{nullptr};
   float baseline_temp_{0};
 
+  bool temp_sensor_ready_{false};
+  bool lux_sensor_ready_{false};
+  uint32_t boot_ts_{0};
+  uint32_t last_temp_fail_ts_{0};
+  uint32_t last_lux_fail_ts_{0};
+  static const uint32_t temp_startup_delay_ms_{10000};
+  static const uint32_t lux_startup_delay_ms_{10000};
+  static const uint32_t temp_retry_interval_ms_{30000};
+  static const uint32_t lux_retry_interval_ms_{30000};
+
   bool use_light_sensor_{false};
   sensor::Sensor *lux_sensor_{nullptr};
   std::vector<LuxSample> lux_samples_;

@@ -231,59 +231,7 @@ void Roode::setup() {
   if (people_counter != nullptr)
     expected_counter_ = people_counter->state;
 
-  auto fmt_bytes = [](uint32_t bytes) {
-    char buf[16];
-    if (bytes >= 1024UL * 1024UL * 1024UL)
-      snprintf(buf, sizeof(buf), "%uG", bytes / 1024 / 1024 / 1024);
-    else if (bytes >= 1024 * 1024)
-      snprintf(buf, sizeof(buf), "%uM", bytes / 1024 / 1024);
-    else
-      snprintf(buf, sizeof(buf), "%uk", bytes / 1024);
-    return std::string(buf);
-  };
-
-  auto fmt_time = [](uint32_t epoch) {
-    if (epoch == 0)
-      return std::string("unknown");
-    time_t t = epoch;
-    struct tm tm_time;
-    if (!localtime_r(&t, &tm_time))
-      return std::string("unknown");
-    char buf[8];
-    int hour = tm_time.tm_hour % 12;
-    if (hour == 0)
-      hour = 12;
-    snprintf(buf, sizeof(buf), "%d:%02d%cM", hour, tm_time.tm_min,
-             tm_time.tm_hour >= 12 ? 'P' : 'A');
-    return std::string(buf);
-  };
-
-  std::vector<std::pair<std::string, std::string>> features;
-#ifdef CONFIG_IDF_TARGET_ESP32
-  features.push_back({"cpu_mode", use_sensor_task_ ? "dual" : "single"});
-  features.push_back({"cpu", ESP.getChipModel()});
-  features.push_back({"cpu_cores", std::to_string(ESP.getChipCores())});
-#else
-  features.push_back({"cpu_mode", "single"});
-  features.push_back({"cpu", "ESP8266"});
-  features.push_back({"cpu_cores", "1"});
-#endif
-  features.push_back({"xshut", distanceSensor->get_xshut_state().has_value() ? "enabled" : "disabled"});
-  features.push_back({"refresh", distanceSensor->is_interrupt_enabled() ? "interrupt" : "polling"});
-  features.push_back({"ram", fmt_bytes(ESP.getHeapSize())});
-  features.push_back({"flash", fmt_bytes(ESP.getFlashChipSize())});
-  features.push_back({"calibration_value", std::to_string(entry->threshold->idle)});
-  uint32_t last_cal_epoch =
-      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
-  features.push_back({"calibration", fmt_time(last_cal_epoch)});
-
-  std::string feature_list;
-  for (auto &f : features) {
-    feature_list += f.first + ":" + f.second + "\n";
-  }
-  if (enabled_features_sensor != nullptr)
-    enabled_features_sensor->publish_state(feature_list);
-  log_event(std::string("features_enabled: ") + feature_list);
+  publish_feature_list();
 }
 
 void Roode::update() {
@@ -539,6 +487,7 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   // thresholds and ROI values immediately after a fail-safe recalibration
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
+  publish_feature_list();
 }
 
 void Roode::apply_cpu_optimizations(float cpu) {
@@ -651,6 +600,7 @@ void Roode::calibrate_zones() {
     calibration_prefs_[1].save(&calibration_data_[1]);
   }
   ESP_LOGI(SETUP, "Finished calibrating sensor zones");
+  publish_feature_list();
 }
 
 void Roode::calibrateDistance() {
@@ -700,6 +650,62 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
   if (exit_roi_width_sensor != nullptr) {
     exit_roi_width_sensor->publish_state(exit->roi->width);
   }
+}
+
+void Roode::publish_feature_list() {
+  auto fmt_bytes = [](uint32_t bytes) {
+    char buf[16];
+    if (bytes >= 1024UL * 1024UL * 1024UL)
+      snprintf(buf, sizeof(buf), "%uG", bytes / 1024 / 1024 / 1024);
+    else if (bytes >= 1024 * 1024)
+      snprintf(buf, sizeof(buf), "%uM", bytes / 1024 / 1024);
+    else
+      snprintf(buf, sizeof(buf), "%uk", bytes / 1024);
+    return std::string(buf);
+  };
+
+  auto fmt_time = [](uint32_t epoch) {
+    if (epoch == 0)
+      return std::string("unknown");
+    time_t t = epoch;
+    struct tm tm_time;
+    if (!localtime_r(&t, &tm_time))
+      return std::string("unknown");
+    char buf[8];
+    int hour = tm_time.tm_hour % 12;
+    if (hour == 0)
+      hour = 12;
+    snprintf(buf, sizeof(buf), "%d:%02d%cM", hour, tm_time.tm_min,
+             tm_time.tm_hour >= 12 ? 'P' : 'A');
+    return std::string(buf);
+  };
+
+  std::vector<std::pair<std::string, std::string>> features;
+#ifdef CONFIG_IDF_TARGET_ESP32
+  features.push_back({"cpu_mode", use_sensor_task_ ? "dual" : "single"});
+  features.push_back({"cpu", ESP.getChipModel()});
+  features.push_back({"cpu_cores", std::to_string(ESP.getChipCores())});
+#else
+  features.push_back({"cpu_mode", "single"});
+  features.push_back({"cpu", "ESP8266"});
+  features.push_back({"cpu_cores", "1"});
+#endif
+  features.push_back({"xshut", distanceSensor->get_xshut_state().has_value() ? "enabled" : "disabled"});
+  features.push_back({"refresh", distanceSensor->is_interrupt_enabled() ? "interrupt" : "polling"});
+  features.push_back({"ram", fmt_bytes(ESP.getHeapSize())});
+  features.push_back({"flash", fmt_bytes(ESP.getFlashChipSize())});
+  features.push_back({"calibration_value", std::to_string(entry->threshold->idle)});
+  uint32_t last_cal_epoch =
+      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  features.push_back({"calibration", fmt_time(last_cal_epoch)});
+
+  std::string feature_list;
+  for (auto &f : features) {
+    feature_list += f.first + ":" + f.second + "\n";
+  }
+  if (enabled_features_sensor != nullptr)
+    enabled_features_sensor->publish_state(feature_list);
+  log_event(std::string("features_enabled: ") + feature_list);
 }
 
 void Roode::sensor_task(void *param) {

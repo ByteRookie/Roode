@@ -201,6 +201,7 @@ class Roode : public PollingComponent {
   bool handle_sensor_status();
   void calibrateDistance();
   void calibrate_zones();
+  void publish_feature_list();
   const RangingMode *determine_ranging_mode(uint16_t average_entry_zone_distance, uint16_t average_exit_zone_distance);
   void publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax);
   void updateCounter(int delta);

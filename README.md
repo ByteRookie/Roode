@@ -46,7 +46,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Manual adjustment counter tracks user corrections to the people count
 - Diagnostic sensors report the state of the interrupt and XSHUT pins
 - Text sensor reports the list of enabled and fallback features
-- Features text sensor reports XSHUT and refresh status, CPU details, memory sizes with units and the last calibration time; each feature appears on its own line
+- Features text sensor reports XSHUT and refresh status, CPU details, memory sizes with units and the last calibration time; each feature appears on its own line and updates after calibration
 - If the device clock is unset, the calibration time shows "unknown"
 - Optional logging of fallback events helps troubleshoot interrupt or XSHUT failures
 - Event logs detail sensor power cycles, interrupt fallbacks with reasons, manual adjustments, and core mode changes

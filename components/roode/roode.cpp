@@ -248,8 +248,12 @@ void Roode::setup() {
     time_t t = epoch;
     struct tm tm;
     localtime_r(&t, &tm);
-    char buf[6];
-    snprintf(buf, sizeof(buf), "%02d:%02d", tm.tm_hour, tm.tm_min);
+    char buf[8];
+    int hour = tm.tm_hour % 12;
+    if (hour == 0)
+      hour = 12;
+    snprintf(buf, sizeof(buf), "%d:%02d%cM", hour, tm.tm_min,
+             tm.tm_hour >= 12 ? 'P' : 'A');
     return std::string(buf);
   };
 
@@ -274,7 +278,7 @@ void Roode::setup() {
 
   std::string feature_list;
   for (auto &f : features) {
-    feature_list += f.first + ":" + f.second + ",";
+    feature_list += f.first + ":" + f.second + "\n";
   }
   if (!feature_list.empty())
     feature_list.pop_back();

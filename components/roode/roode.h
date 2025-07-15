@@ -131,12 +131,9 @@ class Roode : public PollingComponent {
   void apply_cpu_optimizations(float cpu);
   void reset_cpu_optimizations(float cpu);
   void update_metrics();
-  void maybe_auto_recalibrate();
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
   static void log_event(const std::string &msg);
-  void set_auto_recalibrate_interval(uint32_t ms) { auto_recalibrate_interval_ms_ = ms; }
-  void set_recalibrate_cooldown(uint32_t ms) { recalibrate_cooldown_ms_ = ms; }
 
  protected:
   TofSensor *distanceSensor;
@@ -190,11 +187,6 @@ class Roode : public PollingComponent {
   bool force_single_core_{false};
   TaskHandle_t sensor_task_handle_{nullptr};
   uint8_t multicore_retry_count_{0};
-
-  uint32_t auto_recalibrate_interval_ms_{21600000};
-  uint32_t recalibrate_cooldown_ms_{1800000};
-  uint32_t last_recalibration_ts_{0};
-  uint32_t last_auto_recalib_ts_{0};
 
   enum FSMState { STATE_IDLE, STATE_ENTRY_ACTIVE, STATE_BOTH_ACTIVE };
   FSMState state_{STATE_IDLE};

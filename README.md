@@ -190,7 +190,6 @@ roode:
   filter_mode: median
   filter_window: 5
   # Log interrupt fallback events and XSHUT recoveries
-  # Set to false if you want a quieter log
   log_fallback_events: true
   # Disable dual core tasking if needed
   force_single_core: false

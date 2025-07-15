@@ -52,14 +52,20 @@ i2c:
 
 # Sensor is configured separately from Roode people counting algorithm
 vl53l1x:
+  sensor_id: 1
   calibration:
     # ranging: longest # defaults to "auto" for formerly "calibration: true"
     # offset: 8
     # xtalk: 53406
   # These pins are not yet implemented but they are passed into class now
   pins:
-    # xshut: 3 # shutdown pin to change address or multiple sensors
-    # interrupt: 1 # hardware callback when measurement is ready
+    xshut:
+      number: GPIO3
+      mode: OUTPUT_PULLUP
+      ignore_strapping_warning: true
+    interrupt:
+      number: GPIO1
+      mode: INPUT_PULLUP
 roode:
   id: roode_platform
   # I removed the { size: 1 } option here since it was redundant.
@@ -106,6 +112,8 @@ binary_sensor:
   - platform: roode
     presence_sensor:
       name: $friendly_name presence
+    sensor_xshut_state:
+      name: $friendly_name xshut state
 
 sensor:
   - platform: roode
@@ -137,7 +145,11 @@ sensor:
     roi_width_exit:
       name: $friendly_name ROI width zone 1
     sensor_status:
-      name: Sensor Status
+      name: $friendly_name sensor status
+    interrupt_status:
+      name: $friendly_name interrupt status
+    manual_adjustment_count:
+      name: $friendly_name manual adjusts
 
   - platform: wifi_signal
     name: $friendly_name RSSI
@@ -174,6 +186,9 @@ text_sensor:
   - platform: roode
     entry_exit_event:
       name: $friendly_name last direction
+  - platform: roode
+    enabled_features:
+      name: $friendly_name enabled features
   - platform: template
     name: $friendly_name Uptime Human Readable
     id: uptime_human

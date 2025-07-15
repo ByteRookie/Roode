@@ -65,11 +65,20 @@ i2c:
 
 # VL53L1X sensor configuration is separate from Roode people counting algorithm
 vl53l1x:
+  sensor_id: 1
   calibration:
     # The ranging mode is different based on how long the distance is that the sensor need to measure.
     # The longer the distance, the more time the sensor needs to take a measurement.
     # Available options are: auto, shortest, short, medium, long, longer, longest
     ranging: auto
+  pins:
+    xshut:
+      number: GPIO3
+      mode: OUTPUT_PULLUP
+      ignore_strapping_warning: true
+    interrupt:
+      number: GPIO1
+      mode: INPUT_PULLUP
 
 roode:
   id: roode_platform
@@ -110,6 +119,8 @@ binary_sensor:
   - platform: roode
     presence_sensor:
       name: $friendly_name presence
+    sensor_xshut_state:
+      name: $friendly_name xshut state
 
 sensor:
   - platform: roode
@@ -139,7 +150,11 @@ sensor:
     roi_width_exit:
       name: $friendly_name ROI width zone 1
     sensor_status:
-      name: Sensor Status
+      name: $friendly_name sensor status
+    interrupt_status:
+      name: $friendly_name interrupt status
+    manual_adjustment_count:
+      name: $friendly_name manual adjusts
   - platform: wifi_signal
     name: $friendly_name RSSI
     update_interval: 60s
@@ -175,6 +190,9 @@ text_sensor:
   - platform: roode
     entry_exit_event:
       name: $friendly_name last direction
+  - platform: roode
+    enabled_features:
+      name: $friendly_name enabled features
   - platform: template
     name: $friendly_name Uptime Human Readable
     id: uptime_human

@@ -212,6 +212,8 @@ void Roode::setup() {
       lux_fail_count_ = 1;
       lux_sensor_failed_ = true;
       log_event("lux_sensor_failed_init");
+      lux_sensor_ = nullptr;
+      use_light_sensor_ = false;
     }
   }
 

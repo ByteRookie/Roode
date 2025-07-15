@@ -36,10 +36,12 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Interrupt pin support avoids polling overhead with automatic fallback; logs show the interrupt pin level and why polling may be used
 - Multiple sensors can share the I²C bus using XSHUT multiplexing
 - Text sensor reports the list of enabled and fallback features
+- Enabled features now include total RAM, flash size and CPU core count
 - Manual adjustment counter tracks user corrections to the people count
 - Diagnostic sensors report the state of the interrupt and XSHUT pins
 - Optional logging of fallback events helps troubleshoot interrupt or XSHUT failures
 - Event logs detail sensor power cycles, interrupt fallbacks with reasons, manual adjustments, and core mode changes
+- Repeated interrupt pin messages are throttled to keep the log readable
 - Logs are color-coded: green for normal, yellow for info, and red for failures
 
 ## Hardware Recommendation

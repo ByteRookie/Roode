@@ -8,8 +8,18 @@ namespace roode {
 
 // When disabled, fallback diagnostics are omitted from the log to reduce noise.
 bool Roode::log_fallback_events_ = false;
+// Track last interrupt log time to avoid spamming the console
+static uint32_t last_interrupt_log = 0;
 
 void Roode::log_event(const std::string &msg) {
+  // Throttle repeated interrupt miss messages which can overwhelm the log
+  if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0) {
+    uint32_t now = millis();
+    if (now - last_interrupt_log < 1000) {
+      return;
+    }
+    last_interrupt_log = now;
+  }
   if (!log_fallback_events_) {
     if (msg == "interrupt_fallback" || msg == "interrupt_fallback_polling")
       return;
@@ -237,6 +247,15 @@ void Roode::setup() {
 #endif
   feature_list += distanceSensor->get_xshut_state().has_value() ? "xshut," : "no_xshut,";
   feature_list += distanceSensor->is_interrupt_enabled() ? "interrupt," : "polling,";
+  uint32_t total_heap = ESP.getHeapSize() / 1024;
+  uint32_t total_flash = ESP.getFlashChipSize() / 1024;
+  feature_list += "RAM:" + std::to_string(total_heap) + "k,";
+  feature_list += "Flash:" + std::to_string(total_flash) + "k,";
+#ifdef CONFIG_IDF_TARGET_ESP32
+  feature_list += "CPU:" + std::to_string(ESP.getChipCores()) + ',';
+#else
+  feature_list += "CPU:1,";
+#endif
   if (!feature_list.empty())
     feature_list.pop_back();
   if (enabled_features_sensor != nullptr)

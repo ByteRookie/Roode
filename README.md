@@ -45,7 +45,6 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Temperature-based recalibration adjusts thresholds when the ambient sensor temperature changes sharply
 - Ambient light learning suppresses false counts from sunlight using a 95th percentile model with sunrise prediction and dynamic multipliers
 - Lux samples persist so the model survives reboots
-- Light and temperature readings wait 10s after boot and retry every 30s if unavailable
 
 ## Hardware Recommendation
 

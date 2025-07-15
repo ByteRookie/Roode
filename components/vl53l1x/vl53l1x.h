@@ -52,6 +52,8 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   void set_xtalk(uint16_t val) { this->xtalk = val; }
   void set_timeout(uint16_t val) { this->timeout = val; }
 
+  bool is_interrupt_enabled() const { return interrupt_active_ && interrupt_pin.has_value(); }
+
  protected:
   VL53L1X_ULD sensor;
   optional<GPIOPin *> xshut_pin{};
@@ -77,6 +79,11 @@ class VL53L1X : public i2c::I2CDevice, public Component {
    * @return false when the sensor becomes unresponsive while testing pins.
    */
   bool check_features();
+  bool validate_interrupt();
+
+  bool interrupt_active_{false};
+  uint8_t interrupt_miss_count_{0};
+  uint32_t last_interrupt_retry_{0};
 };
 
 }  // namespace vl53l1x

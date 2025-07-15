@@ -236,7 +236,7 @@ void Roode::setup() {
   feature_list += "single_core,";
 #endif
   feature_list += distanceSensor->get_xshut_state().has_value() ? "xshut," : "no_xshut,";
-  feature_list += distanceSensor->get_interrupt_state().has_value() ? "interrupt," : "polling,";
+  feature_list += distanceSensor->is_interrupt_enabled() ? "interrupt," : "polling,";
   if (!feature_list.empty())
     feature_list.pop_back();
   if (enabled_features_sensor != nullptr)

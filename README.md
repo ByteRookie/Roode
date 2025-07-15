@@ -11,12 +11,13 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [Hardware Recommendation](#hardware-recommendation)
+- [Hardware Recommendations](#hardware-recommendations)
 - [Wiring](#wiring)
   - [ESP32](#esp32)
   - [ESP8266](#esp8266)
 - [Configuration](#configuration)
   - [Platform Setup](#platform-setup)
+  - [Interrupt vs Polling](#interrupt-vs-polling)
   - [Sensors](#sensors)
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
@@ -33,7 +34,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 3. Flash it with `esphome run peopleCounter32.yaml` (replace with your file).
 
 
-## Hardware Recommendation
+## Hardware Recommendations
 
 - ESP8266 or ESP32
   - **Wemos D1 Mini ESP32** <-- Recommended
@@ -331,12 +332,12 @@ The concept of path tracking is the detection of a human:
 
 That way we can ensure the direction of movement.
 
-The sensor creates a 16x16 grid and the final distance is computed by taking the average of the distance of the values of the grid.
+The sensor creates a 16x16 grid and computes the final distance by averaging all the values in that grid.
 We are defining two different Region of Interest (ROI) inside this grid. Then the sensor will measure the two distances in the two zones and will detect any presence and tracks the path to receive the direction.
 
 However, the algorithm is very sensitive to the slightest modification of the ROI, regarding both its size and its positioning inside the grid.
 
-ST Microelectronics define the values for the parameters as default like this:
+STMicroelectronics defines default values for these parameters as follows:
 
 The center of the ROI you set is based on the table below and the optical center has to be set as the pad above and to the right of your exact center:
 

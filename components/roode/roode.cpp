@@ -486,7 +486,7 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   calibration_data_[zone_id].baseline_mm = z->threshold->idle;
   calibration_data_[zone_id].threshold_min_mm = z->threshold->min;
   calibration_data_[zone_id].threshold_max_mm = z->threshold->max;
-  calibration_data_[zone_id].last_calibrated_ts = time(nullptr);
+  calibration_data_[zone_id].last_calibrated_ts = static_cast<uint32_t>(time(nullptr));
   if (calibration_persistence_) {
     calibration_prefs_[zone_id].save(&calibration_data_[zone_id]);
   }
@@ -602,8 +602,8 @@ void Roode::calibrate_zones() {
   App.feed_wdt();
   publish_sensor_configuration(entry, exit, false);
   if (calibration_persistence_) {
-    calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max, time(nullptr)};
-    calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max, time(nullptr)};
+    calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max, static_cast<uint32_t>(time(nullptr))};
+    calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max, static_cast<uint32_t>(time(nullptr))};
     calibration_prefs_[0].save(&calibration_data_[0]);
     calibration_prefs_[1].save(&calibration_data_[1]);
   }

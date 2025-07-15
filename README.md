@@ -283,6 +283,8 @@ sensor:
       name: $friendly_name RAM usage
     flash_free:
       name: $friendly_name flash usage
+    sensor_status:
+      name: $friendly_name sensor status
     interrupt_status:
       name: $friendly_name interrupt status
     manual_adjustment_count:

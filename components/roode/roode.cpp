@@ -205,6 +205,13 @@ void Roode::setup() {
   lux_fail_count_ = 0;
   lux_sensor_failed_ = false;
 
+  // Disable features for minimal boot reliability
+  ESP_LOGI(SETUP, "Minimal boot mode active - disabling advanced sensors");
+  use_light_sensor_ = false;
+  lux_sensor_ = nullptr;
+  temperature_sensor_ = nullptr;
+  auto_recalibrate_interval_ms_ = 0;
+
   // Disable lux sensor logic entirely for stability
   use_light_sensor_ = false;
   lux_sensor_ = nullptr;
@@ -240,46 +247,15 @@ void Roode::setup() {
   exit->set_filter_window(filter_window_);
   exit->set_filter_mode(filter_mode_);
 
-  if (calibration_persistence_) {
-    calibration_prefs_[0] = global_preferences->make_preference<CalibrationPrefs>(0xA0);
-    calibration_prefs_[1] = global_preferences->make_preference<CalibrationPrefs>(0xA1);
-    bool loaded = true;
-    for (int i = 0; i < 2; i++) {
-      if (calibration_prefs_[i].load(&calibration_data_[i])) {
-        Zone *z = i == 0 ? entry : exit;
-        z->threshold->idle = calibration_data_[i].baseline_mm;
-        z->threshold->min = calibration_data_[i].threshold_min_mm;
-        z->threshold->max = calibration_data_[i].threshold_max_mm;
-        int valid_count = 0;
-        for (int s = 0; s < 5; s++) {
-          z->readDistance(distanceSensor);
-          if (abs((int) z->getDistance() - (int) z->threshold->idle) < (z->threshold->idle * 0.1))
-            valid_count++;
-        }
-        if (valid_count < 5) {
-          loaded = false;
-          break;
-        }
-      } else {
-        loaded = false;
-        break;
-      }
-    }
-    if (loaded) {
-      entry->reset_roi(orientation_ == Parallel ? 167 : 195);
-      exit->reset_roi(orientation_ == Parallel ? 231 : 60);
-      entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-      exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-      auto *mode = determine_ranging_mode(entry->threshold->idle, exit->threshold->idle);
-      distanceSensor->set_ranging_mode(mode);
-      publish_sensor_configuration(entry, exit, true);
-      publish_sensor_configuration(entry, exit, false);
-    } else {
-      calibrate_zones();
-    }
-  } else {
-    calibrate_zones();
-  }
+  // Skip zone calibration in minimal mode
+  entry->reset_roi(orientation_ == Parallel ? 167 : 195);
+  exit->reset_roi(orientation_ == Parallel ? 231 : 60);
+  entry->threshold->idle = 1000;
+  entry->threshold->min = 150;
+  entry->threshold->max = 800;
+  exit->threshold->idle = 1000;
+  exit->threshold->min = 150;
+  exit->threshold->max = 800;
   if (temperature_sensor_ != nullptr) {
     float t = temperature_sensor_->state;
     if (!isnan(t)) {

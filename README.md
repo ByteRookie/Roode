@@ -110,6 +110,8 @@ external_components:
 
 # VL53L1X sensor configuration is separate from Roode people counting algorithm
 vl53l1x:
+  # ID for this sensor when using multiple VL53L1X modules on the same bus
+  sensor_id: 1
   # A non-standard I2C address
   address:
   # How long to wait for boot and measurements before giving up

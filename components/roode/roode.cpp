@@ -244,16 +244,17 @@ void Roode::setup() {
 
   auto fmt_time = [](uint32_t epoch) {
     if (epoch == 0)
-      return std::string("00:00");
+      return std::string("unknown");
     time_t t = epoch;
-    struct tm tm;
-    localtime_r(&t, &tm);
+    struct tm tm_time;
+    if (!localtime_r(&t, &tm_time))
+      return std::string("unknown");
     char buf[8];
-    int hour = tm.tm_hour % 12;
+    int hour = tm_time.tm_hour % 12;
     if (hour == 0)
       hour = 12;
-    snprintf(buf, sizeof(buf), "%d:%02d%cM", hour, tm.tm_min,
-             tm.tm_hour >= 12 ? 'P' : 'A');
+    snprintf(buf, sizeof(buf), "%d:%02d%cM", hour, tm_time.tm_min,
+             tm_time.tm_hour >= 12 ? 'P' : 'A');
     return std::string(buf);
   };
 
@@ -280,8 +281,6 @@ void Roode::setup() {
   for (auto &f : features) {
     feature_list += f.first + ":" + f.second + "\n";
   }
-  if (!feature_list.empty())
-    feature_list.pop_back();
   if (enabled_features_sensor != nullptr)
     enabled_features_sensor->publish_state(feature_list);
   log_event(std::string("features_enabled: ") + feature_list);

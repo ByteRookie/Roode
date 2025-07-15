@@ -12,7 +12,6 @@
 #include "esphome/core/log.h"
 #include "../vl53l1x/vl53l1x.h"
 #include "esphome/core/preferences.h"
-#include <time.h>
 #include "orientation.h"
 #include "zone.h"
 
@@ -157,7 +156,6 @@ class Roode : public PollingComponent {
   void set_time_multiplier(float val) { time_multiplier_ = val; }
   void set_combined_multiplier(float val) { combined_multiplier_ = val; }
   void set_suppression_window(uint32_t ms) { suppression_window_ms_ = ms; }
-  void set_sunrise_sunset_window(uint32_t ms) { sunrise_sunset_window_ms_ = ms; }
   void set_temperature_sensor(sensor::Sensor *sens) { temperature_sensor_ = sens; }
   void set_lux_sensor(sensor::Sensor *sens) { lux_sensor_ = sens; }
 
@@ -237,10 +235,6 @@ class Roode : public PollingComponent {
   uint32_t lux_learning_window_ms_{86400000};
   uint32_t lux_sample_interval_ms_{60000};
   uint32_t last_lux_sample_ts_{0};
-  ESPPreferenceObject lux_pref_;
-  uint32_t sunrise_sunset_window_ms_{1800000};
-  time_t next_sunrise_ts_{0};
-  time_t next_sunset_ts_{0};
   bool use_sunrise_prediction_{true};
   float latitude_{0};
   float longitude_{0};
@@ -284,9 +278,6 @@ class Roode : public PollingComponent {
   uint64_t loop_time_sum_{0};
   uint32_t loop_count_{0};
   static void sensor_task(void *param);
-  void load_lux_samples();
-  void save_lux_samples();
-  void update_sun_times();
   bool use_sensor_task_{false};
 };
 

@@ -51,7 +51,6 @@ CONF_MAX_MULTIPLIER = "max_multiplier"
 CONF_TIME_MULTIPLIER = "time_multiplier"
 CONF_COMBINED_MULTIPLIER = "combined_multiplier"
 CONF_SUPPRESSION_WINDOW = "suppression_window"
-CONF_SUNRISE_SUNSET_WINDOW = "sunrise_sunset_window"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -124,7 +123,6 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_TIME_MULTIPLIER, default=1.5): cv.float_,
         cv.Optional(CONF_COMBINED_MULTIPLIER, default=3.0): cv.float_,
         cv.Optional(CONF_SUPPRESSION_WINDOW, default="30min"): cv.positive_time_period_milliseconds,
-        cv.Optional(CONF_SUNRISE_SUNSET_WINDOW, default="30min"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
                 cv.Optional(CONF_INVERT, default=False): cv.boolean,
@@ -168,7 +166,6 @@ async def to_code(config: Dict):
     cg.add(roode.set_time_multiplier(config[CONF_TIME_MULTIPLIER]))
     cg.add(roode.set_combined_multiplier(config[CONF_COMBINED_MULTIPLIER]))
     cg.add(roode.set_suppression_window(config[CONF_SUPPRESSION_WINDOW]))
-    cg.add(roode.set_sunrise_sunset_window(config[CONF_SUNRISE_SUNSET_WINDOW]))
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)

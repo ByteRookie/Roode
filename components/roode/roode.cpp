@@ -3,9 +3,6 @@
 #include <string>
 #include <optional>
 #include <algorithm>
-#include <time.h>
-#include <cmath>
-#define MAX_LUX_SAMPLES 1440
 
 namespace esphome {
 namespace roode {
@@ -13,73 +10,6 @@ namespace roode {
 // When disabled, fallback diagnostics are omitted from the log to reduce noise.
 bool Roode::log_fallback_events_ = false;
 Roode *Roode::instance_ = nullptr;
-
-struct LuxPersist {
-  uint16_t count;
-  uint16_t index;
-  std::array<std::pair<uint32_t, float>, MAX_LUX_SAMPLES> samples;
-};
-
-void Roode::load_lux_samples() {
-  LuxPersist data{};
-  if (lux_pref_.load(&data)) {
-    lux_samples_.clear();
-    for (uint16_t i = 0; i < data.count && i < MAX_LUX_SAMPLES; i++) {
-      lux_samples_.push_back(data.samples[(data.index + i) % MAX_LUX_SAMPLES]);
-    }
-    if (lux_samples_.size() >= 60)
-      lux_learning_complete_logged_ = true;
-  }
-}
-
-void Roode::save_lux_samples() {
-  LuxPersist data{};
-  data.count = std::min<uint16_t>(lux_samples_.size(), MAX_LUX_SAMPLES);
-  data.index = 0;
-  for (uint16_t i = 0; i < data.count; i++) {
-    data.samples[i] = lux_samples_[i];
-  }
-  lux_pref_.save(&data);
-}
-
-static float deg_to_rad(float deg) { return deg * M_PI / 180.0f; }
-static float rad_to_deg(float rad) { return rad * 180.0f / M_PI; }
-
-void Roode::update_sun_times() {
-  time_t now = time(nullptr);
-  struct tm t;
-  localtime_r(&now, &t);
-  int day = t.tm_yday + 1;
-  float lngHour = longitude_ / 15.0f;
-  auto calc = [&](bool sunrise) -> time_t {
-    float t_est = day + ((sunrise ? 6.0f : 18.0f) - lngHour) / 24.0f;
-    float M = (0.9856f * t_est) - 3.289f;
-    float L = fmod(M + (1.916f * sin(deg_to_rad(M))) + (0.020f * sin(2 * deg_to_rad(M))) + 282.634f, 360.0f);
-    float RA = rad_to_deg(atan(0.91764f * tan(deg_to_rad(L))));
-    RA = fmod(RA + 360.0f, 360.0f);
-    float Lquadrant  = floor(L / 90.0f) * 90.0f;
-    float RAquadrant = floor(RA / 90.0f) * 90.0f;
-    RA = RA + Lquadrant - RAquadrant;
-    RA /= 15.0f;
-    float sinDec = 0.39782f * sin(deg_to_rad(L));
-    float cosDec = cos(asin(sinDec));
-    float cosH = (cos(deg_to_rad(90.833f)) - (sinDec * sin(deg_to_rad(latitude_)))) /
-                 (cosDec * cos(deg_to_rad(latitude_)));
-    if (cosH > 1 && sunrise) return 0;  // no sunrise
-    if (cosH < -1 && !sunrise) return 0; // no sunset
-    float H = sunrise ? 360.0f - rad_to_deg(acos(cosH)) : rad_to_deg(acos(cosH));
-    H /= 15.0f;
-    float T = H + RA - (0.06571f * t_est) - 6.622f;
-    float UT = fmod(T - lngHour, 24.0f);
-    struct tm out = t;
-    out.tm_hour = int(UT);
-    out.tm_min = int((UT - int(UT)) * 60.0f);
-    out.tm_sec = 0;
-    return mktime(&out);
-  };
-  next_sunrise_ts_ = calc(true);
-  next_sunset_ts_ = calc(false);
-}
 
 void Roode::log_event(const std::string &msg) {
   if (!log_fallback_events_) {
@@ -174,7 +104,6 @@ void Roode::log_event(const std::string &msg) {
 Roode::~Roode() {
   delete entry;
   delete exit;
-  save_lux_samples();
 }
 void Roode::dump_config() {
   ESP_LOGCONFIG(TAG, "Roode:");
@@ -191,11 +120,6 @@ void Roode::setup() {
     version_sensor->publish_state(VERSION);
   }
   ESP_LOGI(SETUP, "Using sampling with sampling size: %d", samples);
-
-  lux_pref_ = global_preferences->make_preference<LuxPersist>(0xB0);
-  load_lux_samples();
-  if (use_sunrise_prediction_ && (latitude_ != 0 || longitude_ != 0))
-    update_sun_times();
 
 
   if (this->distanceSensor->is_failed()) {
@@ -365,7 +289,6 @@ void Roode::update() {
     if (now - last_lux_sample_ts_ >= lux_sample_interval_ms_) {
       lux_samples_.push_back({now, lux_sensor_->state});
       last_lux_sample_ts_ = now;
-      save_lux_samples();
       if (lux_samples_.size() < 60 && !lux_bootstrap_logged_) {
         lux_bootstrap_logged_ = true;
         log_event("lux_model_bootstrapping");
@@ -378,8 +301,6 @@ void Roode::update() {
            now - lux_samples_.front().first > lux_learning_window_ms_) {
       lux_samples_.erase(lux_samples_.begin());
     }
-    if (lux_samples_.size() > 0)
-      save_lux_samples();
   }
 
   // context aware calibration
@@ -446,24 +367,10 @@ void Roode::loop() {
       dynamic_multiplier = base_multiplier_;
     if (dynamic_multiplier > max_multiplier_)
       dynamic_multiplier = max_multiplier_;
-    bool in_time_win = false;
-    if (use_sunrise_prediction_ && next_sunrise_ts_ != 0) {
-      time_t now_sec = time(nullptr);
-      in_time_win = (std::abs(now_sec - next_sunrise_ts_) * 1000 < sunrise_sunset_window_ms_) ||
-                    (std::abs(now_sec - next_sunset_ts_) * 1000 < sunrise_sunset_window_ms_);
-      if (now_sec - next_sunrise_ts_ > 86400 || now_sec - next_sunset_ts_ > 86400)
-        update_sun_times();
-    }
-    float mult = dynamic_multiplier;
-    if (in_time_win)
-      mult = std::max(mult, time_multiplier_);
-    if (lux > pct95 * mult) {
-      zone_trig = false;
+    if (lux > pct95 * dynamic_multiplier) {
+      log_event("lux_outlier_detected");
       sunlight_suppressed_until_ = millis();
-      if (in_time_win)
-        log_event("sunlight_suppressed_event");
-      else
-        log_event("lux_outlier_detected");
+      zone_trig = false;
     } else if (lux > pct95 && millis() < sunlight_suppressed_until_ + suppression_window_ms_) {
       zone_trig = false;
       log_event("sunlight_suppressed_event");
@@ -959,24 +866,10 @@ void Roode::sensor_task(void *param) {
         dynamic_multiplier = self->base_multiplier_;
       if (dynamic_multiplier > self->max_multiplier_)
         dynamic_multiplier = self->max_multiplier_;
-      bool in_time_win = false;
-      if (self->use_sunrise_prediction_ && self->next_sunrise_ts_ != 0) {
-        time_t now_sec = time(nullptr);
-        in_time_win = (std::abs(now_sec - self->next_sunrise_ts_) * 1000 < self->sunrise_sunset_window_ms_) ||
-                      (std::abs(now_sec - self->next_sunset_ts_) * 1000 < self->sunrise_sunset_window_ms_);
-        if (now_sec - self->next_sunrise_ts_ > 86400 || now_sec - self->next_sunset_ts_ > 86400)
-          self->update_sun_times();
-      }
-      float mult = dynamic_multiplier;
-      if (in_time_win)
-        mult = std::max(mult, self->time_multiplier_);
-      if (lux > pct95 * mult) {
-        zone_trig = false;
+      if (lux > pct95 * dynamic_multiplier) {
+        log_event("lux_outlier_detected");
         self->sunlight_suppressed_until_ = millis();
-        if (in_time_win)
-          log_event("sunlight_suppressed_event");
-        else
-          log_event("lux_outlier_detected");
+        zone_trig = false;
       } else if (lux > pct95 && millis() < self->sunlight_suppressed_until_ + self->suppression_window_ms_) {
         zone_trig = false;
         log_event("sunlight_suppressed_event");

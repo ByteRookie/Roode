@@ -43,8 +43,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Event logs detail sensor power cycles, interrupt fallbacks with reasons, manual adjustments, and core mode changes
 - Logs are color-coded: green for normal, yellow for info, and red for failures
 - Scheduled recalibration keeps thresholds accurate over long runtimes
-- Ambient light learning suppresses false counts from sunlight using a 95th percentile model with sunrise prediction
-- Lux samples persist so the model survives reboots
+- Ambient light learning suppresses false counts from sunlight using a 95th percentile model
 
 ## Hardware Recommendation
 

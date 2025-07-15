@@ -60,7 +60,6 @@ static int time_budget_in_ms_max = 200;  // max range: 4m
 
 class Roode : public PollingComponent {
  public:
-  struct LuxSample { uint32_t ts; float lux; };
   void setup() override;
   void update() override;
   void loop() override;
@@ -232,6 +231,7 @@ class Roode : public PollingComponent {
 
   bool use_light_sensor_{false};
   sensor::Sensor *lux_sensor_{nullptr};
+  struct LuxSample { uint32_t ts; float lux; };
   std::vector<LuxSample> lux_samples_;
   bool lux_bootstrap_logged_{false};
   bool lux_learning_complete_logged_{false};

@@ -213,6 +213,11 @@ void Roode::setup() {
     ESP_LOGE(TAG, "Roode cannot be setup without a valid VL53L1X sensor");
     return;
   }
+  if (lux_sensor_ != nullptr && lux_sensor_->is_failed()) {
+    ESP_LOGW(TAG, "Lux sensor failed to initialize, disabling lux features");
+    lux_sensor_ = nullptr;
+    use_light_sensor_ = false;
+  }
 
   // Initialize filtering options before calibrating so threshold sampling uses
   // the configured window and mode
@@ -362,7 +367,7 @@ void Roode::update() {
       manual_adjust_timestamps_.push_back(millis());
     }
   }
-  if (lux_sensor_ != nullptr) {
+  if (lux_sensor_ != nullptr && !lux_sensor_->is_failed()) {
     uint32_t now = millis();
     if (!lux_sensor_ready_) {
       if (now - boot_ts_ >= lux_startup_delay_ms_ &&
@@ -405,6 +410,10 @@ void Roode::update() {
       if (!lux_samples_.empty())
         save_lux_samples();
     }
+  } else if (lux_sensor_ != nullptr && lux_sensor_->is_failed()) {
+    log_event("lux_sensor_failed");
+    lux_sensor_ = nullptr;
+    use_light_sensor_ = false;
   }
 
   // context aware calibration
@@ -458,7 +467,7 @@ void Roode::loop() {
                    current_zone->getMinDistance() > current_zone->threshold->min;
   if (zone_trig)
     record_motion_event();
-  if (use_light_sensor_ && lux_sensor_ != nullptr && lux_sensor_ready_ && !lux_samples_.empty()) {
+  if (use_light_sensor_ && lux_sensor_ != nullptr && !lux_sensor_->is_failed() && lux_sensor_ready_ && !lux_samples_.empty()) {
     std::vector<float> vals;
     vals.reserve(lux_samples_.size());
     for (auto &p : lux_samples_)
@@ -1002,7 +1011,7 @@ void Roode::sensor_task(void *param) {
                      self->current_zone->getMinDistance() > self->current_zone->threshold->min;
     if (zone_trig)
       self->record_motion_event();
-    if (self->lux_sensor_ != nullptr) {
+    if (self->lux_sensor_ != nullptr && !self->lux_sensor_->is_failed()) {
       uint32_t now = millis();
       if (!self->lux_sensor_ready_) {
         if (now - self->boot_ts_ >= self->lux_startup_delay_ms_ &&
@@ -1046,7 +1055,7 @@ void Roode::sensor_task(void *param) {
           self->save_lux_samples();
       }
     }
-    if (self->use_light_sensor_ && self->lux_sensor_ != nullptr && self->lux_sensor_ready_ && !self->lux_samples_.empty()) {
+    if (self->use_light_sensor_ && self->lux_sensor_ != nullptr && !self->lux_sensor_->is_failed() && self->lux_sensor_ready_ && !self->lux_samples_.empty()) {
       std::vector<float> vals;
       vals.reserve(self->lux_samples_.size());
       for (auto &p : self->lux_samples_)

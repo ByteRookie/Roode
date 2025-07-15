@@ -8,6 +8,30 @@
 
 A people counter that works with any smart home system that supports ESPHome/MQTT (e.g., Home Assistant). All necessary entities are created automatically.
 
+## Features
+
+| Feature | Description |
+| --- | --- |
+| Path tracking algorithm | Distinguishes entry vs exit by tracking the order of zone crossings |
+| Auto restart via XSHUT | Sensor restarts automatically if a measurement times out |
+| Clean shutdown | Memory and sensor power managed on reboot |
+| Startup pin test | Logs and disables features if xshut or interrupt pins fail |
+| Built-in pull-ups | XSHUT and interrupt pins use internal pull-ups, no resistors needed |
+| Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
+| Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
+| Persistent calibration | Calibration data can persist in flash across reboots |
+| Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
+| Filtering options | Median/percentile filters smooth jitter with adjustable window |
+| FSM timeouts | Resets the state machine when a transition stalls |
+| CPU optimizations | Automatic optimizations when CPU usage exceeds 90% |
+| Interrupt fallback | Interrupt mode with graceful fallback to polling and logs |
+| XSHUT multiplexing | Supports multiple sensors sharing I²C bus |
+| Feature text sensor | Reports enabled and fallback features for diagnostics |
+| Manual adjustment counter | Tracks user corrections to the people count |
+| Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
+| Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
+| Colored logs | Normal info in green, details in yellow, failures in red |
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)
@@ -23,7 +47,6 @@ A people counter that works with any smart home system that supports ESPHome/MQT
   - [Sensors](#sensors)
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
-- [Features](#features)
 - [FAQ/Troubleshoot](#faqtroubleshoot)
 - [License](#license)
 
@@ -356,7 +379,7 @@ All distances smaller than 200mm and greater than 1760mm will be ignored.
 
 ## Algorithm
 
-The implemented Algorithm is an improved version of my own implementation which checks the direction of a movement through two defined zones. ST implemented a nice and efficient way to track the path from one to the other direction. I migrated the algorithm with some changes into the Roode project.
+The implemented algorithm is an improved version of my own implementation which checks the direction of a movement through two defined zones. ST implemented a nice and efficient way to track the path from one to the other direction. I migrated the algorithm with some changes into the Roode project.
 The concept of path tracking is the detection of a human:
 
 - In the first zone only
@@ -429,29 +452,6 @@ However, note that the lens inside the VL53L1X inverts the image it sees
 sense objects toward the upper left, you should pick a center SPAD in the
 lower right.
 
-## Features
-
-| Feature | Description |
-| --- | --- |
-| Path tracking algorithm | Distinguishes entry vs exit by tracking the order of zone crossings |
-| Auto restart via XSHUT | Sensor restarts automatically if a measurement times out |
-| Clean shutdown | Memory and sensor power managed on reboot |
-| Startup pin test | Logs and disables features if xshut or interrupt pins fail |
-| Built-in pull-ups | XSHUT and interrupt pins use internal pull-ups, no resistors needed |
-| Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
-| Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
-| Persistent calibration | Calibration data can persist in flash across reboots |
-| Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
-| Filtering options | Median/percentile filters smooth jitter with adjustable window |
-| FSM timeouts | Resets the state machine when a transition stalls |
-| CPU optimizations | Automatic optimizations when CPU usage exceeds 90% |
-| Interrupt fallback | Interrupt mode with graceful fallback to polling and logs |
-| XSHUT multiplexing | Supports multiple sensors sharing I²C bus |
-| Feature text sensor | Reports enabled and fallback features for diagnostics |
-| Manual adjustment counter | Tracks user corrections to the people count |
-| Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
-| Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
-| Colored logs | Normal info in green, details in yellow, failures in red |
 
 ## FAQ/Troubleshoot
 

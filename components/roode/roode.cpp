@@ -201,6 +201,8 @@ void Roode::setup() {
   temp_sensor_ready_ = false;
   last_lux_fail_ts_ = boot_ts_;
   last_temp_fail_ts_ = boot_ts_;
+  lux_fail_count_ = 0;
+  lux_sensor_failed_ = false;
 
   lux_pref_ = global_preferences->make_preference<LuxPersist>(0xB0);
   load_lux_samples();
@@ -212,11 +214,6 @@ void Roode::setup() {
     this->mark_failed();
     ESP_LOGE(TAG, "Roode cannot be setup without a valid VL53L1X sensor");
     return;
-  }
-  if (lux_sensor_ != nullptr && lux_sensor_->is_failed()) {
-    ESP_LOGW(TAG, "Lux sensor failed to initialize, disabling lux features");
-    lux_sensor_ = nullptr;
-    use_light_sensor_ = false;
   }
 
   // Initialize filtering options before calibrating so threshold sampling uses
@@ -367,7 +364,7 @@ void Roode::update() {
       manual_adjust_timestamps_.push_back(millis());
     }
   }
-  if (lux_sensor_ != nullptr && !lux_sensor_->is_failed()) {
+  if (lux_sensor_ != nullptr && !lux_sensor_failed_) {
     uint32_t now = millis();
     if (!lux_sensor_ready_) {
       if (now - boot_ts_ >= lux_startup_delay_ms_ &&
@@ -375,18 +372,23 @@ void Roode::update() {
         float val = lux_sensor_->state;
         if (!isnan(val)) {
           lux_sensor_ready_ = true;
+          lux_fail_count_ = 0;
           last_lux_sample_ts_ = now;
           lux_samples_.push_back({now, val});
           save_lux_samples();
         } else {
           last_lux_fail_ts_ = now;
+          lux_fail_count_++;
           log_event("lux_read_failed");
+          if (lux_fail_count_ >= 3)
+            lux_sensor_failed_ = true;
         }
       }
     } else {
       if (now - last_lux_sample_ts_ >= lux_sample_interval_ms_) {
         float val = lux_sensor_->state;
         if (!isnan(val)) {
+          lux_fail_count_ = 0;
           lux_samples_.push_back({now, val});
           last_lux_sample_ts_ = now;
           save_lux_samples();
@@ -400,7 +402,10 @@ void Roode::update() {
         } else {
           lux_sensor_ready_ = false;
           last_lux_fail_ts_ = now;
+          lux_fail_count_++;
           log_event("lux_read_failed");
+          if (lux_fail_count_ >= 3)
+            lux_sensor_failed_ = true;
         }
       }
       while (!lux_samples_.empty() &&
@@ -410,7 +415,7 @@ void Roode::update() {
       if (!lux_samples_.empty())
         save_lux_samples();
     }
-  } else if (lux_sensor_ != nullptr && lux_sensor_->is_failed()) {
+  } else if (lux_sensor_ != nullptr && lux_sensor_failed_) {
     log_event("lux_sensor_failed");
     lux_sensor_ = nullptr;
     use_light_sensor_ = false;
@@ -467,7 +472,7 @@ void Roode::loop() {
                    current_zone->getMinDistance() > current_zone->threshold->min;
   if (zone_trig)
     record_motion_event();
-  if (use_light_sensor_ && lux_sensor_ != nullptr && !lux_sensor_->is_failed() && lux_sensor_ready_ && !lux_samples_.empty()) {
+  if (use_light_sensor_ && lux_sensor_ != nullptr && !lux_sensor_failed_ && lux_sensor_ready_ && !lux_samples_.empty()) {
     std::vector<float> vals;
     vals.reserve(lux_samples_.size());
     for (auto &p : lux_samples_)
@@ -478,7 +483,10 @@ void Roode::loop() {
     if (isnan(lux)) {
       lux_sensor_ready_ = false;
       last_lux_fail_ts_ = millis();
+      lux_fail_count_++;
       log_event("lux_read_failed");
+      if (lux_fail_count_ >= 3)
+        lux_sensor_failed_ = true;
     } else {
     float dynamic_multiplier = 1 + alpha_ * ((lux - pct95) / pct95);
     if (dynamic_multiplier < base_multiplier_)
@@ -1011,7 +1019,7 @@ void Roode::sensor_task(void *param) {
                      self->current_zone->getMinDistance() > self->current_zone->threshold->min;
     if (zone_trig)
       self->record_motion_event();
-    if (self->lux_sensor_ != nullptr && !self->lux_sensor_->is_failed()) {
+    if (self->lux_sensor_ != nullptr && !self->lux_sensor_failed_) {
       uint32_t now = millis();
       if (!self->lux_sensor_ready_) {
         if (now - self->boot_ts_ >= self->lux_startup_delay_ms_ &&
@@ -1024,13 +1032,17 @@ void Roode::sensor_task(void *param) {
             self->save_lux_samples();
           } else {
             self->last_lux_fail_ts_ = now;
+            self->lux_fail_count_++;
             log_event("lux_read_failed");
+            if (self->lux_fail_count_ >= 3)
+              self->lux_sensor_failed_ = true;
           }
         }
       } else {
         if (now - self->last_lux_sample_ts_ >= self->lux_sample_interval_ms_) {
           float val = self->lux_sensor_->state;
           if (!isnan(val)) {
+            self->lux_fail_count_ = 0;
             self->lux_samples_.push_back({now, val});
             self->last_lux_sample_ts_ = now;
             self->save_lux_samples();
@@ -1044,7 +1056,10 @@ void Roode::sensor_task(void *param) {
           } else {
             self->lux_sensor_ready_ = false;
             self->last_lux_fail_ts_ = now;
+            self->lux_fail_count_++;
             log_event("lux_read_failed");
+            if (self->lux_fail_count_ >= 3)
+              self->lux_sensor_failed_ = true;
           }
         }
         while (!self->lux_samples_.empty() &&
@@ -1055,7 +1070,7 @@ void Roode::sensor_task(void *param) {
           self->save_lux_samples();
       }
     }
-    if (self->use_light_sensor_ && self->lux_sensor_ != nullptr && !self->lux_sensor_->is_failed() && self->lux_sensor_ready_ && !self->lux_samples_.empty()) {
+    if (self->use_light_sensor_ && self->lux_sensor_ != nullptr && !self->lux_sensor_failed_ && self->lux_sensor_ready_ && !self->lux_samples_.empty()) {
       std::vector<float> vals;
       vals.reserve(self->lux_samples_.size());
       for (auto &p : self->lux_samples_)
@@ -1066,8 +1081,12 @@ void Roode::sensor_task(void *param) {
       if (isnan(lux)) {
         self->lux_sensor_ready_ = false;
         self->last_lux_fail_ts_ = millis();
+        self->lux_fail_count_++;
         log_event("lux_read_failed");
+        if (self->lux_fail_count_ >= 3)
+          self->lux_sensor_failed_ = true;
       } else {
+      self->lux_fail_count_ = 0;
       float dynamic_multiplier = 1 + self->alpha_ * ((lux - pct95) / pct95);
       if (dynamic_multiplier < self->base_multiplier_)
         dynamic_multiplier = self->base_multiplier_;

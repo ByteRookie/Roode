@@ -231,6 +231,8 @@ class Roode : public PollingComponent {
   uint32_t boot_ts_{0};
   uint32_t last_temp_fail_ts_{0};
   uint32_t last_lux_fail_ts_{0};
+  uint8_t lux_fail_count_{0};
+  bool lux_sensor_failed_{false};
   static const uint32_t temp_startup_delay_ms_{10000};
   static const uint32_t lux_startup_delay_ms_{10000};
   static const uint32_t temp_retry_interval_ms_{30000};

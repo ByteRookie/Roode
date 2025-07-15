@@ -43,8 +43,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Event logs detail sensor power cycles, interrupt fallbacks with reasons, manual adjustments, and core mode changes
 - Logs are color-coded: green for normal, yellow for info, and red for failures
 - Scheduled recalibration keeps thresholds accurate over long runtimes
-- Temperature-based recalibration adjusts thresholds when the ambient sensor temperature changes sharply
-- Ambient light learning suppresses false counts from sunlight using a 95th percentile model with sunrise prediction and dynamic multipliers
+- Ambient light learning suppresses false counts from sunlight using a 95th percentile model with sunrise prediction
 - Lux samples persist so the model survives reboots
 
 ## Hardware Recommendation
@@ -198,24 +197,6 @@ roode:
   auto_recalibrate_interval: 6h
   # Cooldown between automatic recalibrations
   recalibrate_cooldown: 30min
-  # Recalibrate automatically when the temperature shifts by more than 8°C
-  recalibrate_on_temp_change: true
-  max_temp_delta_for_recalib: 8
-  # Use an external lux sensor to learn ambient light patterns
-  use_light_sensor: true
-  lux_learning_window: 24h
-  lux_sample_interval: 1min
-  # Predict sunrise and sunset to suppress false counts
-  use_sunrise_prediction: true
-  latitude: 37.7749
-  longitude: -122.4194
-  alpha: 0.5
-  base_multiplier: 1.0
-  max_multiplier: 4.0
-  time_multiplier: 1.5
-  combined_multiplier: 3.0
-  suppression_window: 30min
-  sunrise_sunset_window: 30min
   # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
 
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.

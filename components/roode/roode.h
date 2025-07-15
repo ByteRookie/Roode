@@ -28,7 +28,6 @@ static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
 
-
 /*
 Use the VL53L1X_SetTimingBudget function to set the TB in milliseconds. The TB
 values available are [15, 20, 33, 50, 100, 200, 500]. This function must be
@@ -60,7 +59,10 @@ static int time_budget_in_ms_max = 200;  // max range: 4m
 
 class Roode : public PollingComponent {
  public:
-  struct LuxSample { uint32_t ts; float lux; };
+  struct LuxSample {
+    uint32_t ts;
+    float lux;
+  };
   void setup() override;
   void update() override;
   void loop() override;
@@ -301,4 +303,3 @@ class Roode : public PollingComponent {
 
 }  // namespace roode
 }  // namespace esphome
-

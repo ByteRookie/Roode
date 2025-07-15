@@ -2,6 +2,7 @@
 #include "Arduino.h"
 #include <string>
 #include <optional>
+#include <vector>
 
 namespace esphome {
 namespace roode {
@@ -20,6 +21,15 @@ void Roode::log_event(const std::string &msg) {
         msg.rfind("xshut_pulse_off_sensor_", 0) == 0 || msg.rfind("xshut_reinitialize_sensor_", 0) == 0 ||
         (msg.rfind("sensor_", 0) == 0 && msg.find(".recovered_via_xshut") != std::string::npos))
       return;
+  }
+
+  static uint32_t last_int_log = 0;
+  if (msg == "interrupt_fallback" || msg == "interrupt_fallback_polling" ||
+      msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0) {
+    uint32_t now = millis();
+    if (last_int_log != 0 && (now - last_int_log) < 5000)
+      return;
+    last_int_log = now;
   }
 
   std::string out = msg;
@@ -219,14 +229,39 @@ void Roode::setup() {
   if (people_counter != nullptr)
     expected_counter_ = people_counter->state;
 
-  std::string feature_list;
+  auto fmt_bytes = [](uint32_t bytes) {
+    char buf[16];
+    if (bytes >= 1024 * 1024)
+      snprintf(buf, sizeof(buf), "%uM", bytes / 1024 / 1024);
+    else
+      snprintf(buf, sizeof(buf), "%uk", bytes / 1024);
+    return std::string(buf);
+  };
+
+  std::vector<std::pair<std::string, std::string>> features;
 #ifdef CONFIG_IDF_TARGET_ESP32
-  feature_list += use_sensor_task_ ? "dual_core," : "single_core,";
+  features.push_back({"core", use_sensor_task_ ? "dual" : "single"});
 #else
-  feature_list += "single_core,";
+  features.push_back({"core", "single"});
 #endif
-  feature_list += distanceSensor->get_xshut_state().has_value() ? "xshut," : "no_xshut,";
-  feature_list += distanceSensor->is_interrupt_enabled() ? "interrupt," : "polling,";
+  features.push_back({"xshut", distanceSensor->get_xshut_state().has_value() ? "1" : "0"});
+  features.push_back({"interrupt", distanceSensor->is_interrupt_enabled() ? "1" : "poll"});
+  features.push_back({"ram", fmt_bytes(ESP.getHeapSize())});
+  features.push_back({"flash", fmt_bytes(ESP.getFlashChipSize())});
+#ifdef CONFIG_IDF_TARGET_ESP32
+  features.push_back({"cpu_cores", std::to_string(ESP.getChipCores())});
+#else
+  features.push_back({"cpu_cores", "1"});
+#endif
+  features.push_back({"orientation", orientation_ == Parallel ? "parallel" : "perpendicular"});
+  features.push_back({"roi_entry", std::to_string(entry->roi->width) + "x" + std::to_string(entry->roi->height)});
+  features.push_back({"roi_exit", std::to_string(exit->roi->width) + "x" + std::to_string(exit->roi->height)});
+  features.push_back({"calibration", calibration_persistence_ ? "stored" : "runtime"});
+
+  std::string feature_list;
+  for (auto &f : features) {
+    feature_list += f.first + ":" + f.second + ",";
+  }
   if (!feature_list.empty())
     feature_list.pop_back();
   if (enabled_features_sensor != nullptr)

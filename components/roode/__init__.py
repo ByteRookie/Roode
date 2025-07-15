@@ -37,20 +37,6 @@ CONF_LOG_FALLBACK = "log_fallback_events"
 CONF_FORCE_SINGLE_CORE = "force_single_core"
 CONF_AUTO_RECALIBRATE_INTERVAL = "auto_recalibrate_interval"
 CONF_RECALIBRATE_COOLDOWN = "recalibrate_cooldown"
-CONF_RECALIBRATE_ON_TEMP_CHANGE = "recalibrate_on_temp_change"
-CONF_MAX_TEMP_DELTA_FOR_RECALIB = "max_temp_delta_for_recalib"
-CONF_USE_LIGHT_SENSOR = "use_light_sensor"
-CONF_LUX_LEARNING_WINDOW = "lux_learning_window"
-CONF_LUX_SAMPLE_INTERVAL = "lux_sample_interval"
-CONF_USE_SUNRISE_PREDICTION = "use_sunrise_prediction"
-CONF_LATITUDE = "latitude"
-CONF_LONGITUDE = "longitude"
-CONF_ALPHA = "alpha"
-CONF_BASE_MULTIPLIER = "base_multiplier"
-CONF_MAX_MULTIPLIER = "max_multiplier"
-CONF_TIME_MULTIPLIER = "time_multiplier"
-CONF_COMBINED_MULTIPLIER = "combined_multiplier"
-CONF_SUPPRESSION_WINDOW = "suppression_window"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -109,20 +95,6 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
         cv.Optional(CONF_AUTO_RECALIBRATE_INTERVAL, default="6h"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_RECALIBRATE_COOLDOWN, default="30min"): cv.positive_time_period_milliseconds,
-        cv.Optional(CONF_RECALIBRATE_ON_TEMP_CHANGE, default=True): cv.boolean,
-        cv.Optional(CONF_MAX_TEMP_DELTA_FOR_RECALIB, default=8): cv.float_,
-        cv.Optional(CONF_USE_LIGHT_SENSOR, default=False): cv.boolean,
-        cv.Optional(CONF_LUX_LEARNING_WINDOW, default="24h"): cv.positive_time_period_milliseconds,
-        cv.Optional(CONF_LUX_SAMPLE_INTERVAL, default="1min"): cv.positive_time_period_milliseconds,
-        cv.Optional(CONF_USE_SUNRISE_PREDICTION, default=True): cv.boolean,
-        cv.Optional(CONF_LATITUDE): cv.float_,
-        cv.Optional(CONF_LONGITUDE): cv.float_,
-        cv.Optional(CONF_ALPHA, default=0.5): cv.float_,
-        cv.Optional(CONF_BASE_MULTIPLIER, default=1.0): cv.float_,
-        cv.Optional(CONF_MAX_MULTIPLIER, default=4.0): cv.float_,
-        cv.Optional(CONF_TIME_MULTIPLIER, default=1.5): cv.float_,
-        cv.Optional(CONF_COMBINED_MULTIPLIER, default=3.0): cv.float_,
-        cv.Optional(CONF_SUPPRESSION_WINDOW, default="30min"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
                 cv.Optional(CONF_INVERT, default=False): cv.boolean,
@@ -150,22 +122,6 @@ async def to_code(config: Dict):
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
     cg.add(roode.set_auto_recalibrate_interval(config[CONF_AUTO_RECALIBRATE_INTERVAL]))
     cg.add(roode.set_recalibrate_cooldown(config[CONF_RECALIBRATE_COOLDOWN]))
-    cg.add(roode.set_recalibrate_on_temp_change(config[CONF_RECALIBRATE_ON_TEMP_CHANGE]))
-    cg.add(roode.set_max_temp_delta_for_recalib(config[CONF_MAX_TEMP_DELTA_FOR_RECALIB]))
-    cg.add(roode.set_use_light_sensor(config[CONF_USE_LIGHT_SENSOR]))
-    cg.add(roode.set_lux_learning_window(config[CONF_LUX_LEARNING_WINDOW]))
-    cg.add(roode.set_lux_sample_interval(config[CONF_LUX_SAMPLE_INTERVAL]))
-    cg.add(roode.set_use_sunrise_prediction(config[CONF_USE_SUNRISE_PREDICTION]))
-    if CONF_LATITUDE in config:
-        cg.add(roode.set_latitude(config[CONF_LATITUDE]))
-    if CONF_LONGITUDE in config:
-        cg.add(roode.set_longitude(config[CONF_LONGITUDE]))
-    cg.add(roode.set_alpha(config[CONF_ALPHA]))
-    cg.add(roode.set_base_multiplier(config[CONF_BASE_MULTIPLIER]))
-    cg.add(roode.set_max_multiplier(config[CONF_MAX_MULTIPLIER]))
-    cg.add(roode.set_time_multiplier(config[CONF_TIME_MULTIPLIER]))
-    cg.add(roode.set_combined_multiplier(config[CONF_COMBINED_MULTIPLIER]))
-    cg.add(roode.set_suppression_window(config[CONF_SUPPRESSION_WINDOW]))
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)

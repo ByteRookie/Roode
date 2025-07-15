@@ -30,8 +30,6 @@ CONF_RAM_FREE = "ram_free"
 CONF_FLASH_FREE = "flash_free"
 CONF_MANUAL_ADJUST = "manual_adjustment_count"
 CONF_INTERRUPT_STATUS = "interrupt_status"
-CONF_TEMPERATURE = "ambient_temperature"
-CONF_LUX = "ambient_lux"
 
 CONFIG_SCHEMA = sensor.sensor_schema().extend(
     {
@@ -138,20 +136,6 @@ CONFIG_SCHEMA = sensor.sensor_schema().extend(
             state_class=STATE_CLASS_MEASUREMENT,
             entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
-        cv.Optional(CONF_TEMPERATURE): sensor.sensor_schema(
-            icon="mdi:thermometer",
-            unit_of_measurement="°C",
-            accuracy_decimals=1,
-            state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
-        ),
-        cv.Optional(CONF_LUX): sensor.sensor_schema(
-            icon="mdi:brightness-6",
-            unit_of_measurement="lx",
-            accuracy_decimals=0,
-            state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
-        ),
         cv.Optional(CONF_INTERRUPT_STATUS): sensor.sensor_schema(
             icon="mdi:lightning-bolt",
             accuracy_decimals=0,
@@ -214,12 +198,6 @@ async def to_code(config):
     if CONF_FLASH_FREE in config:
         count = await sensor.new_sensor(config[CONF_FLASH_FREE])
         cg.add(var.set_flash_free_sensor(count))
-    if CONF_TEMPERATURE in config:
-        count = await sensor.new_sensor(config[CONF_TEMPERATURE])
-        cg.add(var.set_temperature_sensor(count))
-    if CONF_LUX in config:
-        count = await sensor.new_sensor(config[CONF_LUX])
-        cg.add(var.set_lux_sensor(count))
     if CONF_INTERRUPT_STATUS in config:
         count = await sensor.new_sensor(config[CONF_INTERRUPT_STATUS])
         cg.add(var.set_interrupt_status_sensor(count))

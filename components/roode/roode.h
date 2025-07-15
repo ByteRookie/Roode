@@ -209,7 +209,7 @@ class Roode : public PollingComponent {
   static bool log_fallback_events_;
   int manual_adjustment_count_{0};
   float expected_counter_{0};
-  bool force_single_core_{false};
+  bool force_single_core_{true};
   TaskHandle_t sensor_task_handle_{nullptr};
   uint8_t multicore_retry_count_{0};
   bool multicore_failed_{false};

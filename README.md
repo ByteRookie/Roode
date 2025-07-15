@@ -18,6 +18,8 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 - [Configuration](#configuration)
   - [Platform Setup](#platform-setup)
   - [Interrupt vs Polling](#interrupt-vs-polling)
+  - [Single vs Dual Core](#single-vs-dual-core)
+  - [Filtering Modes](#filtering-modes)
   - [Sensors](#sensors)
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
@@ -148,10 +150,12 @@ vl53l1x:
 ### Interrupt vs Polling
 
 Roode prefers the interrupt pin for efficient updates when it is defined and
-validated. If the INT pin is missing or stops working, the driver quietly falls
-back to polling and retries enabling interrupts every 30&nbsp;minutes. Polling is
-also used as a safety net if an interrupt is missed during startup or due to
-noise, so distance readings remain reliable.
+validated. When `interrupt` is present the sensor notifies the MCU whenever a
+sample is ready, avoiding constant I²C traffic. If the INT pin is missing or
+stops working, Roode quietly falls back to a 10&nbsp;ms polling loop and retries
+enabling interrupts every 30&nbsp;minutes. Polling is also used as a safety net
+in case an interrupt is missed during startup or because of noise so distance
+readings remain reliable.
 
 # Roode people counting algorithm
 roode:
@@ -185,8 +189,8 @@ roode:
   calibration_persistence: true
 
   # Jitter reduction options
-  filter_mode: median
-  filter_window: 5
+  filter_mode: median  # min, median or percentile10
+  filter_window: 5     # number of samples used by the filter
   # Log interrupt fallback events and XSHUT recoveries
   log_fallback_events: true
   # Disable dual core tasking if needed
@@ -218,6 +222,20 @@ roode:
         # Exit zone's max detection threshold will be 70% of idle/resting distance, regardless of setting above.
         max: 70%
 ```
+
+### Single vs Dual Core
+
+On ESP32 targets Roode tries to run the sensor loop on the second CPU core so
+Wi‑Fi and other ESPHome tasks stay responsive.  If the task fails to start or
+when running on an ESP8266 the code automatically falls back to a single‑core
+loop.  You can force single‑core mode with `force_single_core: true`.
+
+### Filtering Modes
+
+Roode smooths measurements by buffering several readings.  `filter_mode`
+controls how the sample window is combined: `min` uses the smallest value,
+`median` picks the middle value and `percentile10` selects the 10th percentile.
+`filter_window` sets how many samples are stored.
 
 Also feel free to check out running examples for:
 - [Wemos D1 mini with ESP32](peopleCounter32.yaml)

@@ -17,7 +17,8 @@ void Roode::log_event(const std::string &msg) {
   if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0 ||
       msg == "use_interrupt_mode" || msg.rfind("use_interrupt_mode_", 0) == 0) {
     uint32_t now = millis();
-    if (now - last_interrupt_log < INTERRUPT_LOG_INTERVAL_MS) {
+    if (last_interrupt_log != 0 &&
+        now - last_interrupt_log < INTERRUPT_LOG_INTERVAL_MS) {
       return;
     }
     last_interrupt_log = now;

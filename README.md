@@ -44,6 +44,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
   - [Interrupt vs Polling](#interrupt-vs-polling)
   - [Single vs Dual Core](#single-vs-dual-core)
   - [Filtering Modes](#filtering-modes)
+  - [Configuration Reference](#configuration-reference)
   - [Sensors](#sensors)
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
@@ -272,6 +273,30 @@ controls how the sample window is combined: `min` uses the smallest value,
 | `min` | Very clean environments or quick response needed | Reacts instantly to changes | Sensitive to noise and outliers |
 | `median` | General use when noise is moderate | Ignores spikes for stable readings | Can lag behind fast motion |
 | `percentile10` | Noisy locations where some jitter must be ignored | Balances responsiveness and noise rejection | Slightly less stable than median |
+
+### Configuration Reference
+
+| Option | Required? | Default | Purpose | When to change | Strategy |
+| --- | --- | --- | --- | --- | --- |
+| `vl53l1x.sensor_id` | Optional | `1` | Distinguish multiple sensors on one bus | Using multiple VL53L1X modules | Assign unique ID per sensor |
+| `vl53l1x.address` | Optional | `0x29` | I²C address of the sensor | Address conflict or multi-sensor setup | Change with XSHUT wiring |
+| `vl53l1x.timeout` | Optional | `2s` | How long to wait for a measurement | Long ranges may need more time | Increase if you see timeout errors |
+| `vl53l1x.pins.xshut` | Optional | none | GPIO to power cycle the sensor | Recovering or changing address | Connect to enable automatic restart |
+| `vl53l1x.pins.interrupt` | Optional | none | GPIO for data ready signal | Efficient updates | Use if you can spare a pin |
+| `vl53l1x.calibration.ranging` | Optional | `auto` | Measurement range preset | Known distance extremes | Pick the shortest range that works |
+| `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Calibrate and set measured offset |
+| `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Calibrate using ST tools |
+| `roode.sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Increase to reduce jitter |
+| `roode.orientation` | Optional | `parallel` | Sensor pad orientation | Sensor rotated 90° | Set to `perpendicular` |
+| `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Adjust height/width or use `auto` |
+| `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Tune to ignore doors or walls |
+| `roode.calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning |
+| `roode.filter_mode` | Optional | `min` | How samples are combined | Noisy environment | Try `median` or `percentile10` |
+| `roode.filter_window` | Optional | `5` | Sample count for filter | More noise rejection | Increase gradually |
+| `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing |
+| `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set to true if crashes occur |
+| `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate |
+| `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Override one zone at a time |
 
 Also feel free to check out running examples for:
 - [Wemos D1 mini with ESP32](peopleCounter32.yaml)

@@ -3,6 +3,7 @@
 #include <string>
 #include <optional>
 #include <vector>
+#include <algorithm>
 
 namespace esphome {
 namespace roode {
@@ -231,32 +232,41 @@ void Roode::setup() {
 
   auto fmt_bytes = [](uint32_t bytes) {
     char buf[16];
-    if (bytes >= 1024 * 1024)
+    if (bytes >= 1024UL * 1024UL * 1024UL)
+      snprintf(buf, sizeof(buf), "%uG", bytes / 1024 / 1024 / 1024);
+    else if (bytes >= 1024 * 1024)
       snprintf(buf, sizeof(buf), "%uM", bytes / 1024 / 1024);
     else
       snprintf(buf, sizeof(buf), "%uk", bytes / 1024);
     return std::string(buf);
   };
 
+  auto fmt_time = [](uint32_t ms) {
+    uint32_t sec = ms / 1000;
+    uint32_t min = (sec / 60) % 60;
+    uint32_t hr = (sec / 3600) % 24;
+    char buf[6];
+    snprintf(buf, sizeof(buf), "%02u:%02u", hr, min);
+    return std::string(buf);
+  };
+
   std::vector<std::pair<std::string, std::string>> features;
 #ifdef CONFIG_IDF_TARGET_ESP32
-  features.push_back({"core", use_sensor_task_ ? "dual" : "single"});
-#else
-  features.push_back({"core", "single"});
-#endif
-  features.push_back({"xshut", distanceSensor->get_xshut_state().has_value() ? "1" : "0"});
-  features.push_back({"interrupt", distanceSensor->is_interrupt_enabled() ? "1" : "poll"});
-  features.push_back({"ram", fmt_bytes(ESP.getHeapSize())});
-  features.push_back({"flash", fmt_bytes(ESP.getFlashChipSize())});
-#ifdef CONFIG_IDF_TARGET_ESP32
+  features.push_back({"cpu_mode", use_sensor_task_ ? "dual" : "single"});
+  features.push_back({"cpu", ESP.getChipModel()});
   features.push_back({"cpu_cores", std::to_string(ESP.getChipCores())});
 #else
+  features.push_back({"cpu_mode", "single"});
+  features.push_back({"cpu", "ESP8266"});
   features.push_back({"cpu_cores", "1"});
 #endif
-  features.push_back({"orientation", orientation_ == Parallel ? "parallel" : "perpendicular"});
-  features.push_back({"roi_entry", std::to_string(entry->roi->width) + "x" + std::to_string(entry->roi->height)});
-  features.push_back({"roi_exit", std::to_string(exit->roi->width) + "x" + std::to_string(exit->roi->height)});
-  features.push_back({"calibration", calibration_persistence_ ? "stored" : "runtime"});
+  features.push_back({"xshut", distanceSensor->get_xshut_state().has_value() ? "enabled" : "disabled"});
+  features.push_back({"refresh", distanceSensor->is_interrupt_enabled() ? "interrupt" : "polling"});
+  features.push_back({"ram", fmt_bytes(ESP.getHeapSize())});
+  features.push_back({"flash", fmt_bytes(ESP.getFlashChipSize())});
+  features.push_back({"calibration_value", std::to_string(entry->threshold->idle)});
+  uint32_t last_cal = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  features.push_back({"calibration", fmt_time(last_cal)});
 
   std::string feature_list;
   for (auto &f : features) {

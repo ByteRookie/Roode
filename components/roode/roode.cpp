@@ -13,8 +13,9 @@ static uint32_t last_interrupt_log = 0;
 static const uint32_t INTERRUPT_LOG_INTERVAL_MS = 5000;  // 5 seconds
 
 void Roode::log_event(const std::string &msg) {
-  // Throttle repeated interrupt miss messages which can overwhelm the log
-  if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0) {
+  // Throttle repeated interrupt messages which can overwhelm the log
+  if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0 ||
+      msg == "use_interrupt_mode" || msg.rfind("use_interrupt_mode_", 0) == 0) {
     uint32_t now = millis();
     if (now - last_interrupt_log < INTERRUPT_LOG_INTERVAL_MS) {
       return;

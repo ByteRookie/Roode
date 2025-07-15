@@ -41,7 +41,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Diagnostic sensors report the state of the interrupt and XSHUT pins
 - Optional logging of fallback events helps troubleshoot interrupt or XSHUT failures
 - Event logs detail sensor power cycles, interrupt fallbacks with reasons, manual adjustments, and core mode changes
-- Repeated interrupt pin messages are more aggressively throttled to keep the log readable
+- Interrupt mode messages are throttled to once every 5 seconds for readability
 - Logs are color-coded: green for normal, yellow for info, and red for failures
 
 ## Hardware Recommendation

@@ -10,12 +10,13 @@ namespace roode {
 bool Roode::log_fallback_events_ = false;
 // Track last interrupt log time to avoid spamming the console
 static uint32_t last_interrupt_log = 0;
+static const uint32_t INTERRUPT_LOG_INTERVAL_MS = 5000;  // 5 seconds
 
 void Roode::log_event(const std::string &msg) {
   // Throttle repeated interrupt miss messages which can overwhelm the log
   if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0) {
     uint32_t now = millis();
-    if (now - last_interrupt_log < 1000) {
+    if (now - last_interrupt_log < INTERRUPT_LOG_INTERVAL_MS) {
       return;
     }
     last_interrupt_log = now;
@@ -247,10 +248,16 @@ void Roode::setup() {
 #endif
   feature_list += distanceSensor->get_xshut_state().has_value() ? "xshut," : "no_xshut,";
   feature_list += distanceSensor->is_interrupt_enabled() ? "interrupt," : "polling,";
-  uint32_t total_heap = ESP.getHeapSize() / 1024;
-  uint32_t total_flash = ESP.getFlashChipSize() / 1024;
-  feature_list += "RAM:" + std::to_string(total_heap) + "k,";
-  feature_list += "Flash:" + std::to_string(total_flash) + "k,";
+  uint32_t total_heap_kb = ESP.getHeapSize() / 1024;
+  uint32_t total_flash_kb = ESP.getFlashChipSize() / 1024;
+  if (total_heap_kb >= 1024)
+    feature_list += "RAM:" + std::to_string(total_heap_kb / 1024) + "MB,";
+  else
+    feature_list += "RAM:" + std::to_string(total_heap_kb) + "KB,";
+  if (total_flash_kb >= 1024)
+    feature_list += "Flash:" + std::to_string(total_flash_kb / 1024) + "MB,";
+  else
+    feature_list += "Flash:" + std::to_string(total_flash_kb) + "KB,";
 #ifdef CONFIG_IDF_TARGET_ESP32
   feature_list += "CPU:" + std::to_string(ESP.getChipCores()) + ',';
 #else

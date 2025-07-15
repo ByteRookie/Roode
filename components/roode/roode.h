@@ -58,6 +58,7 @@ static int time_budget_in_ms_max = 200;  // max range: 4m
 
 class Roode : public PollingComponent {
  public:
+  Roode() { instance_ = this; }
   void setup() override;
   void update() override;
   void loop() override;
@@ -182,6 +183,7 @@ class Roode : public PollingComponent {
   uint16_t polling_interval_ms_{10};
 
   static bool log_fallback_events_;
+  static Roode *instance_;
   int manual_adjustment_count_{0};
   float expected_counter_{0};
   bool force_single_core_{false};

@@ -11,6 +11,7 @@ namespace roode {
 
 // When disabled, fallback diagnostics are omitted from the log to reduce noise.
 bool Roode::log_fallback_events_ = false;
+Roode *Roode::instance_ = nullptr;
 void Roode::log_event(const std::string &msg) {
   if (!log_fallback_events_) {
     if (msg == "interrupt_fallback" || msg == "interrupt_fallback_polling")
@@ -99,6 +100,13 @@ void Roode::log_event(const std::string &msg) {
 
   std::string colored = std::string(color) + out + "\033[0m";
   ESP_LOGI(TAG, "%s", colored.c_str());
+  if (instance_ != nullptr) {
+    if (msg == "dual_core_success" || msg == "fallback_single_core" ||
+        msg == "force_single_core" || msg == "interrupt_fallback_polling" ||
+        msg == "interrupt_recovered") {
+      instance_->publish_feature_list();
+    }
+  }
 }
 
 Roode::~Roode() {

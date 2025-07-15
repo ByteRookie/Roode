@@ -26,8 +26,8 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 
 ## Quick Start
 
-1. Install [ESPHome](https://esphome.io/) and clone this repository.
-2. Pick the YAML file matching your board:
+1. Install [ESPHome](https://esphome.io/) on your computer or Home Assistant.
+2. Copy one of the example YAML files to your ESPHome configuration folder (no repository clone required):
    - [peopleCounter32.yaml](peopleCounter32.yaml)
    - [peopleCounter8266.yaml](peopleCounter8266.yaml)
 3. Flash it with `esphome run peopleCounter32.yaml` (replace with your file).

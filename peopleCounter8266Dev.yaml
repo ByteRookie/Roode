@@ -16,7 +16,7 @@ wifi:
     - ssid: !secret ssid1
       password: !secret ssid1_password
   use_address: $devicename
-  fast_connect: True
+  fast_connect: true
   power_save_mode: none
   domain: .local
 

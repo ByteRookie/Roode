@@ -14,10 +14,14 @@ namespace roode {
 bool Roode::log_fallback_events_ = false;
 Roode *Roode::instance_ = nullptr;
 
+struct LuxSample {
+  uint32_t ts;
+  float lux;
+};
 struct LuxPersist {
   uint16_t count;
   uint16_t index;
-  std::array<Roode::LuxSample, MAX_LUX_SAMPLES> samples;
+  std::array<LuxSample, MAX_LUX_SAMPLES> samples;
 };
 
 void Roode::load_lux_samples() {

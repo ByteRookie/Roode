@@ -245,6 +245,8 @@ binary_sensor:
   - platform: roode
     presence_sensor:
       name: $friendly_name presence
+    sensor_xshut_state:
+      name: $friendly_name xshut state
 
 sensor:
   - platform: roode
@@ -283,8 +285,6 @@ sensor:
       name: $friendly_name flash usage
     interrupt_status:
       name: $friendly_name interrupt status
-    sensor_xshut_state:
-      name: $friendly_name xshut state
     manual_adjustment_count:
       name: $friendly_name manual adjusts
 

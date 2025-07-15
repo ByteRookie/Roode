@@ -61,16 +61,18 @@ void Roode::update_sun_times() {
     float L = fmod(M + (1.916f * sin(deg_to_rad(M))) + (0.020f * sin(2 * deg_to_rad(M))) + 282.634f, 360.0f);
     float RA = rad_to_deg(atan(0.91764f * tan(deg_to_rad(L))));
     RA = fmod(RA + 360.0f, 360.0f);
-    float Lquadrant  = floor(L / 90.0f) * 90.0f;
+    float Lquadrant = floor(L / 90.0f) * 90.0f;
     float RAquadrant = floor(RA / 90.0f) * 90.0f;
     RA = RA + Lquadrant - RAquadrant;
     RA /= 15.0f;
     float sinDec = 0.39782f * sin(deg_to_rad(L));
     float cosDec = cos(asin(sinDec));
-    float cosH = (cos(deg_to_rad(90.833f)) - (sinDec * sin(deg_to_rad(latitude_)))) /
-                 (cosDec * cos(deg_to_rad(latitude_)));
-    if (cosH > 1 && sunrise) return 0;  // no sunrise
-    if (cosH < -1 && !sunrise) return 0; // no sunset
+    float cosH =
+        (cos(deg_to_rad(90.833f)) - (sinDec * sin(deg_to_rad(latitude_)))) / (cosDec * cos(deg_to_rad(latitude_)));
+    if (cosH > 1 && sunrise)
+      return 0;  // no sunrise
+    if (cosH < -1 && !sunrise)
+      return 0;  // no sunset
     float H = sunrise ? 360.0f - rad_to_deg(acos(cosH)) : rad_to_deg(acos(cosH));
     H /= 15.0f;
     float T = H + RA - (0.06571f * t_est) - 6.622f;
@@ -91,9 +93,8 @@ void Roode::log_event(const std::string &msg) {
       return;
     if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0)
       return;
-    if (msg == "xshut_toggled" || msg == "xshut_toggled_on" || msg == "xshut_toggled_off" ||
-        msg == "xshut_pulse_off" || msg == "xshut_reinitialize" ||
-        msg == "sensor.recovered_via_xshut" || msg.rfind("xshut_sensor_", 0) == 0 ||
+    if (msg == "xshut_toggled" || msg == "xshut_toggled_on" || msg == "xshut_toggled_off" || msg == "xshut_pulse_off" ||
+        msg == "xshut_reinitialize" || msg == "sensor.recovered_via_xshut" || msg.rfind("xshut_sensor_", 0) == 0 ||
         msg.rfind("xshut_pulse_off_sensor_", 0) == 0 || msg.rfind("xshut_reinitialize_sensor_", 0) == 0 ||
         (msg.rfind("sensor_", 0) == 0 && msg.find(".recovered_via_xshut") != std::string::npos))
       return;
@@ -204,6 +205,10 @@ void Roode::setup() {
   lux_fail_count_ = 0;
   lux_sensor_failed_ = false;
 
+  // Disable lux sensor logic entirely for stability
+  use_light_sensor_ = false;
+  lux_sensor_ = nullptr;
+
   if (!use_light_sensor_)
     lux_sensor_ = nullptr;
   if (use_light_sensor_ && lux_sensor_ != nullptr) {
@@ -221,7 +226,6 @@ void Roode::setup() {
   load_lux_samples();
   if (use_sunrise_prediction_ && (latitude_ != 0 || longitude_ != 0))
     update_sun_times();
-
 
   if (this->distanceSensor->is_failed()) {
     this->mark_failed();
@@ -249,7 +253,7 @@ void Roode::setup() {
         int valid_count = 0;
         for (int s = 0; s < 5; s++) {
           z->readDistance(distanceSensor);
-          if (abs((int)z->getDistance() - (int)z->threshold->idle) < (z->threshold->idle * 0.1))
+          if (abs((int) z->getDistance() - (int) z->threshold->idle) < (z->threshold->idle * 0.1))
             valid_count++;
         }
         if (valid_count < 5) {
@@ -380,8 +384,7 @@ void Roode::update() {
   if (lux_sensor_ != nullptr && !lux_sensor_failed_) {
     uint32_t now = millis();
     if (!lux_sensor_ready_) {
-      if (now - boot_ts_ >= lux_startup_delay_ms_ &&
-          now - last_lux_fail_ts_ >= lux_retry_interval_ms_) {
+      if (now - boot_ts_ >= lux_startup_delay_ms_ && now - last_lux_fail_ts_ >= lux_retry_interval_ms_) {
         float val = lux_sensor_->state;
         if (!isnan(val)) {
           lux_sensor_ready_ = true;
@@ -421,8 +424,7 @@ void Roode::update() {
             lux_sensor_failed_ = true;
         }
       }
-      while (!lux_samples_.empty() &&
-             now - lux_samples_.front().ts > lux_learning_window_ms_) {
+      while (!lux_samples_.empty() && now - lux_samples_.front().ts > lux_learning_window_ms_) {
         lux_samples_.erase(lux_samples_.begin());
       }
       if (!lux_samples_.empty())
@@ -437,10 +439,9 @@ void Roode::update() {
   // context aware calibration
   if (manual_adjust_timestamps_.size() > 0) {
     uint32_t now = millis();
-    manual_adjust_timestamps_.erase(
-        std::remove_if(manual_adjust_timestamps_.begin(), manual_adjust_timestamps_.end(),
-                       [now](uint32_t ts) { return now - ts > 3600000; }),
-        manual_adjust_timestamps_.end());
+    manual_adjust_timestamps_.erase(std::remove_if(manual_adjust_timestamps_.begin(), manual_adjust_timestamps_.end(),
+                                                   [now](uint32_t ts) { return now - ts > 3600000; }),
+                                    manual_adjust_timestamps_.end());
     if (manual_adjust_timestamps_.size() > 5 && lux_sensor_ != nullptr && lux_sensor_ready_) {
       float lux = lux_sensor_->state;
       float pct95 = 0;
@@ -463,8 +464,7 @@ void Roode::update() {
 }
 
 void Roode::loop() {
-  if (!use_sensor_task_ && !force_single_core_ && multicore_failed_ &&
-      millis() - last_multicore_retry_ts_ >= 300000) {
+  if (!use_sensor_task_ && !force_single_core_ && multicore_failed_ && millis() - last_multicore_retry_ts_ >= 300000) {
     last_multicore_retry_ts_ = millis();
     log_event("dual_core_fallback");
     BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 16384, this, 1, &sensor_task_handle_, 1);
@@ -485,13 +485,14 @@ void Roode::loop() {
                    current_zone->getMinDistance() > current_zone->threshold->min;
   if (zone_trig)
     record_motion_event();
-  if (use_light_sensor_ && lux_sensor_ != nullptr && !lux_sensor_failed_ && lux_sensor_ready_ && !lux_samples_.empty()) {
+  if (use_light_sensor_ && lux_sensor_ != nullptr && !lux_sensor_failed_ && lux_sensor_ready_ &&
+      !lux_samples_.empty()) {
     std::vector<float> vals;
     vals.reserve(lux_samples_.size());
     for (auto &p : lux_samples_)
       vals.push_back(p.lux);
     std::sort(vals.begin(), vals.end());
-    float pct95 = vals[(size_t)(vals.size() * 0.95f)];
+    float pct95 = vals[(size_t) (vals.size() * 0.95f)];
     float lux = lux_sensor_->state;
     if (isnan(lux)) {
       lux_sensor_ready_ = false;
@@ -501,33 +502,33 @@ void Roode::loop() {
       if (lux_fail_count_ >= 3)
         lux_sensor_failed_ = true;
     } else {
-    float dynamic_multiplier = 1 + alpha_ * ((lux - pct95) / pct95);
-    if (dynamic_multiplier < base_multiplier_)
-      dynamic_multiplier = base_multiplier_;
-    if (dynamic_multiplier > max_multiplier_)
-      dynamic_multiplier = max_multiplier_;
-    bool in_time_win = false;
-    if (use_sunrise_prediction_ && next_sunrise_ts_ != 0) {
-      time_t now_sec = time(nullptr);
-      in_time_win = (std::abs(now_sec - next_sunrise_ts_) * 1000 < sunrise_sunset_window_ms_) ||
-                    (std::abs(now_sec - next_sunset_ts_) * 1000 < sunrise_sunset_window_ms_);
-      if (now_sec - next_sunrise_ts_ > 86400 || now_sec - next_sunset_ts_ > 86400)
-        update_sun_times();
-    }
-    float mult = dynamic_multiplier;
-    if (in_time_win)
-      mult = std::max(mult, time_multiplier_);
-    if (lux > pct95 * mult) {
-      zone_trig = false;
-      sunlight_suppressed_until_ = millis();
+      float dynamic_multiplier = 1 + alpha_ * ((lux - pct95) / pct95);
+      if (dynamic_multiplier < base_multiplier_)
+        dynamic_multiplier = base_multiplier_;
+      if (dynamic_multiplier > max_multiplier_)
+        dynamic_multiplier = max_multiplier_;
+      bool in_time_win = false;
+      if (use_sunrise_prediction_ && next_sunrise_ts_ != 0) {
+        time_t now_sec = time(nullptr);
+        in_time_win = (std::abs(now_sec - next_sunrise_ts_) * 1000 < sunrise_sunset_window_ms_) ||
+                      (std::abs(now_sec - next_sunset_ts_) * 1000 < sunrise_sunset_window_ms_);
+        if (now_sec - next_sunrise_ts_ > 86400 || now_sec - next_sunset_ts_ > 86400)
+          update_sun_times();
+      }
+      float mult = dynamic_multiplier;
       if (in_time_win)
+        mult = std::max(mult, time_multiplier_);
+      if (lux > pct95 * mult) {
+        zone_trig = false;
+        sunlight_suppressed_until_ = millis();
+        if (in_time_win)
+          log_event("sunlight_suppressed_event");
+        else
+          log_event("lux_outlier_detected");
+      } else if (lux > pct95 && millis() < sunlight_suppressed_until_ + suppression_window_ms_) {
+        zone_trig = false;
         log_event("sunlight_suppressed_event");
-      else
-        log_event("lux_outlier_detected");
-    } else if (lux > pct95 && millis() < sunlight_suppressed_until_ + suppression_window_ms_) {
-      zone_trig = false;
-      log_event("sunlight_suppressed_event");
-    }
+      }
       apply_adaptive_filtering(lux, pct95);
     }
   }
@@ -582,8 +583,8 @@ void Roode::path_tracking(Zone *zone) {
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
 
-  ESP_LOGV(TAG, "Zone %d distance %u (min=%u max=%u)", zone->id, zone->getMinDistance(),
-           zone->threshold->min, zone->threshold->max);
+  ESP_LOGV(TAG, "Zone %d distance %u (min=%u max=%u)", zone->id, zone->getMinDistance(), zone->threshold->min,
+           zone->threshold->max);
 
   // PathTrack algorithm
   if (zone->getMinDistance() < zone->threshold->max && zone->getMinDistance() > zone->threshold->min) {
@@ -598,8 +599,7 @@ void Roode::path_tracking(Zone *zone) {
   }
   if (CurrentZoneStatus == NOBODY) {
     zone_triggered_start_[zone->id] = 0;
-  } else if (zone_triggered_start_[zone->id] != 0 &&
-             millis() - zone_triggered_start_[zone->id] >= 10000 &&
+  } else if (zone_triggered_start_[zone->id] != 0 && millis() - zone_triggered_start_[zone->id] >= 10000 &&
              millis() - last_valid_crossing_ts_ >= 120000) {
     run_zone_calibration(zone->id);
     fail_safe_triggered_ = true;
@@ -740,8 +740,7 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone_id);
   log_event("idle_triggered_recalibration");
   Zone *z = zone_id == 0 ? entry : exit;
-  z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195)
-                             : (orientation_ == Parallel ? 231 : 60));
+  z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
   z->calibrateThreshold(distanceSensor, 50);
   // Recalculate ROI sizes so thresholds remain consistent
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
@@ -830,7 +829,7 @@ void Roode::update_metrics() {
 }
 
 const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_distance,
-                                                uint16_t average_exit_zone_distance) {
+                                                 uint16_t average_exit_zone_distance) {
   uint16_t min = average_entry_zone_distance < average_exit_zone_distance ? average_entry_zone_distance
                                                                           : average_exit_zone_distance;
   uint16_t max = average_entry_zone_distance > average_exit_zone_distance ? average_entry_zone_distance
@@ -984,8 +983,7 @@ void Roode::record_int_fallback() {
     log_event("interrupt_fallback");
     if (distanceSensor != nullptr) {
       distanceSensor->recheck_features();
-      if (!distanceSensor->get_interrupt_state().has_value() &&
-          distanceSensor->get_xshut_state().has_value()) {
+      if (!distanceSensor->get_interrupt_state().has_value() && distanceSensor->get_xshut_state().has_value()) {
         distanceSensor->reset_via_xshut();
         distanceSensor->recheck_features();
       }
@@ -1075,21 +1073,21 @@ void Roode::sensor_task(void *param) {
               self->lux_sensor_failed_ = true;
           }
         }
-        while (!self->lux_samples_.empty() &&
-               now - self->lux_samples_.front().ts > self->lux_learning_window_ms_) {
+        while (!self->lux_samples_.empty() && now - self->lux_samples_.front().ts > self->lux_learning_window_ms_) {
           self->lux_samples_.erase(self->lux_samples_.begin());
         }
         if (!self->lux_samples_.empty())
           self->save_lux_samples();
       }
     }
-    if (self->use_light_sensor_ && self->lux_sensor_ != nullptr && !self->lux_sensor_failed_ && self->lux_sensor_ready_ && !self->lux_samples_.empty()) {
+    if (self->use_light_sensor_ && self->lux_sensor_ != nullptr && !self->lux_sensor_failed_ &&
+        self->lux_sensor_ready_ && !self->lux_samples_.empty()) {
       std::vector<float> vals;
       vals.reserve(self->lux_samples_.size());
       for (auto &p : self->lux_samples_)
         vals.push_back(p.lux);
       std::sort(vals.begin(), vals.end());
-      float pct95 = vals[(size_t)(vals.size() * 0.95f)];
+      float pct95 = vals[(size_t) (vals.size() * 0.95f)];
       float lux = self->lux_sensor_->state;
       if (isnan(lux)) {
         self->lux_sensor_ready_ = false;
@@ -1099,35 +1097,35 @@ void Roode::sensor_task(void *param) {
         if (self->lux_fail_count_ >= 3)
           self->lux_sensor_failed_ = true;
       } else {
-      self->lux_fail_count_ = 0;
-      float dynamic_multiplier = 1 + self->alpha_ * ((lux - pct95) / pct95);
-      if (dynamic_multiplier < self->base_multiplier_)
-        dynamic_multiplier = self->base_multiplier_;
-      if (dynamic_multiplier > self->max_multiplier_)
-        dynamic_multiplier = self->max_multiplier_;
-      bool in_time_win = false;
-      if (self->use_sunrise_prediction_ && self->next_sunrise_ts_ != 0) {
-        time_t now_sec = time(nullptr);
-        in_time_win = (std::abs(now_sec - self->next_sunrise_ts_) * 1000 < self->sunrise_sunset_window_ms_) ||
-                      (std::abs(now_sec - self->next_sunset_ts_) * 1000 < self->sunrise_sunset_window_ms_);
-        if (now_sec - self->next_sunrise_ts_ > 86400 || now_sec - self->next_sunset_ts_ > 86400)
-          self->update_sun_times();
-      }
-      float mult = dynamic_multiplier;
-      if (in_time_win)
-        mult = std::max(mult, self->time_multiplier_);
-      if (lux > pct95 * mult) {
-        zone_trig = false;
-        self->sunlight_suppressed_until_ = millis();
+        self->lux_fail_count_ = 0;
+        float dynamic_multiplier = 1 + self->alpha_ * ((lux - pct95) / pct95);
+        if (dynamic_multiplier < self->base_multiplier_)
+          dynamic_multiplier = self->base_multiplier_;
+        if (dynamic_multiplier > self->max_multiplier_)
+          dynamic_multiplier = self->max_multiplier_;
+        bool in_time_win = false;
+        if (self->use_sunrise_prediction_ && self->next_sunrise_ts_ != 0) {
+          time_t now_sec = time(nullptr);
+          in_time_win = (std::abs(now_sec - self->next_sunrise_ts_) * 1000 < self->sunrise_sunset_window_ms_) ||
+                        (std::abs(now_sec - self->next_sunset_ts_) * 1000 < self->sunrise_sunset_window_ms_);
+          if (now_sec - self->next_sunrise_ts_ > 86400 || now_sec - self->next_sunset_ts_ > 86400)
+            self->update_sun_times();
+        }
+        float mult = dynamic_multiplier;
         if (in_time_win)
+          mult = std::max(mult, self->time_multiplier_);
+        if (lux > pct95 * mult) {
+          zone_trig = false;
+          self->sunlight_suppressed_until_ = millis();
+          if (in_time_win)
+            log_event("sunlight_suppressed_event");
+          else
+            log_event("lux_outlier_detected");
+        } else if (lux > pct95 && millis() < self->sunlight_suppressed_until_ + self->suppression_window_ms_) {
+          zone_trig = false;
           log_event("sunlight_suppressed_event");
-        else
-          log_event("lux_outlier_detected");
-      } else if (lux > pct95 && millis() < self->sunlight_suppressed_until_ + self->suppression_window_ms_) {
-        zone_trig = false;
-        log_event("sunlight_suppressed_event");
-      }
-      self->apply_adaptive_filtering(lux, pct95);
+        }
+        self->apply_adaptive_filtering(lux, pct95);
       }
     }
     if (!self->cpu_optimizations_active_ || zone_trig)

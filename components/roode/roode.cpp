@@ -219,29 +219,32 @@ void Roode::setup() {
   if (people_counter != nullptr)
     expected_counter_ = people_counter->state;
 
-  std::string feature_list;
+  std::vector<std::pair<std::string, std::string>> features;
 #ifdef CONFIG_IDF_TARGET_ESP32
-  feature_list += use_sensor_task_ ? "dual_core," : "single_core,";
+  features.emplace_back("core_mode", use_sensor_task_ ? "dual_core" : "single_core");
 #else
-  feature_list += "single_core,";
+  features.emplace_back("core_mode", "single_core");
 #endif
-  feature_list += distanceSensor->get_xshut_state().has_value() ? "xshut," : "no_xshut,";
-  feature_list += distanceSensor->is_interrupt_enabled() ? "interrupt," : "polling,";
+  features.emplace_back("xshut", distanceSensor->get_xshut_state().has_value() ? "enabled" : "disabled");
+  features.emplace_back("interrupt", distanceSensor->is_interrupt_enabled() ? "enabled" : "polling");
   uint32_t total_heap_kb = ESP.getHeapSize() / 1024;
   uint32_t total_flash_kb = ESP.getFlashChipSize() / 1024;
-  if (total_heap_kb >= 1024)
-    feature_list += "RAM:" + std::to_string(total_heap_kb / 1024) + "MB,";
-  else
-    feature_list += "RAM:" + std::to_string(total_heap_kb) + "KB,";
-  if (total_flash_kb >= 1024)
-    feature_list += "Flash:" + std::to_string(total_flash_kb / 1024) + "MB,";
-  else
-    feature_list += "Flash:" + std::to_string(total_flash_kb) + "KB,";
+  auto fmt_mem = [](uint32_t kb) {
+    if (kb >= 1024)
+      return std::to_string(kb / 1024) + "MB";
+    return std::to_string(kb) + "KB";
+  };
+  features.emplace_back("ram", fmt_mem(total_heap_kb));
+  features.emplace_back("flash", fmt_mem(total_flash_kb));
 #ifdef CONFIG_IDF_TARGET_ESP32
-  feature_list += "CPU:" + std::to_string(ESP.getChipCores()) + ',';
+  features.emplace_back("cpu_cores", std::to_string(ESP.getChipCores()));
 #else
-  feature_list += "CPU:1,";
+  features.emplace_back("cpu_cores", "1");
 #endif
+  std::string feature_list;
+  for (auto &kv : features) {
+    feature_list += kv.first + ':' + kv.second + ',';
+  }
   if (!feature_list.empty())
     feature_list.pop_back();
   if (enabled_features_sensor != nullptr)

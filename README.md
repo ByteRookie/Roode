@@ -36,7 +36,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Interrupt pin support avoids polling overhead with automatic fallback; logs show the interrupt pin level and why polling may be used
 - Multiple sensors can share the I²C bus using XSHUT multiplexing
 - Text sensor reports the list of enabled and fallback features
-- Features text sensor reports XSHUT and refresh status, CPU details, memory sizes and calibration info
+- Features text sensor reports XSHUT and refresh status, CPU details, memory sizes with units and the last calibration time
 - Manual adjustment counter tracks user corrections to the people count
 - Diagnostic sensors report the state of the interrupt and XSHUT pins
 - Optional logging of fallback events helps troubleshoot interrupt or XSHUT failures
@@ -309,8 +309,8 @@ text_sensor:
     enabled_features:
       name: $friendly_name enabled features
 ```
-The features string lists items as `name:value` pairs separated by commas. The current output includes:
-`xshut`, `refresh`, `cpu_mode`, `cpu`, `cpu_cores`, `ram`, `flash`, `calibration_value` and `calibration`.
+The features string lists items as `name:value` pairs separated by commas. The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`, `cpu_cores`, `ram`, `flash`, `calibration_value` and `calibration`.
+Memory values are printed with KB or MB units and the calibration time uses the device's clock in `HH:MM`.
 
 ### Threshold distance
 

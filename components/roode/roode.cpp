@@ -4,6 +4,7 @@
 #include <optional>
 #include <vector>
 #include <algorithm>
+#include <ctime>
 
 namespace esphome {
 namespace roode {
@@ -241,12 +242,14 @@ void Roode::setup() {
     return std::string(buf);
   };
 
-  auto fmt_time = [](uint32_t ms) {
-    uint32_t sec = ms / 1000;
-    uint32_t min = (sec / 60) % 60;
-    uint32_t hr = (sec / 3600) % 24;
+  auto fmt_time = [](uint32_t epoch) {
+    if (epoch == 0)
+      return std::string("00:00");
+    time_t t = epoch;
+    struct tm tm;
+    localtime_r(&t, &tm);
     char buf[6];
-    snprintf(buf, sizeof(buf), "%02u:%02u", hr, min);
+    snprintf(buf, sizeof(buf), "%02d:%02d", tm.tm_hour, tm.tm_min);
     return std::string(buf);
   };
 
@@ -265,8 +268,9 @@ void Roode::setup() {
   features.push_back({"ram", fmt_bytes(ESP.getHeapSize())});
   features.push_back({"flash", fmt_bytes(ESP.getFlashChipSize())});
   features.push_back({"calibration_value", std::to_string(entry->threshold->idle)});
-  uint32_t last_cal = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
-  features.push_back({"calibration", fmt_time(last_cal)});
+  uint32_t last_cal_epoch =
+      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  features.push_back({"calibration", fmt_time(last_cal_epoch)});
 
   std::string feature_list;
   for (auto &f : features) {
@@ -523,7 +527,7 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   calibration_data_[zone_id].baseline_mm = z->threshold->idle;
   calibration_data_[zone_id].threshold_min_mm = z->threshold->min;
   calibration_data_[zone_id].threshold_max_mm = z->threshold->max;
-  calibration_data_[zone_id].last_calibrated_ts = millis();
+  calibration_data_[zone_id].last_calibrated_ts = time(nullptr);
   if (calibration_persistence_) {
     calibration_prefs_[zone_id].save(&calibration_data_[zone_id]);
   }
@@ -638,8 +642,8 @@ void Roode::calibrate_zones() {
   App.feed_wdt();
   publish_sensor_configuration(entry, exit, false);
   if (calibration_persistence_) {
-    calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max, millis()};
-    calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max, millis()};
+    calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max, time(nullptr)};
+    calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max, time(nullptr)};
     calibration_prefs_[0].save(&calibration_data_[0]);
     calibration_prefs_[1].save(&calibration_data_[1]);
   }

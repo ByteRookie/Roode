@@ -151,6 +151,14 @@ vl53l1x:
   # On boot the driver checks that the xshut and interrupt pins work and
   # prints the result to the log.
 
+### Interrupt vs Polling
+
+Roode prefers the interrupt pin for efficient updates when it is defined and
+validated. If the INT pin is missing or stops working, the driver quietly falls
+back to polling and retries enabling interrupts every 30&nbsp;minutes. Polling is
+also used as a safety net if an interrupt is missed during startup or due to
+noise, so distance readings remain reliable.
+
 # Roode people counting algorithm
 roode:
   # Smooth out measurements by using the minimum distance from this number of readings

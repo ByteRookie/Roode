@@ -180,12 +180,13 @@ enabling interrupts every 30\u00a0minutes. Polling is also used as a safety net
 in case an interrupt is missed during startup or because of noise so distance
 readings remain reliable.
 
-| Condition | Mode used |
-| --- | --- |
-| Interrupt pin defined and working | Hardware interrupt for every sample |
-| Interrupt pin missing or failing | 10&nbsp;ms polling with interrupt retries |
-| Single missed interrupts/noise | Polling continues as backup to ensure a reading |
-
+| Situation | Use INT | Use Polling |
+| --- | --- | --- |
+| Normal operation | ✅ | 🔁 (optional verify) |
+| INT not received in time | ⛔️ | ✅ |
+| Sensor just booted | ⛔️ | ✅ |
+| Interrupt unreliable | ⛔️ | ✅ |
+| Low-power mode handling | ⛔️ | ✅ |
 # Roode people counting algorithm
 roode:
   # Smooth out measurements by using the minimum distance from this number of readings

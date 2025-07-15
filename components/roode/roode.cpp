@@ -8,21 +8,7 @@ namespace roode {
 
 // When disabled, fallback diagnostics are omitted from the log to reduce noise.
 bool Roode::log_fallback_events_ = false;
-// Track last interrupt log time to avoid spamming the console
-static uint32_t last_interrupt_log = 0;
-static const uint32_t INTERRUPT_LOG_INTERVAL_MS = 5000;  // 5 seconds
-
 void Roode::log_event(const std::string &msg) {
-  // Throttle repeated interrupt messages which can overwhelm the log
-  if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0 ||
-      msg == "use_interrupt_mode" || msg.rfind("use_interrupt_mode_", 0) == 0) {
-    uint32_t now = millis();
-    if (last_interrupt_log != 0 &&
-        now - last_interrupt_log < INTERRUPT_LOG_INTERVAL_MS) {
-      return;
-    }
-    last_interrupt_log = now;
-  }
   if (!log_fallback_events_) {
     if (msg == "interrupt_fallback" || msg == "interrupt_fallback_polling")
       return;
@@ -82,15 +68,6 @@ void Roode::log_event(const std::string &msg) {
     out += " - sensor " + id + " recovered via XSHUT";
   } else if (msg == "sensor.recovered_via_xshut") {
     out += " - sensor recovered via XSHUT";
-  } else if (msg.rfind("use_interrupt_mode_", 0) == 0) {
-    std::string level = msg.substr(sizeof("use_interrupt_mode_") - 1);
-    out += " - INT pin initial " + level;
-    if (level == "low")
-      out += "; waiting for HIGH";
-    else
-      out += "; waiting for LOW";
-  } else if (msg == "use_interrupt_mode") {
-    out += " - using interrupt mode";
   } else if (msg == "interrupt_fallback_polling" || msg == "interrupt_fallback")
     out += " - INT pin timeout, polling";
   else if (msg == "int_pin_missed")

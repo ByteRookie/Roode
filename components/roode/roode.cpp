@@ -204,6 +204,17 @@ void Roode::setup() {
   lux_fail_count_ = 0;
   lux_sensor_failed_ = false;
 
+  if (!use_light_sensor_)
+    lux_sensor_ = nullptr;
+  if (use_light_sensor_ && lux_sensor_ != nullptr) {
+    float v = lux_sensor_->state;
+    if (isnan(v)) {
+      lux_fail_count_ = 1;
+      lux_sensor_failed_ = true;
+      log_event("lux_sensor_failed_init");
+    }
+  }
+
   lux_pref_ = global_preferences->make_preference<LuxPersist>(0xB0);
   load_lux_samples();
   if (use_sunrise_prediction_ && (latitude_ != 0 || longitude_ != 0))
@@ -278,13 +289,13 @@ void Roode::setup() {
   if (!force_single_core_) {
     log_event("use_dual_core");
     vTaskDelay(pdMS_TO_TICKS(200));
-    BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 12288, this, 1, &sensor_task_handle_, 1);
+    BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 16384, this, 1, &sensor_task_handle_, 1);
     multicore_retry_count_ = 0;
     while (res != pdPASS && multicore_retry_count_ < 2) {
       multicore_retry_count_++;
       log_event(std::string("retry_multicore_") + std::to_string(multicore_retry_count_));
       vTaskDelay(pdMS_TO_TICKS(200));
-      res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 12288, this, 1, &sensor_task_handle_, 1);
+      res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 16384, this, 1, &sensor_task_handle_, 1);
     }
     if (res == pdPASS) {
       use_sensor_task_ = true;
@@ -454,7 +465,7 @@ void Roode::loop() {
       millis() - last_multicore_retry_ts_ >= 300000) {
     last_multicore_retry_ts_ = millis();
     log_event("dual_core_fallback");
-    BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 12288, this, 1, &sensor_task_handle_, 1);
+    BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 16384, this, 1, &sensor_task_handle_, 1);
     if (res == pdPASS) {
       use_sensor_task_ = true;
       log_event("dual_core_recovered");

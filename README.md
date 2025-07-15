@@ -6,8 +6,11 @@
 
 [![Roode community](https://img.shields.io/discord/879407995837087804.svg?label=Discord&logo=Discord&colorB=7289da&style=for-the-badge)](https://discord.gg/hU9SvSXMHs)
 
-People counter working with any smart home system which supports ESPHome/MQTT like Home Assistant. All necessary entities are created automatically.
+A people counter that works with any smart home system that supports ESPHome/MQTT (e.g., Home Assistant). All necessary entities are created automatically.
 
+## Table of Contents
+
+- [Quick Start](#quick-start)
 - [Hardware Recommendation](#hardware-recommendation)
 - [Wiring](#wiring)
   - [ESP32](#esp32)
@@ -17,30 +20,18 @@ People counter working with any smart home system which supports ESPHome/MQTT li
   - [Sensors](#sensors)
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
+- [Features](#features)
 - [FAQ/Troubleshoot](#faqtroubleshoot)
+- [License](#license)
 
-## Features
+## Quick Start
 
-- Automatic sensor restart using the xshut pin when a measurement times out
-- Cleaner memory management and sensor shutdown on reboot
-- Startup check that logs whether the xshut and interrupt pins are functional
-- If a pin test fails at boot the feature is automatically disabled so the sensor continues operating
-- Xshut and interrupt pins use internal pull-ups so no extra resistors are needed
-- Optional sensors report loop time, CPU usage, RAM and flash usage percentages
-- Fail-safe recalibration restores thresholds if a zone stays active
-- Calibration data can persist in flash across reboots
-- Dual-core tasking keeps distance polling responsive on ESP32 with automatic retry and fallback
-- Median/percentile filtering smooths jitter with a configurable window
-- State machine timeouts reset the FSM if a transition stalls
-- Optional CPU optimizations kick in automatically above 90% usage and revert once load drops
-- Interrupt pin support avoids polling overhead with automatic fallback; logs show the interrupt pin level and why polling may be used
-- Multiple sensors can share the I²C bus using XSHUT multiplexing
-- Text sensor reports the list of enabled and fallback features
-- Manual adjustment counter tracks user corrections to the people count
-- Diagnostic sensors report the state of the interrupt and XSHUT pins
-- Optional logging of fallback events helps troubleshoot interrupt or XSHUT failures
-- Event logs detail sensor power cycles, interrupt fallbacks with reasons, manual adjustments, and core mode changes
-- Logs are color-coded: green for normal, yellow for info, and red for failures
+1. Install [ESPHome](https://esphome.io/) and clone this repository.
+2. Pick the YAML file matching your board:
+   - [peopleCounter32.yaml](peopleCounter32.yaml)
+   - [peopleCounter8266.yaml](peopleCounter8266.yaml)
+3. Flash it with `esphome run peopleCounter32.yaml` (replace with your file).
+
 
 ## Hardware Recommendation
 
@@ -54,16 +45,16 @@ People counter working with any smart home system which supports ESPHome/MQTT li
   - Black PCB chinese sensor
   - Pimoroni
 - 1A Power Supply **Do not use an USB port of your computer!**
-- Encolsure (see .stl files) - will be updated soon!
+- Enclosure (see .stl files) - will be updated soon!
   Pins:
   SDA_PIN 4 (ESP8266) or 21 (ESP32)
   SCL_PIN 5 (ESP8266) or 22 (ESP32)
 
 ## Wiring
 
-The sensors from Pololu, Adafruit and the GY-53 can also be connected to the 5v pin (VIN) as they have an voltage regulator.
+The sensors from Pololu, Adafruit and the GY-53 can also be connected to the 5v pin (VIN) as they have a voltage regulator.
 
-If you use a GY-53 you need to connect GND the PS (Ps=0) pin.
+If you use a GY-53, connect the PS pin to GND (Ps=0).
 
 Ps=1 (default): Serial port UART mode, Pin3 is TX, Pin4 is RX, TTL level, PWM output works.
 Ps=0 (when connected to GND): In the IIC mode, the user can operate the chip by himself. The module owns the MCU and does not operate the chip. The PWM output does not work.
@@ -92,9 +83,9 @@ Ps=0 (when connected to GND): In the IIC mode, the user can operate the chip by 
 
 ## Configuration
 
-## Platform Setup
+### Platform Setup
 
-Roode is provided as an external_component which means it is easy to setup in any ESPHome sensor configuration file.
+Roode is provided as an external_component which means it is easy to set up in any ESPHome sensor configuration file.
 
 Other than base ESPHome configuration the only config that's needed for Roode is
 
@@ -171,7 +162,7 @@ roode:
   # This controls the size of the Region of Interest the sensor should take readings in.
   # The current default is
   roi: { height: 16, width: 6 }
-  # We have an experiential automatic mode that can be enabled with
+  # We have an experimental automatic mode that can be enabled with
   # roi: auto
   # or only automatic for one dimension
   # roi: { height: 16, width: auto }
@@ -200,7 +191,7 @@ roode:
   # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
 
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
-  # This allows for detecting whether a crossing is an entry or exit based on which zones was crossed first.
+  # This allows for detecting whether a crossing is an entry or exit based on which zone was crossed first.
   zones:
     # Flip the entry/exit zones. If Roode seems to be counting backwards, set this to true.
     invert: false
@@ -325,13 +316,13 @@ Person height:      1800mm
 max_threshold_percentage: 80% = 1760
 min_threshold_percentage: 10% = 200
 
-All distances smaller then 200mm and greater then 1760mm will be ignored.
+All distances smaller than 200mm and greater than 1760mm will be ignored.
 ```
 
 ## Algorithm
 
-The implemented Algorithm is an improved version of my own implementation which checks the direction of a movement through two defined zones. ST implemented a nice and efficient way to track the path from one to the other direction. I migrated the algorigthm with some changes into the Roode project.
-The concept of path tracking is the detecion of a human:
+The implemented Algorithm is an improved version of my own implementation which checks the direction of a movement through two defined zones. ST implemented a nice and efficient way to track the path from one to the other direction. I migrated the algorithm with some changes into the Roode project.
+The concept of path tracking is the detection of a human:
 
 - In the first zone only
 - In both zones
@@ -352,7 +343,7 @@ The center of the ROI you set is based on the table below and the optical center
 Set the center SPAD of the region of interest (ROI)
 based on VL53L1X_SetROICenter() from STSW-IMG009 Ultra Lite Driver
 
-ST user manual UM2555 explains ROI selection in detail, so we recommend
+ST user manual [UM2555](https://www.st.com/resource/en/user_manual/um2555-ultralite-driver-for-vl53l1x.pdf) explains ROI selection in detail, so we recommend
 reading that document carefully. Here is a table of SPAD locations from
 UM2555 (199 is the default/center):
 
@@ -403,11 +394,35 @@ However, note that the lens inside the VL53L1X inverts the image it sees
 sense objects toward the upper left, you should pick a center SPAD in the
 lower right.
 
+## Features
+
+| Feature | Description |
+| --- | --- |
+| Path tracking algorithm | Distinguishes entry vs exit by tracking the order of zone crossings |
+| Auto restart via XSHUT | Sensor restarts automatically if a measurement times out |
+| Clean shutdown | Memory and sensor power managed on reboot |
+| Startup pin test | Logs and disables features if xshut or interrupt pins fail |
+| Built-in pull-ups | XSHUT and interrupt pins use internal pull-ups, no resistors needed |
+| Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
+| Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
+| Persistent calibration | Calibration data can persist in flash across reboots |
+| Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
+| Filtering options | Median/percentile filters smooth jitter with adjustable window |
+| FSM timeouts | Resets the state machine when a transition stalls |
+| CPU optimizations | Automatic optimizations when CPU usage exceeds 90% |
+| Interrupt fallback | Interrupt mode with graceful fallback to polling and logs |
+| XSHUT multiplexing | Supports multiple sensors sharing I²C bus |
+| Feature text sensor | Reports enabled and fallback features for diagnostics |
+| Manual adjustment counter | Tracks user corrections to the people count |
+| Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
+| Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
+| Colored logs | Normal info in green, details in yellow, failures in red |
+
 ## FAQ/Troubleshoot
 
 **Question:** Why is the Sensor not measuring the correct distances?
 
-**Answer:** This can happen in various scenarios. I try to list causes sorted by likelyhood
+**Answer:** This can happen in various scenarios. I try to list causes sorted by likelihood
 
 1. You did not remove the protection film (most times its yellow)
 2. You did not connect the Sensor properly
@@ -416,7 +431,11 @@ lower right.
 
 ## Sponsors
 
-Thank you very much for you sponsorship!
+Thank you very much for your sponsorship!
 
 - sunshine-hass
+
+## License
+
+This project is licensed under the terms of the [Unlicense](LICENSE).
 

@@ -27,6 +27,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
 - [Features](#features)
+- [Logging and Diagnostics](#logging-and-diagnostics)
 - [FAQ/Troubleshoot](#faqtroubleshoot)
 - [License](#license)
 
@@ -488,6 +489,32 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
 | Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
 | Colored logs | Normal info in green, details in yellow, failures in red |
+
+## Logging and Diagnostics
+
+Roode prints key events to the ESPHome logger. Set `log_fallback_events: true`
+in the `roode:` section to include interrupt fallbacks and XSHUT recovery
+details. Event logs cover power cycles of the sensor, automatic changes between
+interrupt and polling mode, and manual adjustments to the people count.
+
+### Feature text sensor
+
+The `enabled_features` text sensor summarizes which runtime features are active.
+Typical values include `dual_core` or `single_core`, `xshut` or `no_xshut`, and
+`interrupt` or `polling`. This helps verify that the hardware pins and options
+are detected correctly.
+
+### Diagnostic sensors
+
+Optional sensors provide insight into Roode's operation:
+
+- `loop_time`, `cpu_usage`, `ram_free` and `flash_free` report resource usage.
+- `sensor_status` and `interrupt_status` show the current hardware state.
+- ROI size and threshold sensors allow live tuning of each zone.
+- `manual_adjustment_count` records people-count corrections.
+
+See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
+these sensors.
 
 
 ## FAQ/Troubleshoot

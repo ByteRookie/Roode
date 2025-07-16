@@ -33,6 +33,8 @@ CONF_ZONES = "zones"
 CONF_CALIBRATION_PERSISTENCE = "calibration_persistence"
 CONF_FILTER_MODE = "filter_mode"
 CONF_FILTER_WINDOW = "filter_window"
+CONF_LOG_FALLBACK = "log_fallback_events"
+CONF_FORCE_SINGLE_CORE = "force_single_core"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -87,6 +89,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=False): cv.boolean,
         cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(FILTER_MODES, upper=False),
         cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
+        cv.Optional(CONF_LOG_FALLBACK, default=False): cv.boolean,
+        cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
                 cv.Optional(CONF_INVERT, default=False): cv.boolean,
@@ -110,6 +114,8 @@ async def to_code(config: Dict):
     cg.add(roode.set_calibration_persistence(config[CONF_CALIBRATION_PERSISTENCE]))
     cg.add(roode.set_filter_mode(config[CONF_FILTER_MODE]))
     cg.add(roode.set_filter_window(config[CONF_FILTER_WINDOW]))
+    cg.add(roode.set_log_fallback_events(config[CONF_LOG_FALLBACK]))
+    cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)

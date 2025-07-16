@@ -1,12 +1,19 @@
 #include "vl53l1x.h"
+#include "../roode/roode.h"
+#include <cstdio>
 
 namespace esphome {
 namespace vl53l1x {
+
+std::vector<VL53L1X *> VL53L1X::sensors{};
 
 VL53L1X::~VL53L1X() {
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->digital_write(false);
     ESP_LOGD(TAG, "XShut pin set LOW - powering down sensor");
+    roode::Roode::log_event("xshut_sensor_" + std::to_string(sensor_id_) + "_off");
+    roode::Roode::log_event("xshut_toggled_off");
+    roode::Roode::log_event("xshut_toggled");
   }
   this->sensor.StopRanging();
 }
@@ -30,12 +37,25 @@ void VL53L1X::dump_config() {
 void VL53L1X::setup() {
   ESP_LOGD(TAG, "Beginning setup");
 
+  sensors.push_back(this);
+  for (auto *s : sensors) {
+    if (s != this && s->xshut_pin.has_value()) {
+      s->xshut_pin.value()->digital_write(false);
+      roode::Roode::log_event("xshut_sensor_" + std::to_string(s->sensor_id_) + "_off");
+      roode::Roode::log_event("xshut_toggled_off");
+      roode::Roode::log_event("xshut_toggled");
+    }
+  }
+
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->pin_mode(gpio::FLAG_OUTPUT | gpio::FLAG_PULLUP);
     this->xshut_pin.value()->setup();
     ESP_LOGD(TAG, "XShut pin configured");
     this->xshut_pin.value()->digital_write(true);
     ESP_LOGD(TAG, "XShut pin set HIGH - sensor powered on");
+    roode::Roode::log_event("xshut_sensor_" + std::to_string(sensor_id_) + "_on");
+    roode::Roode::log_event("xshut_toggled_on");
+    roode::Roode::log_event("xshut_toggled");
     delay(2);
   }
 
@@ -45,13 +65,22 @@ void VL53L1X::setup() {
     ESP_LOGD(TAG, "Interrupt pin configured");
   }
 
-  // TODO use xshut_pin, if given, to change address
   auto status = this->init();
   if (status != VL53L1_ERROR_NONE) {
     this->mark_failed();
     return;
   }
   ESP_LOGD(TAG, "Device initialized");
+  if (desired_address_ != 0x29) {
+    status = this->sensor.SetI2CAddress(desired_address_ << 1);
+    if (status == VL53L1_ERROR_NONE) {
+      char buf[5];
+      snprintf(buf, sizeof(buf), "%02X", desired_address_);
+      roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + "_addr = 0x" + std::string(buf));
+    } else {
+      ESP_LOGE(TAG, "Failed to change address. Error: %d", status);
+    }
+  }
 
   if (this->offset.has_value()) {
     ESP_LOGI(TAG, "Setting offset calibration to %d", this->offset.value());
@@ -76,6 +105,16 @@ void VL53L1X::setup() {
   if (!this->check_features()) {
     ESP_LOGE(TAG, "Feature check failed. Sensor disabled");
     return;
+  }
+
+  for (auto *s : sensors) {
+    if (s != this && s->xshut_pin.has_value()) {
+      s->xshut_pin.value()->digital_write(true);
+      roode::Roode::log_event("xshut_sensor_" + std::to_string(s->sensor_id_) + "_on");
+      roode::Roode::log_event("xshut_toggled_on");
+      roode::Roode::log_event("xshut_toggled");
+      delay(2);
+    }
   }
 
   ESP_LOGI(TAG, "Setup complete");
@@ -202,24 +241,70 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     last_roi = roi;
   }
 
+  // Decide whether we can use the interrupt pin for this reading
+  uint8_t dataReady = false;
+  bool use_int = is_interrupt_enabled();
+  if (!use_int && this->interrupt_pin.has_value() &&
+      (millis() - last_interrupt_retry_ >= 1800000UL)) {
+    if (validate_interrupt()) {
+      interrupt_active_ = true;
+      interrupt_miss_count_ = 0;
+      roode::Roode::log_event("interrupt_recovered");
+      use_int = true;
+    } else {
+      last_interrupt_retry_ = millis();
+    }
+  }
+
   status = this->sensor.StartRanging();
   if (status != VL53L1_ERROR_NONE) {
     ESP_LOGE(TAG, "Failed to start ranging, error code: %d", status);
     return {};
   }
 
-  // Wait for the measurement to be ready
-  // TODO use interrupt_pin, if given, to await data ready instead of polling
-  uint8_t dataReady = false;
+  // Wait for measurement ready using interrupt pin when available
+  bool initial_state = false;
+  if (use_int) {
+    initial_state = this->interrupt_pin.value()->digital_read();
+  }
   auto start_time = millis();
   while (!dataReady && (millis() - start_time) < this->timeout) {
-    status = this->sensor.CheckForDataReady(&dataReady);
-    if (status != VL53L1_ERROR_NONE) {
-      ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
-      return {};
+    if (use_int) {
+      if (this->interrupt_pin.value()->digital_read() != initial_state) {
+        dataReady = true;
+      }
+    } else {
+      status = this->sensor.CheckForDataReady(&dataReady);
+      if (status != VL53L1_ERROR_NONE) {
+        ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
+        return {};
+      }
     }
     delay(1);
     App.feed_wdt();
+  }
+  if (use_int && !dataReady) {
+    roode::Roode::log_event("int_pin_missed_sensor_" + std::to_string(sensor_id_));
+    roode::Roode::log_event("int_pin_missed");
+    interrupt_miss_count_++;
+    if (interrupt_miss_count_ >= 5) {
+      roode::Roode::log_event("interrupt_fallback_polling");
+      interrupt_active_ = false;
+      last_interrupt_retry_ = millis();
+    } else {
+      roode::Roode::log_event("interrupt_fallback");
+    }
+    // Fallback to polling for this measurement
+    start_time = millis();
+    while (!dataReady && (millis() - start_time) < this->timeout) {
+      status = this->sensor.CheckForDataReady(&dataReady);
+      if (status != VL53L1_ERROR_NONE) {
+        ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
+        return {};
+      }
+      delay(1);
+      App.feed_wdt();
+    }
   }
   if (!dataReady) {
     ESP_LOGW(TAG, "Timed out waiting for measurement ready");
@@ -227,11 +312,18 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     this->sensor.StopRanging();
     if (this->xshut_pin.has_value()) {
       this->xshut_pin.value()->digital_write(false);
+      roode::Roode::log_event("xshut_pulse_off_sensor_" + std::to_string(sensor_id_));
+      roode::Roode::log_event("xshut_pulse_off");
       ESP_LOGW(TAG, "XShut pin set LOW - resetting sensor");
-      delay(10);
+      delay(100);
       this->xshut_pin.value()->digital_write(true);
+      roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
+      roode::Roode::log_event("xshut_reinitialize");
       ESP_LOGD(TAG, "XShut pin set HIGH - reset complete");
       this->wait_for_boot();
+      roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
+      roode::Roode::log_event("sensor.recovered_via_xshut");
+      recovery_count_++;
     }
     return {};
   }
@@ -255,6 +347,9 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     ESP_LOGE(TAG, "Could not stop ranging, error code: %d", status);
     return {};
   }
+
+  if (use_int)
+    interrupt_miss_count_ = 0;
 
   ESP_LOGV(TAG, "Finished distance read: %d", distance);
   return {distance};
@@ -290,31 +385,20 @@ bool VL53L1X::check_features() {
   }
 
   if (this->interrupt_pin.has_value()) {
-    bool initial = this->interrupt_pin.value()->digital_read();
-    ESP_LOGD(TAG, "Interrupt pin initial state: %d", initial);
-    auto status = this->sensor.StartRanging();
-    if (status == VL53L1_ERROR_NONE) {
-      auto start = millis();
-      while ((millis() - start) < this->timeout) {
-        if (this->interrupt_pin.value()->digital_read() != initial) {
-          ESP_LOGD(TAG, "Interrupt pin state changed - measurement ready");
-          int_ok = true;
-          break;
-        }
-        App.feed_wdt();
-      }
-      if (!int_ok)
-        ESP_LOGD(TAG, "Interrupt pin did not change state during validation");
-      this->sensor.ClearInterrupt();
-      this->sensor.StopRanging();
-    }
+    int_ok = validate_interrupt();
     if (!int_ok) {
       ESP_LOGE(TAG, "Interrupt pin validation failed, falling back to polling");
-      this->interrupt_pin.reset();
-      ESP_LOGW(TAG, "Interrupt pin disabled due to validation failure");
+      interrupt_active_ = false;
+      interrupt_miss_count_ = 0;
+      last_interrupt_retry_ = millis();
     } else {
       ESP_LOGI(TAG, "Interrupt pin working");
+      interrupt_active_ = true;
+      roode::Roode::log_event("interrupt_initialized");
+      interrupt_miss_count_ = 0;
     }
+  } else {
+    interrupt_active_ = false;
   }
 
   if (!this->interrupt_pin.has_value()) {
@@ -329,6 +413,31 @@ bool VL53L1X::check_features() {
   }
 
   return !this->is_failed();
+}
+
+bool VL53L1X::validate_interrupt() {
+  bool ok = false;
+  if (!this->interrupt_pin.has_value())
+    return false;
+  bool initial = this->interrupt_pin.value()->digital_read();
+  ESP_LOGD(TAG, "Interrupt pin initial state: %d", initial);
+  auto status = this->sensor.StartRanging();
+  if (status == VL53L1_ERROR_NONE) {
+    auto start = millis();
+    while ((millis() - start) < this->timeout) {
+      if (this->interrupt_pin.value()->digital_read() != initial) {
+        ESP_LOGD(TAG, "Interrupt pin state changed - measurement ready");
+        ok = true;
+        break;
+      }
+      App.feed_wdt();
+    }
+    if (!ok)
+      ESP_LOGD(TAG, "Interrupt pin did not change state during validation");
+    this->sensor.ClearInterrupt();
+    this->sensor.StopRanging();
+  }
+  return ok;
 }
 
 }  // namespace vl53l1x

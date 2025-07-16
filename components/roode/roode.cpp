@@ -778,8 +778,8 @@ bool Roode::should_suppress_event() {
   float dynamic_multiplier = 1.0f;
   if (lux_percentile95_ > 0)
     dynamic_multiplier =
-        std::clamp(1 + alpha_ * ((lux - lux_percentile95_) / lux_percentile95_),
-                    base_multiplier_, max_multiplier_);
+        esphome::clamp(1 + alpha_ * ((lux - lux_percentile95_) / lux_percentile95_),
+                        base_multiplier_, max_multiplier_);
   float multiplier = dynamic_multiplier;
   if (time_window)
     multiplier = std::max({dynamic_multiplier, time_multiplier_, combined_multiplier_});

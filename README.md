@@ -258,27 +258,25 @@ controls how the sample window is combined: `min` uses the smallest value,
 
 ### Configuration Reference
 
-| Option | Required? | Default | Purpose | When to change | Strategy |
-| --- | --- | --- | --- | --- | --- |
-| `vl53l1x.sensor_id` | Optional | `1` | Distinguish multiple sensors on one bus | Using multiple VL53L1X modules | Assign unique ID per sensor |
-| `vl53l1x.address` | Optional | `0x29` | I²C address of the sensor | Address conflict or multi-sensor setup | Change with XSHUT wiring |
-| `vl53l1x.timeout` | Optional | `2s` | How long to wait for a measurement | Long ranges may need more time | Increase in 500&nbsp;ms steps until errors stop |
-| `vl53l1x.pins.xshut` | Optional | none | GPIO to power cycle the sensor | Recovering or changing address | Connect to enable automatic restart |
-| `vl53l1x.pins.interrupt` | Optional | none | GPIO for data ready signal | Efficient updates | Use if you can spare a pin |
-| `vl53l1x.calibration.ranging` | Optional | `auto` | Measurement range preset | Known distance extremes | Pick the shortest range that works |
-| `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration |
-| `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Only adjust with ST's calibration output |
-| `roode.sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Try 3–5 for noisy areas; above 5 adds lag |
-| `roode.orientation` | Optional | `parallel` | Sensor pad orientation | Sensor rotated 90° | Set to `perpendicular` |
-| `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Change by 2–4 units or use `auto` to learn |
-| `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% (or ~50 mm) each time |
-| `roode.calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning |
-| `roode.filter_mode` | Optional | `min` | How samples are combined | Noisy environment | Try `median` or `percentile10` |
-| `roode.filter_window` | Optional | `5` | Sample count for filter | More noise rejection | Use 7 or 9 for heavy jitter; 3 for speed |
-| `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing |
-| `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set to true if crashes occur |
-| `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate |
-| `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed |
+| Option(s) | Required? | Default | Purpose | When to change | Strategy | Example |
+| --- | --- | --- | --- | --- | --- | --- |
+| `vl53l1x.sensor_id` | Optional | `1` | Distinguish multiple sensors on one bus | Using multiple VL53L1X modules | Assign unique ID per sensor | `sensor_id: 2` |
+| `vl53l1x.address` & `vl53l1x.pins.xshut` | Optional together | `0x29` | Change the sensor I²C address | Address conflict or multi-sensor setup | Provide an XSHUT pin and new address | `address: 0x30`<br>`pins:`<br>`  xshut: GPIO3` |
+| `vl53l1x.timeout` | Optional | `2s` | How long to wait for a measurement | Long ranges may need more time | Increase in 500&nbsp;ms steps until errors stop | `timeout: 3s` |
+| `vl53l1x.pins.interrupt` | Optional | none | GPIO for data ready signal | Efficient updates | Use if you can spare a pin | `interrupt: GPIO1` |
+| `vl53l1x.calibration.ranging` | Optional | `auto` | Measurement range preset | Known distance extremes | Pick the shortest range that works | `ranging: short` |
+| `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration | `offset: 8mm` |
+| `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Only adjust with ST's calibration output | `crosstalk: 53406cps` |
+| `roode.sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Try 3–5 for noisy areas; above 5 adds lag | `sampling: 3` |
+| `roode.orientation` | Optional | `parallel` | Sensor pad orientation | Sensor rotated 90° | Set to `perpendicular` | `orientation: perpendicular` |
+| `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Change by 2–4 units or use `auto` to learn | `roi: { height: 16, width: 8 }` |
+| `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% (or ~50 mm) each time | `detection_thresholds: { min: 5%, max: 80% }` |
+| `roode.calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning | `calibration_persistence: true` |
+| `roode.filter_mode` & `roode.filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows | `filter_mode: median`<br>`filter_window: 7` |
+| `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | `log_fallback_events: true` |
+| `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: true` |
+| `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: true }` |
+| `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | `zones:`<br>`  entry:`<br>`    roi: auto` |
 
 Also feel free to check out running examples for:
 - [Wemos D1 mini with ESP32](peopleCounter32.yaml)

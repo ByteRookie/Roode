@@ -445,7 +445,8 @@ text_sensor:
 The features string lists items as `name:value` pairs separated by new lines.
 The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
 `cpu_cores`, `ram`, `flash`, `calibration_value`, `calibration`,
-`scheduled_recalibration`, `ambient_light_learning`, `cpu_resilience`,
+`scheduled_recalibration`, `ambient_light_learning`, `light_control`,
+`temp_control`, `light_control_status`, `cpu_resilience`,
 `int_pin_robustness`, `context_calibration` and `adaptive_filtering`.
 Features that rely on sensors report `disabled` if a sensor error occurs and
 automatically switch back to `enabled` after the sensor recovers.
@@ -467,6 +468,9 @@ calibration_value:1399
 calibration:6:01PM
 scheduled_recalibration:supported
 ambient_light_learning:supported
+light_control:lux
+temp_control:disabled
+light_control_status:0
 cpu_resilience:supported
 int_pin_robustness:supported
 context_calibration:supported
@@ -611,6 +615,8 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | INT pin robustness | Monitors missed interrupts and recovers via XSHUT |
 | Context-aware calibration | Suggests recalibration after repeated manual changes |
 | Adaptive filtering | Adjusts filter window based on motion & lighting |
+| Light control | Uses lux or location data to suppress sunlight spikes |
+| Temp control | Enables recalibration on significant temperature change |
 
 ### Scheduled Recalibration
 

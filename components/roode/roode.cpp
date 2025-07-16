@@ -758,8 +758,10 @@ void Roode::sample_lux() {
 }
 
 bool Roode::should_suppress_event() {
-  if (!validate_lux_sensor() || lux_samples_.empty())
+  if (!validate_lux_sensor() || lux_samples_.empty()) {
+    light_control_offset_ = 0;
     return false;
+  }
   float lux = current_lux_;
   uint32_t now = millis() / 1000;
   if (now - last_suppression_ts_ < suppression_window_sec_)
@@ -781,7 +783,9 @@ bool Roode::should_suppress_event() {
   float multiplier = dynamic_multiplier;
   if (time_window)
     multiplier = std::max({dynamic_multiplier, time_multiplier_, combined_multiplier_});
-  if (lux > lux_percentile95_ * multiplier) {
+  float threshold = lux_percentile95_ * multiplier;
+  if (lux > threshold) {
+    light_control_offset_ = lux - threshold;
     if (time_window)
       log_event("sunlight_suppressed_event");
     else
@@ -789,6 +793,7 @@ bool Roode::should_suppress_event() {
     last_suppression_ts_ = now;
     return true;
   }
+  light_control_offset_ = 0;
   return false;
 }
 
@@ -998,6 +1003,17 @@ void Roode::publish_feature_list() {
   features.push_back({"scheduled_recalibration", sched_enabled ? "enabled" : "disabled"});
   bool light_enabled = use_light_sensor_ && lux_sensor_ != nullptr && lux_sensor_operational_;
   features.push_back({"ambient_light_learning", light_enabled ? "enabled" : "disabled"});
+  std::string light_ctrl = "off";
+  if (light_enabled && use_sunrise_prediction_)
+    light_ctrl = "both";
+  else if (light_enabled)
+    light_ctrl = "lux";
+  else if (use_sunrise_prediction_)
+    light_ctrl = "location";
+  features.push_back({"light_control", light_ctrl});
+  std::string temp_ctrl = (recalibrate_on_temp_change_ && temperature_sensor_operational_) ? "enabled" : "disabled";
+  features.push_back({"temp_control", temp_ctrl});
+  features.push_back({"light_control_status", std::to_string(light_control_offset_)});
   features.push_back({"cpu_resilience", "supported"});
   features.push_back({"int_pin_robustness", "supported"});
   features.push_back({"context_calibration", "supported"});

@@ -252,6 +252,7 @@ class Roode : public PollingComponent {
   float current_lux_{NAN};
   bool lux_learning_complete_{false};
   uint32_t last_suppression_ts_{0};
+  float light_control_offset_{0};
   int sunrise_sec_{21600};
   int sunset_sec_{64800};
   int sun_times_day_{-1};

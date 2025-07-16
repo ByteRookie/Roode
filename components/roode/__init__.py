@@ -49,6 +49,12 @@ ORIENTATION_VALUES = {
     "perpendicular": Orientation.Perpendicular,
 }
 
+# New configuration keys for scheduled recalibration
+CONF_AUTO_RECALIBRATE_INTERVAL = "auto_recalibrate_interval"
+CONF_RECALIBRATE_ON_TEMP_CHANGE = "recalibrate_on_temp_change"
+CONF_MAX_TEMP_DELTA_FOR_RECALIB = "max_temp_delta_for_recalib"
+CONF_RECALIBRATE_COOLDOWN = "recalibrate_cooldown"
+
 roi_range = cv.int_range(min=4, max=16)
 
 ROI_SCHEMA = cv.Any(
@@ -91,6 +97,11 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_LOG_FALLBACK, default=False): cv.boolean,
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
+        # Scheduled recalibration options
+        cv.Optional(CONF_AUTO_RECALIBRATE_INTERVAL, default="6h"): cv.positive_time_period,
+        cv.Optional(CONF_RECALIBRATE_ON_TEMP_CHANGE, default=True): cv.boolean,
+        cv.Optional(CONF_MAX_TEMP_DELTA_FOR_RECALIB, default=8): cv.int_,
+        cv.Optional(CONF_RECALIBRATE_COOLDOWN, default="30min"): cv.positive_time_period,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
                 cv.Optional(CONF_INVERT, default=False): cv.boolean,
@@ -116,6 +127,10 @@ async def to_code(config: Dict):
     cg.add(roode.set_filter_window(config[CONF_FILTER_WINDOW]))
     cg.add(roode.set_log_fallback_events(config[CONF_LOG_FALLBACK]))
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
+    cg.add(roode.set_auto_recalibrate_interval(config[CONF_AUTO_RECALIBRATE_INTERVAL]))
+    cg.add(roode.set_recalibrate_on_temp_change(config[CONF_RECALIBRATE_ON_TEMP_CHANGE]))
+    cg.add(roode.set_max_temp_delta_for_recalib(config[CONF_MAX_TEMP_DELTA_FOR_RECALIB]))
+    cg.add(roode.set_recalibrate_cooldown(config[CONF_RECALIBRATE_COOLDOWN]))
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)

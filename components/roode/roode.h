@@ -113,6 +113,10 @@ class Roode : public PollingComponent {
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
+  void set_auto_recalibrate_interval(uint32_t seconds) { auto_recalibrate_interval_sec_ = seconds; }
+  void set_recalibrate_on_temp_change(bool val) { recalibrate_on_temp_change_ = val; }
+  void set_max_temp_delta_for_recalib(uint8_t delta) { max_temp_delta_for_recalib_ = delta; }
+  void set_recalibrate_cooldown(uint32_t seconds) { recalibrate_cooldown_sec_ = seconds; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
   void set_filter_mode(FilterMode mode) {
     filter_mode_ = mode;
@@ -128,6 +132,8 @@ class Roode : public PollingComponent {
   }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
+  void perform_recalibration(bool manual);
+  void check_auto_recalibration();
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
   void set_exit_threshold_percentages(uint8_t min, uint8_t max) { exit->set_threshold_percentages(min, max); }
   void apply_cpu_optimizations(float cpu);
@@ -190,6 +196,13 @@ class Roode : public PollingComponent {
   bool force_single_core_{false};
   TaskHandle_t sensor_task_handle_{nullptr};
   uint8_t multicore_retry_count_{0};
+  // Scheduled recalibration tracking
+  uint32_t auto_recalibrate_interval_sec_{21600};
+  bool recalibrate_on_temp_change_{true};
+  uint8_t max_temp_delta_for_recalib_{8};
+  uint32_t recalibrate_cooldown_sec_{1800};
+  uint32_t last_recalibrate_ts_{0};
+  uint32_t last_auto_recalibrate_ts_{0};
 
   enum FSMState { STATE_IDLE, STATE_ENTRY_ACTIVE, STATE_BOTH_ACTIVE };
   FSMState state_{STATE_IDLE};

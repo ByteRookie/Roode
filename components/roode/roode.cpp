@@ -240,6 +240,8 @@ void Roode::setup() {
     expected_counter_ = people_counter->state;
 
   publish_feature_list();
+  last_recalibrate_ts_ = static_cast<uint32_t>(time(nullptr));
+  last_auto_recalibrate_ts_ = last_recalibrate_ts_;
 }
 
 void Roode::update() {
@@ -270,6 +272,7 @@ void Roode::update() {
       log_event("manual_adjust " + sign + std::to_string(diff) + " total=" + std::to_string(manual_adjustment_count_));
     }
   }
+  check_auto_recalibration();
 }
 
 void Roode::loop() {
@@ -469,7 +472,30 @@ void Roode::updateCounter(int delta) {
   call.set_value(next);
   call.perform();
 }
-void Roode::recalibration() { calibrate_zones(); }
+void Roode::recalibration() { perform_recalibration(true); }
+
+void Roode::perform_recalibration(bool manual) {
+  calibrate_zones();
+  last_recalibrate_ts_ = static_cast<uint32_t>(time(nullptr));
+  if (!manual)
+    last_auto_recalibrate_ts_ = last_recalibrate_ts_;
+  if (manual)
+    log_event("manual_recalibrate_triggered");
+}
+
+void Roode::check_auto_recalibration() {
+  if (auto_recalibrate_interval_sec_ == 0)
+    return;
+  uint32_t now = static_cast<uint32_t>(time(nullptr));
+  if (now - last_auto_recalibrate_ts_ < auto_recalibrate_interval_sec_)
+    return;
+  if (now - last_recalibrate_ts_ < recalibrate_cooldown_sec_) {
+    log_event("recalibrate_cooldown_active");
+    return;
+  }
+  log_event("auto_recalibrate_interval");
+  perform_recalibration(false);
+}
 
 void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone_id);

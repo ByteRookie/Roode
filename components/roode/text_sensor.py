@@ -39,9 +39,18 @@ CONFIG_SCHEMA = cv.Schema(
                 ): cv.entity_category,
             }
         ),
+        cv.Optional(STATUS): text_sensor.text_sensor_schema().extend(
+            {
+                cv.Optional(CONF_ICON, default="mdi:check-circle"): cv.icon,
+                cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category,
+            }
+        ),
         cv.Optional(FEATURES): text_sensor.text_sensor_schema().extend(
             {
-                cv.Optional(CONF_ICON, default="mdi:cog" ): cv.icon,
+                cv.Optional(CONF_ICON, default="mdi:cog"): cv.icon,
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
                 cv.Optional(
                     CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC

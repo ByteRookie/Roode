@@ -591,7 +591,9 @@ are detected correctly.
 Optional sensors provide insight into Roode's operation:
 
 - `loop_time`, `cpu_usage`, `ram_free` and `flash_free` report resource usage.
-- `sensor_status` and `interrupt_status` show the current hardware state.
+- `sensor_status` and `interrupt_status` show the current hardware state. The
+  status sensor reports `ok`, `timeout`, `reinitializing`, `error` or `offline`
+  so automations can react to issues.
 - ROI size and threshold sensors allow live tuning of each zone.
 - `manual_adjustment_count` records people-count corrections.
 

@@ -83,6 +83,8 @@ class VL53L1X : public i2c::I2CDevice, public Component {
 
   bool interrupt_active_{false};
   uint8_t interrupt_miss_count_{0};
+  uint8_t interrupt_fallback_count_{0};
+  uint32_t fallback_window_start_{0};
   uint32_t last_interrupt_retry_{0};
 };
 

@@ -287,12 +287,46 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     roode::Roode::log_event("int_pin_missed_sensor_" + std::to_string(sensor_id_));
     roode::Roode::log_event("int_pin_missed");
     interrupt_miss_count_++;
+    bool fallback_event = false;
     if (interrupt_miss_count_ >= 5) {
       roode::Roode::log_event("interrupt_fallback_polling");
       interrupt_active_ = false;
       last_interrupt_retry_ = millis();
+      fallback_event = true;
     } else {
       roode::Roode::log_event("interrupt_fallback");
+      fallback_event = true;
+    }
+    if (fallback_event) {
+      uint32_t now_ms = millis();
+      if (fallback_window_start_ == 0 || now_ms - fallback_window_start_ > 1800000UL) {
+        fallback_window_start_ = now_ms;
+        interrupt_fallback_count_ = 1;
+      } else {
+        interrupt_fallback_count_++;
+      }
+      if (interrupt_fallback_count_ >= 3) {
+        if (this->xshut_pin.has_value()) {
+          this->xshut_pin.value()->digital_write(false);
+          roode::Roode::log_event("xshut_pulse_off_sensor_" + std::to_string(sensor_id_));
+          roode::Roode::log_event("xshut_pulse_off");
+          delay(100);
+          this->xshut_pin.value()->digital_write(true);
+          roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
+          roode::Roode::log_event("xshut_reinitialize");
+          this->wait_for_boot();
+          roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
+          roode::Roode::log_event("sensor.recovered_via_xshut");
+          recovery_count_++;
+        }
+        bool valid = validate_interrupt();
+        interrupt_active_ = valid;
+        interrupt_miss_count_ = 0;
+        last_interrupt_retry_ = now_ms;
+        roode::Roode::log_event(valid ? "interrupt_recovered" : "interrupt_fallback_polling");
+        fallback_window_start_ = now_ms;
+        interrupt_fallback_count_ = 0;
+      }
     }
     // Fallback to polling for this measurement
     start_time = millis();

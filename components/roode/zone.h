@@ -39,6 +39,7 @@ class Zone {
   void reset_roi(uint8_t default_center);
   void calibrateThreshold(TofSensor *distanceSensor, int number_attempts);
   void roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Orientation orientation);
+  void set_threshold_percentages(uint8_t min_percent, uint8_t max_percent);
   const uint8_t id;
   uint16_t getDistance() const;
   uint16_t getMinDistance() const;
@@ -68,4 +69,3 @@ class Zone {
 };
 }  // namespace roode
 }  // namespace esphome
-

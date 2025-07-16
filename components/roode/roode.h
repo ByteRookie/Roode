@@ -26,7 +26,6 @@ static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
 
-
 /*
 Use the VL53L1X_SetTimingBudget function to set the TB in milliseconds. The TB
 values available are [15, 20, 33, 50, 100, 200, 500]. This function must be
@@ -128,6 +127,8 @@ class Roode : public PollingComponent {
   }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
+  void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
+  void set_exit_threshold_percentages(uint8_t min, uint8_t max) { exit->set_threshold_percentages(min, max); }
   void apply_cpu_optimizations(float cpu);
   void reset_cpu_optimizations(float cpu);
   void update_metrics();
@@ -221,4 +222,3 @@ class Roode : public PollingComponent {
 
 }  // namespace roode
 }  // namespace esphome
-

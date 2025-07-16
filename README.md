@@ -1,7 +1,7 @@
 # RooDe
 
 [![GitHub release](https://img.shields.io/github/v/tag/Lyr3x/Roode?style=flat-square)](https://GitHub.com/Lyr3x/Roode/releases/)
-[![Build](https://img.shields.io/github/workflow/status/Lyr3x/Roode/CI?style=flat-square)](https://github.com/Lyr3x/Roode/blob/master/.github/workflows/ci.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/Lyr3x/Roode/ci.yml?style=flat-square)](https://github.com/Lyr3x/Roode/blob/master/.github/workflows/ci.yml)
 [![Maintenance](https://img.shields.io/maintenance/yes/2025?style=flat-square)](https://GitHub.com/Lyr3x/Roode/graphs/commit-activity)
 
 [![Roode community](https://img.shields.io/discord/879407995837087804.svg?label=Discord&logo=Discord&colorB=7289da&style=for-the-badge)](https://discord.gg/hU9SvSXMHs)
@@ -27,6 +27,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
 - [Features](#features)
+- [Logging and Diagnostics](#logging-and-diagnostics)
 - [FAQ/Troubleshoot](#faqtroubleshoot)
 - [License](#license)
 
@@ -51,7 +52,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
   - Black PCB chinese sensor
   - Pimoroni
 - 1A Power Supply **Do not use an USB port of your computer!**
-- Enclosure (see .stl files) - will be updated soon!
+- Enclosure (see models in [STL/](STL))
   Pins:
   SDA_PIN 4 (ESP8266) or 21 (ESP32)
   SCL_PIN 5 (ESP8266) or 22 (ESP32)
@@ -128,9 +129,11 @@ vl53l1x:
     # The longer the distance, the more time the sensor needs to take a measurement.
     # Available options are: auto, shortest, short, medium, long, longer, longest
     ranging: auto
-    # The offset correction distance. See calibration section (WIP) for more details.
+    # The offset correction distance. Run [calibration/OffsetAndXtalkCalibration](calibration/OffsetAndXtalkCalibration)
+    # with a 17% grey target 140 mm away and copy the reported value.
     offset: 8mm
-    # The corrected photon count in counts per second. See calibration section (WIP) for more details.
+    # The corrected photon count in counts per second. Use the same sketch in a
+    # dark room to measure crosstalk and copy the result.
     crosstalk: 53406cps
 
   # Hardware pins
@@ -379,18 +382,30 @@ automatically: after powering up, leave the area clear for about 10&nbsp;seconds
 the idle distance can be measured. The default maximum threshold is 80&nbsp;% of this
 resting value.
 
-To fine-tune detection, adjust the `detection_thresholds` option in your YAML or
-call the `recalibrate` service to re-measure the idle distance. For example, if
-the sensor sits about 20&nbsp;cm above a door you might ignore the door leaf by
-setting `detection_thresholds.min: 10%`.
 
-Example:
 
-```
+To fine-tune detection, adjust the `detection_thresholds` option in your YAML or call the `recalibrate` service to re-measure the idle distance.
+
+By default, the sensor calculates thresholds after startup by sampling the idle distance for about 10 seconds. The maximum threshold is set to 80% of this distance and the minimum to 15%. These can be changed at runtime using the `set_entry_threshold_percentages()` and `set_exit_threshold_percentages()` methods.
+
+If you install the sensor \~20 cm above a door and want to ignore door movements, you might lower the minimum threshold:
+
+```yaml
 detection_thresholds:
   min: 10%
   max: 80%
 ```
+
+Or in code:
+
+```cpp
+set_entry_threshold_percentages(10, 80);
+```
+
+This ensures movements too close to the sensor (like door leaf motion) are filtered out while still detecting people passing underneath.
+
+
+
 
 See the [calibration instructions](calibration/) for further details.
 
@@ -491,6 +506,32 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
 | Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
 | Colored logs | Normal info in green, details in yellow, failures in red |
+
+## Logging and Diagnostics
+
+Roode prints key events to the ESPHome logger. Set `log_fallback_events: true`
+in the `roode:` section to include interrupt fallbacks and XSHUT recovery
+details. Event logs cover power cycles of the sensor, automatic changes between
+interrupt and polling mode, and manual adjustments to the people count.
+
+### Feature text sensor
+
+The `enabled_features` text sensor summarizes which runtime features are active.
+Typical values include `dual_core` or `single_core`, `xshut` or `no_xshut`, and
+`interrupt` or `polling`. This helps verify that the hardware pins and options
+are detected correctly.
+
+### Diagnostic sensors
+
+Optional sensors provide insight into Roode's operation:
+
+- `loop_time`, `cpu_usage`, `ram_free` and `flash_free` report resource usage.
+- `sensor_status` and `interrupt_status` show the current hardware state.
+- ROI size and threshold sensors allow live tuning of each zone.
+- `manual_adjustment_count` records people-count corrections.
+
+See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
+these sensors.
 
 
 ## FAQ/Troubleshoot

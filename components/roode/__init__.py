@@ -158,13 +158,29 @@ async def to_code(config: Dict):
     cg.add(roode.set_filter_window(config[CONF_FILTER_WINDOW]))
     cg.add(roode.set_log_fallback_events(config[CONF_LOG_FALLBACK]))
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
-    cg.add(roode.set_auto_recalibrate_interval(config[CONF_AUTO_RECALIBRATE_INTERVAL]))
+    cg.add(
+        roode.set_auto_recalibrate_interval(
+            config[CONF_AUTO_RECALIBRATE_INTERVAL].total_seconds
+        )
+    )
     cg.add(roode.set_recalibrate_on_temp_change(config[CONF_RECALIBRATE_ON_TEMP_CHANGE]))
     cg.add(roode.set_max_temp_delta_for_recalib(config[CONF_MAX_TEMP_DELTA_FOR_RECALIB]))
-    cg.add(roode.set_recalibrate_cooldown(config[CONF_RECALIBRATE_COOLDOWN]))
+    cg.add(
+        roode.set_recalibrate_cooldown(
+            config[CONF_RECALIBRATE_COOLDOWN].total_seconds
+        )
+    )
     cg.add(roode.set_use_light_sensor(config[CONF_USE_LIGHT_SENSOR]))
-    cg.add(roode.set_lux_learning_window(config[CONF_LUX_LEARNING_WINDOW]))
-    cg.add(roode.set_lux_sample_interval(config[CONF_LUX_SAMPLE_INTERVAL]))
+    cg.add(
+        roode.set_lux_learning_window(
+            config[CONF_LUX_LEARNING_WINDOW].total_seconds
+        )
+    )
+    cg.add(
+        roode.set_lux_sample_interval(
+            config[CONF_LUX_SAMPLE_INTERVAL].total_seconds
+        )
+    )
     cg.add(roode.set_use_sunrise_prediction(config[CONF_USE_SUNRISE_PREDICTION]))
     if CONF_LATITUDE in config:
         cg.add(roode.set_latitude(config[CONF_LATITUDE]))
@@ -175,9 +191,17 @@ async def to_code(config: Dict):
     cg.add(roode.set_max_multiplier(config[CONF_MAX_MULTIPLIER]))
     cg.add(roode.set_time_multiplier(config[CONF_TIME_MULTIPLIER]))
     cg.add(roode.set_combined_multiplier(config[CONF_COMBINED_MULTIPLIER]))
-    cg.add(roode.set_suppression_window(config[CONF_SUPPRESSION_WINDOW]))
+    cg.add(
+        roode.set_suppression_window(
+            config[CONF_SUPPRESSION_WINDOW].total_seconds
+        )
+    )
     if CONF_IDLE_RECALIB_INTERVAL in config:
-        cg.add(roode.set_idle_recalib_interval(config[CONF_IDLE_RECALIB_INTERVAL]))
+        cg.add(
+            roode.set_idle_recalib_interval(
+                config[CONF_IDLE_RECALIB_INTERVAL].total_seconds
+            )
+        )
     if CONF_LUX_SENSOR in config:
         sens = await cg.get_variable(config[CONF_LUX_SENSOR])
         cg.add(roode.set_lux_sensor(sens))

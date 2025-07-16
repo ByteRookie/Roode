@@ -71,6 +71,7 @@ roode:
   # I removed the { size: 1 } option here since it was redundant.
   # Can always add back later if we have more sampling paramaters.
   sampling: 2
+  filter_mode: median
   # defaults for both zones
   roi:
     # height: 14

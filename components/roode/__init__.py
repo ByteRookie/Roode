@@ -32,6 +32,7 @@ CONF_SAMPLING = "sampling"
 CONF_ZONES = "zones"
 CONF_CALIBRATION_PERSISTENCE = "calibration_persistence"
 CONF_FILTER_MODE = "filter_mode"
+CONF_FILTER_WINDOW = "filter_window"
 CONF_LOG_FALLBACK = "log_fallback_events"
 CONF_FORCE_SINGLE_CORE = "force_single_core"
 
@@ -87,6 +88,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_DETECTION_THRESHOLDS, default={}): THRESHOLDS_SCHEMA,
         cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=False): cv.boolean,
         cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(FILTER_MODES, upper=False),
+        cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_LOG_FALLBACK, default=False): cv.boolean,
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
@@ -111,6 +113,7 @@ async def to_code(config: Dict):
     cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
     cg.add(roode.set_calibration_persistence(config[CONF_CALIBRATION_PERSISTENCE]))
     cg.add(roode.set_filter_mode(config[CONF_FILTER_MODE]))
+    cg.add(roode.set_filter_window(config[CONF_FILTER_WINDOW]))
     cg.add(roode.set_log_fallback_events(config[CONF_LOG_FALLBACK]))
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))

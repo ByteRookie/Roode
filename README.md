@@ -156,7 +156,6 @@ roode:
   # Smooth out measurements by using the minimum distance from this number of readings
   # Increase to 4-5 if jitter is a problem; 1 is fastest but noisier
   sampling: 2
-  filter_mode: median  # min, median or percentile10
 
   # The orientation of the two sensor pads in relation to the entryway being tracked.
   # The advised orientation is parallel, but if needed this can be changed to perpendicular.
@@ -184,6 +183,11 @@ roode:
 
   # Persist calibration data so thresholds survive restarts
   calibration_persistence: true
+
+  # Jitter reduction options
+  filter_mode: median  # min, median or percentile10
+  # Increase the window to 7 or 9 for heavy noise, drop to 3 for faster response
+  filter_window: 5     # number of samples used by the filter
   # Log interrupt fallback events and XSHUT recoveries
   log_fallback_events: true
   # Disable dual core tasking if needed
@@ -247,7 +251,7 @@ loop.  You can force single‑core mode with `force_single_core: true`.
 Roode smooths measurements by buffering several readings.  `filter_mode`
 controls how the sample window is combined: `min` uses the smallest value,
 `median` picks the middle value and `percentile10` selects the 10th percentile.
-The window size comes from the `sampling` option.
+`filter_window` sets how many samples are stored.
 
 | Mode | When to use | Pros | Cons |
 | --- | --- | --- | --- |
@@ -271,7 +275,7 @@ The window size comes from the `sampling` option.
 | `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Change by 2–4 units or use `auto` to learn | `roi: { height: 16, width: 6 }` | `roi: auto` |
 | `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% (or ~50 mm) each time | `detection_thresholds: { min: 5%, max: 85% }` | `detection_thresholds: { min: 50mm, max: 234cm }` |
 | `roode.calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning | `calibration_persistence: false` | `calibration_persistence: true` |
-| `roode.filter_mode` | Optional | `min` | How samples are combined | Noisy environment | Use `median`/`percentile10` with larger sampling values | `filter_mode: min` | `filter_mode: percentile10` |
+| `roode.filter_mode` & `roode.filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows | `filter_mode: min`<br>`filter_window: 5` | `filter_mode: percentile10`<br>`filter_window: 9` |
 | `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | `log_fallback_events: false` | `log_fallback_events: true` |
 | `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: false` | `force_single_core: true` |
 | `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
@@ -511,7 +515,7 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
 | Persistent calibration | Calibration data can persist in flash across reboots |
 | Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
-| Filtering options | Median/percentile filters smooth jitter using the sampling buffer |
+| Filtering options | Median/percentile filters smooth jitter with adjustable window |
 | FSM timeouts | Resets the state machine when a transition stalls |
 | CPU optimizations | Automatic optimizations when CPU usage exceeds 90% |
 | Interrupt fallback | Interrupt mode with graceful fallback to polling and logs |

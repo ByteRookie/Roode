@@ -7,7 +7,6 @@ vl53l1x:
 
 roode:
   sampling: 2
-  filter_mode: median
 
 sensor:
   - platform: roode

@@ -71,7 +71,6 @@ roode:
   id: roode_platform
   # Smooth out measurements by using the minimum distance from this number of readings
   sampling: 2
-  filter_mode: median
   # This controls the size of the Region of Interest the sensor should take readings in.
   roi: { height: 16, width: 6 }
   # The detection thresholds for determining whether a measurement should count as a person crossing.

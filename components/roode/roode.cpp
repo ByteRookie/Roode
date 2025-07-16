@@ -664,11 +664,11 @@ void Roode::publish_feature_list() {
   auto fmt_bytes = [](uint32_t bytes) {
     char buf[16];
     if (bytes >= 1024UL * 1024UL * 1024UL)
-      snprintf(buf, sizeof(buf), "%uG", bytes / 1024 / 1024 / 1024);
+      snprintf(buf, sizeof(buf), "%uGB", bytes / 1024 / 1024 / 1024);
     else if (bytes >= 1024 * 1024)
-      snprintf(buf, sizeof(buf), "%uM", bytes / 1024 / 1024);
+      snprintf(buf, sizeof(buf), "%uMB", bytes / 1024 / 1024);
     else
-      snprintf(buf, sizeof(buf), "%uk", bytes / 1024);
+      snprintf(buf, sizeof(buf), "%uKB", bytes / 1024);
     return std::string(buf);
   };
 

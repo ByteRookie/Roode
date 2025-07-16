@@ -20,7 +20,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
   - [Platform Setup](#platform-setup)
   - [Interrupt vs Polling](#interrupt-vs-polling)
   - [Single vs Dual Core](#single-vs-dual-core)
-  - [Filtering Modes](#filtering-modes)
+  - [Sampling and Filtering](#sampling-and-filtering)
 - [Configuration Reference](#configuration-reference)
   - [Example Configurations](#example-configurations)
   - [Sensors](#sensors)
@@ -246,18 +246,44 @@ Wi‑Fi and other ESPHome tasks stay responsive.  If the task fails to start or
 when running on an ESP8266 the code automatically falls back to a single‑core
 loop.  You can force single‑core mode with `force_single_core: true`.
 
-### Filtering Modes
+### Sampling and Filtering
 
-Roode smooths measurements by buffering several readings.  `filter_mode`
-controls how the sample window is combined: `min` uses the smallest value,
-`median` picks the middle value and `percentile10` selects the 10th percentile.
-`filter_window` sets how many samples are stored.
+Roode smooths distance readings in two stages. The driver first averages
+multiple raw measurements using the `sampling` option. Each zone then applies a
+filter across the last few measurements controlled by `filter_mode` and
+`filter_window`.
+
+Increasing either value reduces noise but also slows the response. Start with
+`sampling: 2` and a `filter_window` of `3` and raise them together if your
+environment is unstable. See the table below for how the available filter modes
+behave.
 
 | Mode | When to use | Pros | Cons |
 | --- | --- | --- | --- |
 | `min` | Very clean environments or quick response needed | Reacts instantly to changes | Sensitive to noise and outliers |
 | `median` | General use when noise is moderate | Ignores spikes for stable readings | Can lag behind fast motion |
 | `percentile10` | Noisy locations where some jitter must be ignored | Balances responsiveness and noise rejection | Slightly less stable than median |
+
+#### `sampling`
+
+*Averages consecutive raw measurements before filtering.* Increase above `2` only when noise causes flickering.
+
+#### `filter_window`
+
+*Number of past measurements considered by the filter.* `3` is responsive, while `5+` helps in harsh lighting or reflective areas.
+
+Filter mode tips: use `median` to ignore spikes or `percentile10` for gradual noise.
+
+### Quick Tips Summary
+
+| Setting | Purpose | Good For | Tradeoff |
+| ---------------------- | ---------------------------------- | ------------------------------- | ------------------------ |
+| `sampling: 1` | Fastest response | Controlled lighting, indoors | Higher noise |
+| `sampling: 2–3` | Balanced stability and speed | General use | Slight delay |
+| `filter_window: 3` | General smoothing | Balanced use | Slightly slower response |
+| `filter_window: 5+` | Suppress false triggers | Harsh lighting, sunlight | Laggy detection |
+| `filter_mode: median` | Handle spikes (sunlight, noise) | Flashy or inconsistent lighting | Less smooth transition |
+| `filter_mode: percentile10` | Smooth drifting noise | Consistent background shifts | May react to anomalies |
 
 ### Configuration Reference
 

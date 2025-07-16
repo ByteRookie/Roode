@@ -57,6 +57,7 @@ static int time_budget_in_ms_max = 200;  // max range: 4m
 
 class Roode : public PollingComponent {
  public:
+  Roode() { instance_ = this; }
   void setup() override;
   void update() override;
   void loop() override;
@@ -183,6 +184,7 @@ class Roode : public PollingComponent {
   uint16_t polling_interval_ms_{10};
 
   static bool log_fallback_events_;
+  static Roode *instance_;
   int manual_adjustment_count_{0};
   float expected_counter_{0};
   bool force_single_core_{false};
@@ -202,6 +204,7 @@ class Roode : public PollingComponent {
   bool handle_sensor_status();
   void calibrateDistance();
   void calibrate_zones();
+  void publish_feature_list();
   const RangingMode *determine_ranging_mode(uint16_t average_entry_zone_distance, uint16_t average_exit_zone_distance);
   void publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax);
   void updateCounter(int delta);

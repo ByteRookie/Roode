@@ -40,8 +40,6 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 3. Flash it with `esphome run peopleCounter32.yaml` (replace with your file).
 
 
-## Hardware Recommendations
-
 - ESP8266 or ESP32
   - **Wemos D1 Mini ESP32** <-- Recommended
   - Wemos D1 mini (ESP8266)
@@ -372,6 +370,27 @@ text_sensor:
   - platform: roode
     enabled_features:
       name: $friendly_name enabled features
+      ## This sensor is a text_sensor that lists all enabled features
+```
+The features string lists items as `name:value` pairs separated by new lines.
+The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
+`cpu_cores`, `ram`, `flash`, `calibration_value` and `calibration`.
+Memory values are printed with **KB**, **MB** or **GB** units. Calibration time
+uses the device clock in `h:MMAM/PM` format or displays `unknown` if the clock
+has not been initialised.
+
+Example output:
+
+```
+cpu_mode:dual
+cpu:ESP32-D0WDQ5
+cpu_cores:2
+xshut:enabled
+refresh:interrupt
+ram:309KB
+flash:16MB
+calibration_value:1399
+calibration:6:01PM
 ```
 
 ### Threshold distance

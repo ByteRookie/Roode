@@ -266,8 +266,6 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   bool initial_state = false;
   if (use_int) {
     initial_state = this->interrupt_pin.value()->digital_read();
-    roode::Roode::log_event("use_interrupt_mode");
-    roode::Roode::log_event("use_interrupt_mode_" + std::string(initial_state ? "high" : "low"));
   }
   auto start_time = millis();
   while (!dataReady && (millis() - start_time) < this->timeout) {

@@ -746,6 +746,7 @@ void Roode::update_status_text(const std::string &status) {
     status_text_sensor->publish_state(status);
     last_status_text_ = status;
   }
+}
 
 void Roode::restart_sensor() {
   distanceSensor->restart();

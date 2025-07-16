@@ -471,6 +471,7 @@ calibration:6:01PM
 | `sensor_status` (text) | text_sensor | "ok", "timeout", "reinitializing", "error" or "offline" |
 | `enabled_features` | text_sensor | List of active runtime features |
 
+
 ### Threshold distance
 
 A crossing is detected when the measured distance for a zone falls between its

@@ -1,6 +1,7 @@
 from typing import Dict, Union
 import esphome.codegen as cg
 import esphome.config_validation as cv
+from esphome.components import sensor
 from esphome.const import (
     CONF_HEIGHT,
     CONF_ID,

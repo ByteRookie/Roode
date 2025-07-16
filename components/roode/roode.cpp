@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <ctime>
+#include <cmath>
 
 namespace esphome {
 namespace roode {
@@ -272,6 +273,10 @@ void Roode::update() {
       log_event("manual_adjust " + sign + std::to_string(diff) + " total=" + std::to_string(manual_adjustment_count_));
     }
   }
+  sample_lux();
+  adjust_filtering();
+  check_context_calibration();
+  check_multicore_recovery();
   check_auto_recalibration();
 }
 
@@ -423,8 +428,8 @@ void Roode::path_tracking(Zone *zone) {
         if ((PathTrack[1] == 1) && (PathTrack[2] == 3) && (PathTrack[3] == 2)) {
           // This an exit
           ESP_LOGI("Roode pathTracking", "Exit detected.");
-
-          this->updateCounter(-1);
+          if (!should_suppress_event())
+            this->updateCounter(-1);
           last_valid_crossing_ts_ = millis();
           if (entry_exit_event_sensor != nullptr) {
             entry_exit_event_sensor->publish_state("Exit");
@@ -432,7 +437,8 @@ void Roode::path_tracking(Zone *zone) {
         } else if ((PathTrack[1] == 2) && (PathTrack[2] == 3) && (PathTrack[3] == 1)) {
           // This an entry
           ESP_LOGI("Roode pathTracking", "Entry detected.");
-          this->updateCounter(1);
+          if (!should_suppress_event())
+            this->updateCounter(1);
           last_valid_crossing_ts_ = millis();
           if (entry_exit_event_sensor != nullptr) {
             entry_exit_event_sensor->publish_state("Entry");
@@ -484,9 +490,39 @@ void Roode::perform_recalibration(bool manual) {
 }
 
 void Roode::check_auto_recalibration() {
+  uint32_t now = static_cast<uint32_t>(time(nullptr));
+  if (recalibrate_on_temp_change_ && temperature_sensor_ != nullptr &&
+      !isnan(temperature_sensor_->state)) {
+    float t = temperature_sensor_->state;
+    if (!isnan(last_temperature_) &&
+        fabs(t - last_temperature_) >= max_temp_delta_for_recalib_) {
+      if (now - last_recalibrate_ts_ < recalibrate_cooldown_sec_) {
+        log_event("recalibrate_cooldown_active");
+      } else {
+        log_event("temp_triggered_recalibration");
+        perform_recalibration(false);
+      }
+      last_temperature_ = t;
+      return;
+    }
+    if (isnan(last_temperature_))
+      last_temperature_ = t;
+  }
+
+  if (idle_recalib_interval_sec_ > 0 &&
+      now - last_valid_crossing_ts_ >= idle_recalib_interval_sec_) {
+    if (now - last_recalibrate_ts_ < recalibrate_cooldown_sec_) {
+      log_event("recalibrate_cooldown_active");
+    } else {
+      log_event("idle_triggered_recalibration");
+      perform_recalibration(false);
+    }
+    last_valid_crossing_ts_ = now;
+    return;
+  }
+
   if (auto_recalibrate_interval_sec_ == 0)
     return;
-  uint32_t now = static_cast<uint32_t>(time(nullptr));
   if (now - last_auto_recalibrate_ts_ < auto_recalibrate_interval_sec_)
     return;
   if (now - last_recalibrate_ts_ < recalibrate_cooldown_sec_) {
@@ -588,6 +624,122 @@ void Roode::update_metrics() {
   loop_time_sum_ = 0;
   loop_count_ = 0;
   loop_window_start_ = now;
+}
+
+void Roode::sample_lux() {
+  if (!use_light_sensor_ || lux_sensor_ == nullptr)
+    return;
+  uint32_t now = millis() / 1000;
+  if (now - last_lux_sample_ts_ < lux_sample_interval_sec_)
+    return;
+  last_lux_sample_ts_ = now;
+  float lux = lux_sensor_->state;
+  if (std::isnan(lux))
+    return;
+  lux_samples_.push_back(lux);
+  size_t max_samples = lux_learning_window_sec_ / lux_sample_interval_sec_;
+  while (lux_samples_.size() > max_samples)
+    lux_samples_.pop_front();
+  if (lux_samples_.size() < 60) {
+    log_event("lux_model_bootstrapping");
+    return;
+  }
+  std::vector<float> tmp(lux_samples_.begin(), lux_samples_.end());
+  std::sort(tmp.begin(), tmp.end());
+  size_t idx = (size_t)(0.95f * (tmp.size() - 1));
+  lux_percentile95_ = tmp[idx];
+  if (!lux_learning_complete_) {
+    lux_learning_complete_ = true;
+    log_event("lux_learning_complete");
+  }
+}
+
+bool Roode::should_suppress_event() {
+  if (!use_light_sensor_ || lux_sensor_ == nullptr || lux_samples_.empty())
+    return false;
+  float lux = lux_sensor_->state;
+  if (std::isnan(lux))
+    return false;
+  uint32_t now = millis() / 1000;
+  bool time_window = false;
+  if (use_sunrise_prediction_) {
+    time_t t = time(nullptr);
+    struct tm tm_time;
+    localtime_r(&t, &tm_time);
+    int sec = tm_time.tm_hour * 3600 + tm_time.tm_min * 60 + tm_time.tm_sec;
+    if (abs(sec - 21600) <= 1800 || abs(sec - 64800) <= 1800)
+      time_window = true;
+  }
+  float dynamic_multiplier = 1.0f;
+  if (lux_percentile95_ > 0)
+    dynamic_multiplier =
+        std::clamp(1 + alpha_ * ((lux - lux_percentile95_) / lux_percentile95_),
+                    base_multiplier_, max_multiplier_);
+  float multiplier = dynamic_multiplier;
+  if (time_window)
+    multiplier = std::max(dynamic_multiplier, time_multiplier_);
+  if (lux > lux_percentile95_ * multiplier) {
+    if (time_window)
+      log_event("sunlight_suppressed_event");
+    else
+      log_event("lux_outlier_detected");
+    last_suppression_ts_ = now;
+    return true;
+  }
+  return false;
+}
+
+void Roode::adjust_filtering() {
+  if (!use_light_sensor_ || lux_sensor_ == nullptr)
+    return;
+  float lux = lux_sensor_->state;
+  if (std::isnan(lux) || lux_percentile95_ == 0)
+    return;
+  uint8_t new_win = filter_window_;
+  if (lux > lux_percentile95_ * 4)
+    new_win = std::min<uint8_t>(9, default_filter_window_ + 2);
+  else if (lux < lux_percentile95_ * 2)
+    new_win = default_filter_window_;
+  if (new_win != filter_window_) {
+    filter_window_ = new_win;
+    entry->set_filter_window(new_win);
+    exit->set_filter_window(new_win);
+    log_event("filter_window_changed");
+  }
+}
+
+void Roode::check_context_calibration() {
+  uint32_t now = millis() / 1000;
+  if (manual_adjustment_count_ == 1)
+    manual_adjust_window_start_ = now;
+  if (manual_adjustment_count_ > 5 &&
+      now - manual_adjust_window_start_ <= 3600 && lux_sensor_ != nullptr &&
+      !std::isnan(lux_sensor_->state) && lux_sensor_->state > lux_percentile95_) {
+    log_event("manual_recalibrate_triggered");
+    perform_recalibration(false);
+    manual_adjustment_count_ = 0;
+  }
+  if (now - manual_adjust_window_start_ > 3600)
+    manual_adjustment_count_ = 0;
+}
+
+void Roode::check_multicore_recovery() {
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (!use_sensor_task_ && !force_single_core_) {
+    uint32_t now = millis();
+    if (now - last_multicore_retry_ms_ >= 300000) {
+      last_multicore_retry_ms_ = now;
+      BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 4096,
+                                              this, 1, &sensor_task_handle_, 1);
+      if (res == pdPASS) {
+        use_sensor_task_ = true;
+        log_event("dual_core_recovered");
+      } else {
+        log_event("dual_core_fallback");
+      }
+    }
+  }
+#endif
 }
 
 const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_distance,

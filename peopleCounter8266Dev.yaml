@@ -90,6 +90,7 @@ roode:
   time_multiplier: 1.5
   combined_multiplier: 3.0
   suppression_window: 30min
+  idle_recalibrate_interval: 12h
   zones:
     invert: true
     entry:

@@ -344,6 +344,9 @@ reflections cause false triggers.
 | `roode.auto_recalibrate_interval` | Optional | `6h` | Time between automatic recalibrations | Sensor drifts gradually | Increase for stable temps or set to 0 to disable | `auto_recalibrate_interval: 6h` | `auto_recalibrate_interval: 12h` |
 | `roode.recalibrate_on_temp_change` | Optional | `true` | Recalibrate when temperature shifts | Large indoor/outdoor swings | Disable if temps stable | `recalibrate_on_temp_change: true` | `recalibrate_on_temp_change: false` |
 | `roode.use_light_sensor` | Optional | `true` | Enable lux learning to suppress sunlight events | Sensor near windows | Disable if no light sensor | `use_light_sensor: true` | `use_light_sensor: false` |
+| `roode.lux_learning_window` | Optional | `24h` | Time range for lux history | Slow lighting changes | Shorten for seasonal shifts | `lux_learning_window: 24h` | `lux_learning_window: 12h` |
+| `roode.lux_sample_interval` | Optional | `1min` | How often to sample lux | Battery savings | Increase for low-power setups | `lux_sample_interval: 1min` | `lux_sample_interval: 5min` |
+| `roode.suppression_window` | Optional | `30min` | Ignore repeated light spikes | Sudden sunlight bursts | Reduce for indoor lights | `suppression_window: 30min` | `suppression_window: 5min` |
 | `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
 | `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
 

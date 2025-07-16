@@ -2,6 +2,7 @@
 #include <math.h>
 #include <string>
 #include "Arduino.h"
+#include <deque>
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
@@ -117,6 +118,21 @@ class Roode : public PollingComponent {
   void set_recalibrate_on_temp_change(bool val) { recalibrate_on_temp_change_ = val; }
   void set_max_temp_delta_for_recalib(uint8_t delta) { max_temp_delta_for_recalib_ = delta; }
   void set_recalibrate_cooldown(uint32_t seconds) { recalibrate_cooldown_sec_ = seconds; }
+  void set_temperature_sensor(sensor::Sensor *sensor) { temperature_sensor_ = sensor; }
+  void set_lux_sensor(sensor::Sensor *sensor) { lux_sensor_ = sensor; }
+  void set_use_light_sensor(bool val) { use_light_sensor_ = val; }
+  void set_lux_learning_window(uint32_t seconds) { lux_learning_window_sec_ = seconds; }
+  void set_lux_sample_interval(uint32_t seconds) { lux_sample_interval_sec_ = seconds; }
+  void set_use_sunrise_prediction(bool val) { use_sunrise_prediction_ = val; }
+  void set_latitude(float val) { latitude_ = val; }
+  void set_longitude(float val) { longitude_ = val; }
+  void set_alpha(float val) { alpha_ = val; }
+  void set_base_multiplier(float val) { base_multiplier_ = val; }
+  void set_max_multiplier(float val) { max_multiplier_ = val; }
+  void set_time_multiplier(float val) { time_multiplier_ = val; }
+  void set_combined_multiplier(float val) { combined_multiplier_ = val; }
+  void set_suppression_window(uint32_t seconds) { suppression_window_sec_ = seconds; }
+  void set_idle_recalib_interval(uint32_t seconds) { idle_recalib_interval_sec_ = seconds; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
   void set_filter_mode(FilterMode mode) {
     filter_mode_ = mode;
@@ -139,6 +155,11 @@ class Roode : public PollingComponent {
   void apply_cpu_optimizations(float cpu);
   void reset_cpu_optimizations(float cpu);
   void update_metrics();
+  void sample_lux();
+  bool should_suppress_event();
+  void adjust_filtering();
+  void check_context_calibration();
+  void check_multicore_recovery();
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
   static void log_event(const std::string &msg);
@@ -203,6 +224,29 @@ class Roode : public PollingComponent {
   uint32_t recalibrate_cooldown_sec_{1800};
   uint32_t last_recalibrate_ts_{0};
   uint32_t last_auto_recalibrate_ts_{0};
+  uint32_t idle_recalib_interval_sec_{0};
+  sensor::Sensor *temperature_sensor_{nullptr};
+  sensor::Sensor *lux_sensor_{nullptr};
+  bool use_light_sensor_{false};
+  uint32_t lux_learning_window_sec_{86400};
+  uint32_t lux_sample_interval_sec_{60};
+  bool use_sunrise_prediction_{true};
+  float latitude_{0};
+  float longitude_{0};
+  float alpha_{0.5f};
+  float base_multiplier_{1.0f};
+  float max_multiplier_{4.0f};
+  float time_multiplier_{1.5f};
+  float combined_multiplier_{3.0f};
+  uint32_t suppression_window_sec_{1800};
+  std::deque<float> lux_samples_{};
+  uint32_t last_lux_sample_ts_{0};
+  float lux_percentile95_{0};
+  bool lux_learning_complete_{false};
+  uint32_t last_suppression_ts_{0};
+  float last_temperature_{NAN};
+  uint32_t manual_adjust_window_start_{0};
+  uint32_t last_multicore_retry_ms_{0};
 
   enum FSMState { STATE_IDLE, STATE_ENTRY_ACTIVE, STATE_BOTH_ACTIVE };
   FSMState state_{STATE_IDLE};

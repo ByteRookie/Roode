@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.0
+- Auto restart sensors via XSHUT with multiplexing support
+- Startup pin validation with built‑in pull-ups
+- Fail-safe recalibration with calibration data stored in flash
+- Feature text sensor and diagnostics for XSHUT/INT pin states
+- Manual adjustment counter with detailed event logging
+- CPU optimizations using a dual-core task with automatic fallback
+- Filtering options with adjustable window and median/percentile modes
+- Interrupt mode gracefully falls back to polling and logs the reason
+- Colored logs for easier troubleshooting
+
 ## 1.5.1
 - Add diagnostic sensors reporting loop time, CPU usage, and RAM and flash usage percentages
 

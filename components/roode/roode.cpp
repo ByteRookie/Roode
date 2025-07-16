@@ -601,9 +601,13 @@ void Roode::calibrate_zones() {
   publish_sensor_configuration(entry, exit, true);
   App.feed_wdt();
   publish_sensor_configuration(entry, exit, false);
+
+  calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max,
+                          static_cast<uint32_t>(time(nullptr))};
+  calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max,
+                          static_cast<uint32_t>(time(nullptr))};
+
   if (calibration_persistence_) {
-    calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max, static_cast<uint32_t>(time(nullptr))};
-    calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max, static_cast<uint32_t>(time(nullptr))};
     calibration_prefs_[0].save(&calibration_data_[0]);
     calibration_prefs_[1].save(&calibration_data_[1]);
   }

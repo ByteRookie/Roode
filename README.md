@@ -48,6 +48,7 @@ People counter working with any smart home system which supports ESPHome/MQTT li
 - Text sensor reports the list of enabled and fallback features
 - Features text sensor reports XSHUT and refresh status, CPU details, memory sizes with KB/MB/GB units and the last calibration time; each feature appears on its own line and updates after calibration or when core/refresh modes change
 - If the device clock is unset, the calibration time shows "unknown"
+- Calibration timestamps still update after manual calibration runs even when persistence is disabled; enabling persistence saves them across reboots
 - Optional logging of fallback events helps troubleshoot interrupt or XSHUT failures
 - Event logs detail sensor power cycles, interrupt fallbacks with reasons, manual adjustments, and core mode changes
 - Interrupt mode logs only report errors

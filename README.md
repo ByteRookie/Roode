@@ -636,6 +636,11 @@ If the configured light sensor fails to report valid lux values, the
 learning and suppression logic disables itself and automatically retries
 after 30&nbsp;min.
 
+> **Note**: Storing a full 24&nbsp;h lux history at one‑minute intervals keeps
+> roughly 1,440 samples in memory (about 6&nbsp;kB). Extended windows or faster
+> sampling require even more RAM, so an ESP32 is recommended when using a large
+> buffer.
+
 | Condition          | Suppression?  | Multiplier                                 | Log Event                   |
 | ------------------ | ------------- | ------------------------------------------ | --------------------------- |
 | Lux spike only     | ✅             | `dynamic_multiplier`                       | `lux_outlier_detected`      |

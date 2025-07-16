@@ -447,29 +447,30 @@ calibration:6:01PM
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | `people_counter` | number | Adjustable tally of detected people |
-| `presence_sensor` | binary_sensor | True when presence is detected |
-| `sensor_xshut_state` | binary_sensor | State of the XSHUT pin |
-| `distance_entry` | sensor | Distance measured for entry zone |
-| `distance_exit` | sensor | Distance measured for exit zone |
-| `max_threshold_entry` | sensor | Entry zone maximum threshold |
-| `max_threshold_exit` | sensor | Exit zone maximum threshold |
-| `min_threshold_entry` | sensor | Entry zone minimum threshold |
-| `min_threshold_exit` | sensor | Exit zone minimum threshold |
-| `roi_height_entry` | sensor | Entry zone ROI height in pixels |
-| `roi_width_entry` | sensor | Entry zone ROI width in pixels |
-| `roi_height_exit` | sensor | Exit zone ROI height in pixels |
-| `roi_width_exit` | sensor | Exit zone ROI width in pixels |
-| `loop_time` | sensor | Average loop execution time |
-| `cpu_usage` | sensor | MCU CPU usage percent |
-| `ram_free` | sensor | Free RAM percent |
+| `presence_sensor` | binary_sensor | True while movement is detected |
+| `sensor_xshut_state` | binary_sensor | Current level of the XSHUT power pin |
+| `distance_entry` | sensor | Measured distance in the entry zone |
+| `distance_exit` | sensor | Measured distance in the exit zone |
+| `max_threshold_entry` | sensor | Upper detection threshold for entry zone |
+| `max_threshold_exit` | sensor | Upper detection threshold for exit zone |
+| `min_threshold_entry` | sensor | Lower detection threshold for entry zone |
+| `min_threshold_exit` | sensor | Lower detection threshold for exit zone |
+| `roi_height_entry` | sensor | Height of the entry zone ROI (px) |
+| `roi_width_entry` | sensor | Width of the entry zone ROI (px) |
+| `roi_height_exit` | sensor | Height of the exit zone ROI (px) |
+| `roi_width_exit` | sensor | Width of the exit zone ROI (px) |
+| `loop_time` | sensor | Average loop time over recent readings |
+| `cpu_usage` | sensor | Estimated MCU CPU usage in percent |
+| `ram_free` | sensor | Free heap memory percent |
 | `flash_free` | sensor | Free flash storage percent |
-| `sensor_status` | sensor | Numeric status code from VL53L1X |
-| `interrupt_status` | sensor | Interrupt pin state |
-| `manual_adjustment_count` | sensor | Count of manual people-count corrections |
+| `sensor_status` | sensor | Numeric VL53L1X status code (0=ok) |
+| `interrupt_status` | sensor | VL53L1X GPIO1 interrupt pin level |
+| `manual_adjustment_count` | sensor | Total manual people-count corrections |
 | `version` | text_sensor | Firmware version string |
-| `entry_exit_event` | text_sensor | Last detected direction |
-| `sensor_status` (text) | text_sensor | Human-readable sensor status |
-| `enabled_features` | text_sensor | List of enabled runtime features |
+| `entry_exit_event` | text_sensor | Last entry or exit direction |
+| `sensor_status` (text) | text_sensor | "ok", "timeout", "reinitializing", "error" or "offline" |
+| `enabled_features` | text_sensor | List of active runtime features |
+
 
 ### Threshold distance
 

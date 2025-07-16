@@ -32,6 +32,8 @@ A people counter that works with any smart home system that supports ESPHome/MQT
   - [INT Pin Robustness](#int-pin-robustness)
   - [Context-Aware Calibration](#context-aware-calibration)
   - [Adaptive Filtering](#adaptive-filtering)
+  - [Light Control](#light-control)
+  - [Temp Control](#temp-control)
 - [Logging and Diagnostics](#logging-and-diagnostics)
 - [FAQ/Troubleshoot](#faqtroubleshoot)
 - [License](#license)
@@ -249,6 +251,8 @@ roode:
 
 ### Configuration Reference
 
+#### VL53L1X Options
+
 | Option(s) | Required? | Default | Purpose | When to change | Strategy | Conservative Example | Aggressive Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `vl53l1x.sensor_id` | Optional | `1` | Distinguish multiple sensors on one bus | Using multiple VL53L1X modules | Assign unique ID per sensor | `sensor_id: 1` | `sensor_id: 2` |
@@ -258,6 +262,11 @@ roode:
 | `vl53l1x.calibration.ranging` | Optional | `auto` | Measurement range preset | Known distance extremes | Pick the shortest range that works | `ranging: auto` | `ranging: long` |
 | `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration | *(not set)* | `offset: 20mm` |
 | `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Only adjust with ST's calibration output | *(not set)* | `crosstalk: 100000cps` |
+
+#### Basic Options
+
+| Option(s) | Required? | Default | Purpose | When to change | Strategy | Conservative Example | Aggressive Example |
+| --- | --- | --- | --- | --- | --- | --- | --- |
 | `roode.sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Try 3–5 for noisy areas; above 5 adds lag | `sampling: 2` | `sampling: 5` |
 | `roode.orientation` | Optional | `parallel` | Sensor pad orientation | Sensor rotated 90° | Set to `perpendicular` | `orientation: parallel` | `orientation: perpendicular` |
 | `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Change by 2–4 units or use `auto` to learn | `roi: { height: 16, width: 6 }` | `roi: auto` |
@@ -266,11 +275,21 @@ roode:
 | `roode.filter_mode` & `roode.filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows | `filter_mode: min`<br>`filter_window: 5` | `filter_mode: percentile10`<br>`filter_window: 9` |
 | `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | `log_fallback_events: false` | `log_fallback_events: true` |
 | `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: false` | `force_single_core: true` |
+
+#### Recalibration Options
+
+| Option(s) | Required? | Default | Purpose | When to change | Strategy | Conservative Example | Aggressive Example |
+| --- | --- | --- | --- | --- | --- | --- | --- |
 | `roode.auto_recalibrate_interval` | Optional | `6h` | Time between automatic recalibrations | Sensor drifts gradually | Increase for stable temps or set to 0 to disable | `auto_recalibrate_interval: 6h` | `auto_recalibrate_interval: 12h` |
-| `roode.recalibrate_on_temp_change` | Optional | `false` | Recalibrate when temperature shifts | Large indoor/outdoor swings | Enable only if temps vary | `recalibrate_on_temp_change: true` | `recalibrate_on_temp_change: false` |
+| `roode.recalibrate_on_temp_change` | Optional | `false` | Recalibrate when temperature shifts | Use with a temperature sensor | Enable only if temps vary | `recalibrate_on_temp_change: true` | `recalibrate_on_temp_change: false` |
 | `roode.max_temp_delta_for_recalib` | Optional | `8` | Temperature change in °C that triggers recalibration | Rapid heat/cool cycles | Lower if drift occurs quickly, raise to avoid noise | `max_temp_delta_for_recalib: 8` | `max_temp_delta_for_recalib: 3` |
 | `roode.recalibrate_cooldown` | Optional | `30min` | Minimum time between automatic recalibrations | Multiple triggers in short time | Extend to prevent loops or shorten for responsiveness | `recalibrate_cooldown: 30min` | `recalibrate_cooldown: 5min` |
 | `roode.idle_recalibrate_interval` | Optional | `0` | Recalibrate after long idle period | Sensor rarely triggered | Set long interval like 12h to combat slow drift | `idle_recalibrate_interval: 12h` | `idle_recalibrate_interval: 4h` |
+
+#### Ambient Light Learning & Light Control
+
+| Option(s) | Required? | Default | Purpose | When to change | Strategy | Conservative Example | Aggressive Example |
+| --- | --- | --- | --- | --- | --- | --- | --- |
 | `roode.use_light_sensor` | Optional | `false` | Enable lux learning to suppress sunlight events | Sensor near windows | Enable with a light sensor | `use_light_sensor: true` | `use_light_sensor: false` |
 | `roode.lux_learning_window` | Optional | `24h` | Time range for lux history | Slow lighting changes | Shorten for seasonal shifts | `lux_learning_window: 24h` | `lux_learning_window: 12h` |
 | `roode.lux_sample_interval` | Optional | `1min` | How often to sample lux | Battery savings | Increase for low-power setups | `lux_sample_interval: 1min` | `lux_sample_interval: 5min` |
@@ -282,6 +301,11 @@ roode:
 | `roode.time_multiplier` | Optional | `1.5` | Extra weighting near sunrise/sunset | Bright horizon light at dawn/dusk | Adjust if events still occur | `time_multiplier: 1.5` | `time_multiplier: 2.0` |
 | `roode.combined_multiplier` | Optional | `3.0` | Limit when both time & lux match | Balances lux and schedule inputs | Increase to enforce stricter suppression | `combined_multiplier: 3.0` | `combined_multiplier: 4.0` |
 | `roode.suppression_window` | Optional | `30min` | Ignore repeated light spikes | Sudden sunlight bursts | Reduce for indoor lights | `suppression_window: 30min` | `suppression_window: 5min` |
+
+#### Zone Options
+
+| Option(s) | Required? | Default | Purpose | When to change | Strategy | Conservative Example | Aggressive Example |
+| --- | --- | --- | --- | --- | --- | --- | --- |
 | `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
 | `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
 
@@ -549,8 +573,8 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | [INT pin robustness](#int-pin-robustness) | Monitors missed interrupts and recovers via XSHUT |
 | [Context-aware calibration](#context-aware-calibration) | Suggests recalibration after repeated manual changes |
 | [Adaptive filtering](#adaptive-filtering) | Adjusts filter window based on motion & lighting |
-| Light control | Uses lux or location data to suppress sunlight spikes |
-| Temp control | Enables recalibration on significant temperature change |
+| [Light control](#light-control) | Uses lux or location data to suppress sunlight spikes |
+| [Temp control](#temp-control) | Enables recalibration on significant temperature change |
 
 ### Interrupt vs Polling
 
@@ -625,6 +649,8 @@ recalibration via the API or button ignores this cooldown and executes
 immediately. If the temperature sensor stops reporting valid data the
 temperature-based trigger disables itself and retries after
 30&nbsp;min.
+The time-based schedule works on its own—you can disable temperature or idle
+triggers while still using the interval timer.
 
 ### Ambient Light Learning & Sunlight Suppression
 
@@ -635,6 +661,8 @@ treated more aggressively to avoid false counts from direct sunlight.
 If the configured light sensor fails to report valid lux values, the
 learning and suppression logic disables itself and automatically retries
 after 30&nbsp;min.
+Sunrise prediction and lux learning operate independently—you can enable either
+one or both depending on available sensors.
 
 > **Note**: Storing a full 24&nbsp;h lux history at one‑minute intervals keeps
 > roughly 1,440 samples in memory (about 6&nbsp;kB). Extended windows or faster
@@ -671,6 +699,20 @@ and logs `manual_recalibrate_triggered`.
 The filter window dynamically expands when lux spikes four to six times above
 the learned maximum and returns to the default size once lighting stabilises.
 This change is recorded with the `filter_window_changed` log event.
+
+### Light Control
+
+Lux readings or sunrise predictions can suppress events when direct light would
+cause false counts. `light_control` reports the active mode as `lux`,
+`location` or `both` depending on which inputs are enabled. If neither the light
+sensor nor sunrise prediction is configured the offset value stays `0`.
+
+### Temp Control
+
+The counter can recalibrate when the ambient temperature changes drastically.
+Temperature-based recalibration is optional—scheduled recalibration works even
+without a temperature sensor. The feature disables itself if the sensor reports
+errors and automatically retries after 30&nbsp;min.
 
 ## Logging and Diagnostics
 

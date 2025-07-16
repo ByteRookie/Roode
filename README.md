@@ -317,6 +317,7 @@ text_sensor:
   - platform: roode
     enabled_features:
       name: $friendly_name enabled features
+      ## This sensor is a text_sensor that lists all enabled features
 ```
 The features string lists items as `name:value` pairs separated by new lines.
 The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,

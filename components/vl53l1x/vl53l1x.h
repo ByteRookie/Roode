@@ -43,6 +43,7 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   int get_recovery_count() const { return recovery_count_; }
   void set_sensor_id(uint8_t id) { sensor_id_ = id; }
   void set_desired_address(uint8_t addr) { desired_address_ = addr; }
+  void restart();
 
   void set_xshut_pin(GPIOPin *pin) { this->xshut_pin = pin; }
   void set_interrupt_pin(InternalGPIOPin *pin) { this->interrupt_pin = pin; }

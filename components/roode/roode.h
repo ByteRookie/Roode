@@ -219,8 +219,11 @@ class Roode : public PollingComponent {
   uint32_t loop_window_start_{0};
   uint64_t loop_time_sum_{0};
   uint32_t loop_count_{0};
+  uint32_t last_loop_update_ts_{0};
+  uint32_t last_sensor_restart_ts_{0};
   static void sensor_task(void *param);
   bool use_sensor_task_{false};
+  void restart_sensor();
 };
 
 }  // namespace roode

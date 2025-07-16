@@ -440,5 +440,26 @@ bool VL53L1X::validate_interrupt() {
   return ok;
 }
 
+void VL53L1X::restart() {
+  if (this->xshut_pin.has_value()) {
+    this->xshut_pin.value()->digital_write(false);
+    roode::Roode::log_event("xshut_pulse_off_sensor_" + std::to_string(sensor_id_));
+    roode::Roode::log_event("xshut_pulse_off");
+    ESP_LOGW(TAG, "XShut pin set LOW - restarting sensor");
+    delay(100);
+    this->xshut_pin.value()->digital_write(true);
+    roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
+    roode::Roode::log_event("xshut_reinitialize");
+    ESP_LOGD(TAG, "XShut pin set HIGH - restart complete");
+    this->wait_for_boot();
+    roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
+    roode::Roode::log_event("sensor.recovered_via_xshut");
+    recovery_count_++;
+  } else {
+    ESP_LOGW(TAG, "Restarting sensor without XSHUT pin");
+    this->init();
+  }
+}
+
 }  // namespace vl53l1x
 }  // namespace esphome

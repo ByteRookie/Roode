@@ -72,8 +72,10 @@ class Roode : public PollingComponent {
   void set_orientation(Orientation val) { orientation_ = val; }
   void set_sampling_size(uint8_t size) {
     samples = size;
-    entry->set_max_samples(size);
-    exit->set_max_samples(size);
+    filter_window_ = size;
+    default_filter_window_ = size;
+    entry->set_filter_window(size);
+    exit->set_filter_window(size);
   }
   void set_distance_entry(sensor::Sensor *distance_entry_) { distance_entry = distance_entry_; }
   void set_distance_exit(sensor::Sensor *distance_exit_) { distance_exit = distance_exit_; }
@@ -174,9 +176,9 @@ class Roode : public PollingComponent {
   bool fail_safe_triggered_{false};
 
   FilterMode filter_mode_{FILTER_MIN};
-  uint8_t filter_window_{5};
+  uint8_t filter_window_{2};
   FilterMode default_filter_mode_{FILTER_MIN};
-  uint8_t default_filter_window_{5};
+  uint8_t default_filter_window_{2};
 
   bool cpu_optimizations_active_{false};
   uint16_t polling_interval_ms_{10};

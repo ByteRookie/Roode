@@ -1,7 +1,14 @@
 #include "zone.h"
+#include <algorithm>
 
 namespace esphome {
 namespace roode {
+
+Zone::~Zone() {
+  delete roi;
+  delete roi_override;
+  delete threshold;
+}
 
 void Zone::dump_config() const {
   ESP_LOGCONFIG(TAG, "   %s", id == 0U ? "Entry" : "Exit");
@@ -20,11 +27,35 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
   }
 
   last_distance = result.value();
-  samples.insert(samples.begin(), result.value());
-  if (samples.size() > max_samples) {
-    samples.pop_back();
-  };
-  min_distance = *std::min_element(samples.begin(), samples.end());
+  if (sensor_status != VL53L1_ERROR_NONE || result.value() == 0 || result.value() > 4000) {
+    return sensor_status;
+  }
+
+  samples[sample_idx_] = result.value();
+  sample_idx_ = (sample_idx_ + 1) % max_samples;
+  if (sample_count_ < max_samples)
+    sample_count_++;
+
+  std::array<uint16_t, MAX_BUFFER_SIZE> tmp;
+  std::copy_n(samples.begin(), sample_count_, tmp.begin());
+  std::sort(tmp.begin(), tmp.begin() + sample_count_);
+
+  switch (filter_mode_) {
+    case FILTER_MEDIAN:
+      min_distance = tmp[sample_count_ / 2];
+      break;
+    case FILTER_PERCENTILE10: {
+      uint8_t idx = (sample_count_ * 10) / 100;
+      if (idx >= sample_count_)
+        idx = sample_count_ - 1;
+      min_distance = tmp[idx];
+      break;
+    }
+    case FILTER_MIN:
+    default:
+      min_distance = tmp[0];
+      break;
+  }
 
   return sensor_status;
 }
@@ -43,21 +74,32 @@ void Zone::reset_roi(uint8_t default_center) {
 
 void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   ESP_LOGD(CALIBRATION, "Beginning. zoneId: %d", id);
-  int *zone_distances = new int[number_attempts];
+  std::vector<int> zone_distances;
+  zone_distances.reserve(number_attempts);
   int sum = 0;
   for (int i = 0; i < number_attempts; i++) {
     this->readDistance(distanceSensor);
-    zone_distances[i] = this->getDistance();
-    sum += zone_distances[i];
+    if (sensor_status != VL53L1_ERROR_NONE) {
+      ESP_LOGW(CALIBRATION, "Distance read failed during calibration. status: %d", sensor_status);
+      break;
+    }
+    zone_distances.push_back(this->getDistance());
+    sum += zone_distances.back();
   };
-  threshold->idle = this->getOptimizedValues(zone_distances, sum, number_attempts);
+  if (zone_distances.empty()) {
+    threshold->idle = 0;
+    ESP_LOGW(CALIBRATION, "Calibration failed: no valid distances recorded");
+  } else {
+    int avg = sum / zone_distances.size();
+    threshold->idle = avg;
+    uint8_t max_pct = threshold->max_percentage.value_or(80);
+    uint8_t min_pct = threshold->min_percentage.value_or(15);
+    threshold->max_percentage = max_pct;
+    threshold->min_percentage = min_pct;
+    threshold->max = (avg * max_pct) / 100;
+    threshold->min = (avg * min_pct) / 100;
+  }
 
-  if (threshold->max_percentage.has_value()) {
-    threshold->max = (threshold->idle * threshold->max_percentage.value()) / 100;
-  }
-  if (threshold->min_percentage.has_value()) {
-    threshold->min = (threshold->idle * threshold->min_percentage.value()) / 100;
-  }
   ESP_LOGI(CALIBRATION, "Calibrated threshold for zone. zoneId: %d, idle: %d, min: %d (%d%%), max: %d (%d%%)", id,
            threshold->idle, threshold->min,
            threshold->min_percentage.value_or((threshold->min * 100) / threshold->idle), threshold->max,
@@ -109,24 +151,16 @@ void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Or
            roi->height, roi->center);
 }
 
-int Zone::getOptimizedValues(int *values, int sum, int size) {
-  int sum_squared = 0;
-  int variance = 0;
-  int sd = 0;
-  int avg = sum / size;
-
-  for (int i = 0; i < size; i++) {
-    sum_squared = sum_squared + (values[i] * values[i]);
-    App.feed_wdt();
-  }
-  variance = sum_squared / size - (avg * avg);
-  sd = sqrt(variance);
-  ESP_LOGD(CALIBRATION, "Zone AVG: %d", avg);
-  ESP_LOGD(CALIBRATION, "Zone SD: %d", sd);
-  return avg - sd;
-}
-
 uint16_t Zone::getDistance() const { return this->last_distance; }
 uint16_t Zone::getMinDistance() const { return this->min_distance; }
+
+void Zone::set_threshold_percentages(uint8_t min_percent, uint8_t max_percent) {
+  threshold->min_percentage = min_percent;
+  threshold->max_percentage = max_percent;
+  if (threshold->idle > 0) {
+    threshold->min = (threshold->idle * min_percent) / 100;
+    threshold->max = (threshold->idle * max_percent) / 100;
+  }
+}
 }  // namespace roode
 }  // namespace esphome

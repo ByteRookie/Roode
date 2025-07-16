@@ -39,6 +39,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
    - [peopleCounter8266.yaml](peopleCounter8266.yaml)
 3. Flash it with `esphome run peopleCounter32.yaml` (replace with your file).
 
+## Hardware Recommendations
 
 - ESP8266 or ESP32
   - **Wemos D1 Mini ESP32** <-- Recommended

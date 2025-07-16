@@ -194,6 +194,23 @@ roode:
   log_fallback_events: true
   # Disable dual core tasking if needed
   force_single_core: false
+  # Scheduled sensor recalibration and ambient light suppression
+  auto_recalibrate_interval: 6h
+  recalibrate_on_temp_change: true
+  max_temp_delta_for_recalib: 8
+  recalibrate_cooldown: 30min
+  use_light_sensor: true
+  lux_learning_window: 24h
+  lux_sample_interval: 1min
+  use_sunrise_prediction: true
+  latitude: 37.7749
+  longitude: -122.4194
+  alpha: 0.5
+  base_multiplier: 1.0
+  max_multiplier: 4.0
+  time_multiplier: 1.5
+  combined_multiplier: 3.0
+  suppression_window: 30min
   # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
 
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
@@ -324,6 +341,12 @@ reflections cause false triggers.
 | `roode.filter_mode` & `roode.filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows | `filter_mode: min`<br>`filter_window: 5` | `filter_mode: percentile10`<br>`filter_window: 9` |
 | `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | `log_fallback_events: false` | `log_fallback_events: true` |
 | `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: false` | `force_single_core: true` |
+| `roode.auto_recalibrate_interval` | Optional | `6h` | Time between automatic recalibrations | Sensor drifts gradually | Increase for stable temps or set to 0 to disable | `auto_recalibrate_interval: 6h` | `auto_recalibrate_interval: 12h` |
+| `roode.recalibrate_on_temp_change` | Optional | `true` | Recalibrate when temperature shifts | Large indoor/outdoor swings | Disable if temps stable | `recalibrate_on_temp_change: true` | `recalibrate_on_temp_change: false` |
+| `roode.use_light_sensor` | Optional | `true` | Enable lux learning to suppress sunlight events | Sensor near windows | Disable if no light sensor | `use_light_sensor: true` | `use_light_sensor: false` |
+| `roode.lux_learning_window` | Optional | `24h` | Time range for lux history | Slow lighting changes | Shorten for seasonal shifts | `lux_learning_window: 24h` | `lux_learning_window: 12h` |
+| `roode.lux_sample_interval` | Optional | `1min` | How often to sample lux | Battery savings | Increase for low-power setups | `lux_sample_interval: 1min` | `lux_sample_interval: 5min` |
+| `roode.suppression_window` | Optional | `30min` | Ignore repeated light spikes | Sudden sunlight bursts | Reduce for indoor lights | `suppression_window: 30min` | `suppression_window: 5min` |
 | `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
 | `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
 
@@ -420,7 +443,9 @@ text_sensor:
 ```
 The features string lists items as `name:value` pairs separated by new lines.
 The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
-`cpu_cores`, `ram`, `flash`, `calibration_value` and `calibration`.
+`cpu_cores`, `ram`, `flash`, `calibration_value`, `calibration`,
+`scheduled_recalibration`, `ambient_light_learning`, `cpu_resilience`,
+`int_pin_robustness`, `context_calibration` and `adaptive_filtering`.
 Memory values are printed with **KB**, **MB** or **GB** units. Calibration time
 uses the device clock in `h:MMAM/PM` format or displays `unknown` if the clock
 has not been initialised.
@@ -437,6 +462,12 @@ ram:309KB
 flash:16MB
 calibration_value:1399
 calibration:6:01PM
+scheduled_recalibration:supported
+ambient_light_learning:supported
+cpu_resilience:supported
+int_pin_robustness:supported
+context_calibration:supported
+adaptive_filtering:supported
 ```
 
 ### Threshold distance
@@ -571,6 +602,12 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
 | Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
 | Colored logs | Normal info in green, details in yellow, failures in red |
+| Scheduled recalibration | Periodically recalibrates to prevent sensor drift |
+| Ambient light learning | Learns lux patterns and suppresses sunlight spikes |
+| CPU resilience & multicore | Retries dual-core mode and recovers after failures |
+| INT pin robustness | Monitors missed interrupts and recovers via XSHUT |
+| Context-aware calibration | Suggests recalibration after repeated manual changes |
+| Adaptive filtering | Adjusts filter window based on motion & lighting |
 
 ## Logging and Diagnostics
 

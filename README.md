@@ -8,29 +8,6 @@
 
 A people counter that works with any smart home system that supports ESPHome/MQTT (e.g., Home Assistant). All necessary entities are created automatically.
 
-## Features
-
-| Feature | Description |
-| --- | --- |
-| Path tracking algorithm | Distinguishes entry vs exit by tracking the order of zone crossings |
-| Auto restart via XSHUT | Sensor restarts automatically if a measurement times out |
-| Clean shutdown | Memory and sensor power managed on reboot |
-| Startup pin test | Logs and disables features if xshut or interrupt pins fail |
-| Built-in pull-ups | XSHUT and interrupt pins use internal pull-ups, no resistors needed |
-| Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
-| Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
-| Persistent calibration | Calibration data can persist in flash across reboots |
-| Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
-| Filtering options | Median/percentile filters smooth jitter with adjustable window |
-| FSM timeouts | Resets the state machine when a transition stalls |
-| CPU optimizations | Automatic optimizations when CPU usage exceeds 90% |
-| Interrupt fallback | Interrupt mode with graceful fallback to polling and logs |
-| XSHUT multiplexing | Supports multiple sensors sharing I²C bus |
-| Feature text sensor | Reports enabled and fallback features for diagnostics |
-| Manual adjustment counter | Tracks user corrections to the people count |
-| Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
-| Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
-| Colored logs | Normal info in green, details in yellow, failures in red |
 
 ## Table of Contents
 
@@ -191,14 +168,15 @@ readings remain reliable.
 # Roode people counting algorithm
 roode:
   # Smooth out measurements by using the minimum distance from this number of readings
+  # Increase to 4-5 if jitter is a problem; 1 is fastest but noisier
   sampling: 2
 
   # The orientation of the two sensor pads in relation to the entryway being tracked.
   # The advised orientation is parallel, but if needed this can be changed to perpendicular.
   orientation: parallel
 
-  # This controls the size of the Region of Interest the sensor should take readings in.
-  # The current default is
+  # This controls the Region of Interest. Adjust width/height a few steps at a time
+  # when the doorway is unusually narrow or wide. The current default is
   roi: { height: 16, width: 6 }
   # We have an experimental automatic mode that can be enabled with
   # roi: auto
@@ -210,7 +188,8 @@ roode:
   # These can be given as absolute distances or as percentages.
   # Percentages are based on the automatically determined idle or resting distance.
   detection_thresholds:
-    min: 0% # default minimum is any distance
+    min: 0%  # default minimum is any distance
+    # raise by ~5% or 50mm steps if door movements cause counts
     max: 85% # default maximum is 85%
     # an example of absolute units
     # min: 50mm
@@ -221,6 +200,7 @@ roode:
 
   # Jitter reduction options
   filter_mode: median  # min, median or percentile10
+  # Increase the window to 7 or 9 for heavy noise, drop to 3 for faster response
   filter_window: 5     # number of samples used by the filter
   # Log interrupt fallback events and XSHUT recoveries
   log_fallback_events: true
@@ -241,7 +221,7 @@ roode:
       roi: auto
     exit:
       roi:
-        # Exit zone will have a height of 8 and a width of number set above or default or auto
+        # Exit zone height starts at 8. Change by 1-2 if objects are closer on this side
         height: 8
         # Additionally, zones can manually set their center point.
         # Usually though, this is left for Roode to automatically determine.
@@ -251,8 +231,15 @@ roode:
         # Exit zone's min detection threshold will be 5% of idle/resting distance, regardless of setting above.
         min: 5%
         # Exit zone's max detection threshold will be 70% of idle/resting distance, regardless of setting above.
+        # Adjust these in 5% steps if one side sees false counts
         max: 70%
 ```
+
+The `entry` and `exit` blocks allow tuning each zone when they behave differently.
+For example, an entryway with a shelf on one side might need a smaller ROI or
+stricter thresholds only in that zone. Start with small adjustments—change the
+ROI height or width by one or two units or nudge thresholds 5 % at a time—and
+test before making larger changes.
 
 ### Single vs Dual Core
 
@@ -280,23 +267,23 @@ controls how the sample window is combined: `min` uses the smallest value,
 | --- | --- | --- | --- | --- | --- |
 | `vl53l1x.sensor_id` | Optional | `1` | Distinguish multiple sensors on one bus | Using multiple VL53L1X modules | Assign unique ID per sensor |
 | `vl53l1x.address` | Optional | `0x29` | I²C address of the sensor | Address conflict or multi-sensor setup | Change with XSHUT wiring |
-| `vl53l1x.timeout` | Optional | `2s` | How long to wait for a measurement | Long ranges may need more time | Increase if you see timeout errors |
+| `vl53l1x.timeout` | Optional | `2s` | How long to wait for a measurement | Long ranges may need more time | Increase in 500&nbsp;ms steps until errors stop |
 | `vl53l1x.pins.xshut` | Optional | none | GPIO to power cycle the sensor | Recovering or changing address | Connect to enable automatic restart |
 | `vl53l1x.pins.interrupt` | Optional | none | GPIO for data ready signal | Efficient updates | Use if you can spare a pin |
 | `vl53l1x.calibration.ranging` | Optional | `auto` | Measurement range preset | Known distance extremes | Pick the shortest range that works |
-| `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Calibrate and set measured offset |
-| `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Calibrate using ST tools |
-| `roode.sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Increase to reduce jitter |
+| `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration |
+| `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Only adjust with ST's calibration output |
+| `roode.sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Try 3–5 for noisy areas; above 5 adds lag |
 | `roode.orientation` | Optional | `parallel` | Sensor pad orientation | Sensor rotated 90° | Set to `perpendicular` |
-| `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Adjust height/width or use `auto` |
-| `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Tune to ignore doors or walls |
+| `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Change by 2–4 units or use `auto` to learn |
+| `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% (or ~50 mm) each time |
 | `roode.calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning |
 | `roode.filter_mode` | Optional | `min` | How samples are combined | Noisy environment | Try `median` or `percentile10` |
-| `roode.filter_window` | Optional | `5` | Sample count for filter | More noise rejection | Increase gradually |
+| `roode.filter_window` | Optional | `5` | Sample count for filter | More noise rejection | Use 7 or 9 for heavy jitter; 3 for speed |
 | `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing |
 | `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set to true if crashes occur |
 | `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate |
-| `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Override one zone at a time |
+| `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed |
 
 Also feel free to check out running examples for:
 - [Wemos D1 mini with ESP32](peopleCounter32.yaml)
@@ -475,8 +462,31 @@ closest to the VDD pin on the Pololu VL53L1X carrier board:
 
 However, note that the lens inside the VL53L1X inverts the image it sees
 (like the way a camera works). So for example, to shift the sensor's FOV to
-sense objects toward the upper left, you should pick a center SPAD in the
-lower right.
+sense objects toward the upper left, you should pick a center SPAD in the lower right.
+
+## Features
+
+| Feature | Description |
+| --- | --- |
+| Path tracking algorithm | Distinguishes entry vs exit by tracking the order of zone crossings |
+| Auto restart via XSHUT | Sensor restarts automatically if a measurement times out |
+| Clean shutdown | Memory and sensor power managed on reboot |
+| Startup pin test | Logs and disables features if xshut or interrupt pins fail |
+| Built-in pull-ups | XSHUT and interrupt pins use internal pull-ups, no resistors needed |
+| Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
+| Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
+| Persistent calibration | Calibration data can persist in flash across reboots |
+| Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
+| Filtering options | Median/percentile filters smooth jitter with adjustable window |
+| FSM timeouts | Resets the state machine when a transition stalls |
+| CPU optimizations | Automatic optimizations when CPU usage exceeds 90% |
+| Interrupt fallback | Interrupt mode with graceful fallback to polling and logs |
+| XSHUT multiplexing | Supports multiple sensors sharing I²C bus |
+| Feature text sensor | Reports enabled and fallback features for diagnostics |
+| Manual adjustment counter | Tracks user corrections to the people count |
+| Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
+| Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
+| Colored logs | Normal info in green, details in yellow, failures in red |
 
 
 ## FAQ/Troubleshoot

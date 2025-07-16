@@ -220,6 +220,7 @@ void VL53L1X::set_ranging_mode(const RangingMode *mode) {
 optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   if (this->is_failed()) {
     ESP_LOGW(TAG, "Cannot read distance while component is failed");
+    record_failure();
     return {};
   }
 
@@ -231,11 +232,13 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     status = this->sensor.SetROI(roi->width, roi->height);
     if (status != VL53L1_ERROR_NONE) {
       ESP_LOGE(TAG, "Could not set ROI width/height, error code: %d", status);
+      record_failure();
       return {};
     }
     status = this->sensor.SetROICenter(roi->center);
     if (status != VL53L1_ERROR_NONE) {
       ESP_LOGE(TAG, "Could not set ROI center, error code: %d", status);
+      record_failure();
       return {};
     }
     last_roi = roi;
@@ -259,6 +262,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   status = this->sensor.StartRanging();
   if (status != VL53L1_ERROR_NONE) {
     ESP_LOGE(TAG, "Failed to start ranging, error code: %d", status);
+    record_failure();
     return {};
   }
 
@@ -277,6 +281,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
       status = this->sensor.CheckForDataReady(&dataReady);
       if (status != VL53L1_ERROR_NONE) {
         ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
+        record_failure();
         return {};
       }
     }
@@ -300,6 +305,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
       status = this->sensor.CheckForDataReady(&dataReady);
       if (status != VL53L1_ERROR_NONE) {
         ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
+        record_failure();
         return {};
       }
       delay(1);
@@ -325,6 +331,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
       roode::Roode::log_event("sensor.recovered_via_xshut");
       recovery_count_++;
     }
+    record_failure();
     return {};
   }
 
@@ -333,6 +340,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   status = this->sensor.GetDistanceInMm(&distance);
   if (status != VL53L1_ERROR_NONE) {
     ESP_LOGE(TAG, "Could not get distance, error code: %d", status);
+    record_failure();
     return {};
   }
 
@@ -340,11 +348,13 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   status = this->sensor.ClearInterrupt();
   if (status != VL53L1_ERROR_NONE) {
     ESP_LOGE(TAG, "Could not clear interrupt, error code: %d", status);
+    record_failure();
     return {};
   }
   status = this->sensor.StopRanging();
   if (status != VL53L1_ERROR_NONE) {
     ESP_LOGE(TAG, "Could not stop ranging, error code: %d", status);
+    record_failure();
     return {};
   }
 
@@ -352,6 +362,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     interrupt_miss_count_ = 0;
 
   ESP_LOGV(TAG, "Finished distance read: %d", distance);
+  consecutive_failures_ = 0;
   return {distance};
 }
 
@@ -440,17 +451,22 @@ bool VL53L1X::validate_interrupt() {
   return ok;
 }
 
-void VL53L1X::restart() {
+void VL53L1X::soft_reset() {
+
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->digital_write(false);
     roode::Roode::log_event("xshut_pulse_off_sensor_" + std::to_string(sensor_id_));
     roode::Roode::log_event("xshut_pulse_off");
-    ESP_LOGW(TAG, "XShut pin set LOW - restarting sensor");
+
+    ESP_LOGW(TAG, "XShut pin set LOW - resetting sensor");
+
     delay(100);
     this->xshut_pin.value()->digital_write(true);
     roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
     roode::Roode::log_event("xshut_reinitialize");
-    ESP_LOGD(TAG, "XShut pin set HIGH - restart complete");
+
+    ESP_LOGD(TAG, "XShut pin set HIGH - reset complete");
+
     this->wait_for_boot();
     roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
     roode::Roode::log_event("sensor.recovered_via_xshut");
@@ -460,6 +476,17 @@ void VL53L1X::restart() {
     this->init();
   }
 }
+
+
+void VL53L1X::record_failure() {
+  if (++consecutive_failures_ >= 10) {
+    roode::Roode::log_event("10 read errors — triggering recovery");
+    ESP_LOGW(TAG, "10 read errors — triggering recovery");
+    soft_reset();
+    consecutive_failures_ = 0;
+  }
+}
+
 
 }  // namespace vl53l1x
 }  // namespace esphome

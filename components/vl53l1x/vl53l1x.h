@@ -82,9 +82,13 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   bool check_features();
   bool validate_interrupt();
 
+  void soft_reset();
+  void record_failure();
+
   bool interrupt_active_{false};
   uint8_t interrupt_miss_count_{0};
   uint32_t last_interrupt_retry_{0};
+  uint8_t consecutive_failures_{0};
 };
 
 }  // namespace vl53l1x

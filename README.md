@@ -17,15 +17,21 @@ A people counter that works with any smart home system that supports ESPHome/MQT
   - [ESP8266](#esp8266)
 - [Configuration](#configuration)
   - [Platform Setup](#platform-setup)
-  - [Interrupt vs Polling](#interrupt-vs-polling)
-  - [Single vs Dual Core](#single-vs-dual-core)
-  - [Sampling and Filtering](#sampling-and-filtering)
 - [Configuration Reference](#configuration-reference)
   - [Example Configurations](#example-configurations)
   - [Sensors](#sensors)
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
 - [Features](#features)
+  - [Interrupt vs Polling](#interrupt-vs-polling)
+  - [Single vs Dual Core](#single-vs-dual-core)
+  - [Sampling and Filtering](#sampling-and-filtering)
+  - [Scheduled Recalibration](#scheduled-recalibration)
+  - [Ambient Light Learning & Sunlight Suppression](#ambient-light-learning--sunlight-suppression)
+  - [CPU Resilience & Multicore](#cpu-resilience--multicore)
+  - [INT Pin Robustness](#int-pin-robustness)
+  - [Context-Aware Calibration](#context-aware-calibration)
+  - [Adaptive Filtering](#adaptive-filtering)
 - [Logging and Diagnostics](#logging-and-diagnostics)
 - [FAQ/Troubleshoot](#faqtroubleshoot)
 - [License](#license)
@@ -240,87 +246,6 @@ roode:
         max: 70%
 ```
 
-The `entry` and `exit` blocks allow tuning each zone when they behave differently.
-For example, an entryway with a shelf on one side might need a smaller ROI or
-stricter thresholds only in that zone. Start with small adjustments—change the
-ROI height or width by one or two units or nudge thresholds 5 % at a time—and
-test before making larger changes.
-### Interrupt vs Polling
-
-Roode prefers the interrupt pin for efficient updates. When `interrupt` is defined and validated, the VL53L1X notifies the MCU whenever a new sample is ready. If the INT pin is missing or stops working, Roode falls back to a 10 ms polling loop and tries interrupts again every 30 minutes. Polling also acts as a safety net during startup.
-
-| Situation | Use INT | Use Polling |
-| --- | --- | --- |
-| Normal operation | ✅ | 🔁 (optional verify) |
-| INT not received in time | ⛔️ | ✅ |
-| Sensor just booted | ⛔️ | ✅ |
-| Interrupt unreliable | ⛔️ | ✅ |
-| Low-power mode handling | ⛔️ | ✅ |
-
-
-### Single vs Dual Core
-
-On ESP32 targets Roode tries to run the sensor loop on the second CPU core so
-Wi‑Fi and other ESPHome tasks stay responsive.  If the task fails to start or
-when running on an ESP8266 the code automatically falls back to a single‑core
-loop.  You can force single‑core mode with `force_single_core: true`.
-
-### Sampling and Filtering
-
-Roode smooths distance readings in two stages. The driver first averages
-multiple raw measurements using the `sampling` option. Each zone then applies a
-filter across the last few averaged values controlled by `filter_mode` and
-`filter_window`.
-
-Raising `sampling` makes each reading steadier while `filter_window` dictates
-how many of those readings must agree before an event fires. Because the filter
-operates on averaged data, the total number of raw readings considered is
-`sampling` multiplied by `filter_window`. This gives better noise rejection at
-the cost of reaction speed. Start with `sampling: 2` and `filter_window: 3` and
-increase them together if your environment is unstable. See the table below for
-how the available filter modes behave.
-
-| Mode | When to use | Pros | Cons |
-| --- | --- | --- | --- |
-| `min` | Very clean environments or quick response needed | Reacts instantly to changes | Sensitive to noise and outliers |
-| `median` | General use when noise is moderate | Ignores spikes for stable readings | Can lag behind fast motion |
-| `percentile10` | Noisy locations where some jitter must be ignored | Balances responsiveness and noise rejection | Slightly less stable than median |
-
-#### `sampling`
-
-*Averages consecutive raw measurements before filtering.* Increase above `2` only when noise causes flickering.
-
-**Recommended values** moved to the Quick Tips section below.
-
-#### `filter_window`
-
-*Number of past measurements considered by the filter.* `3` is responsive, while `5+` helps in harsh lighting or reflective areas.
-
-**Recommended values** moved to the Quick Tips section below.
-
-Filter mode tips: use `median` to ignore spikes or `percentile10` for gradual noise.
-
-### Quick Tips Summary
-
-The two settings work together: a window of `3` with `sampling: 2` means each
-reported value reflects six raw readings. Raise both when sunlight or
-reflections cause false triggers.
-
-#### Sampling
-
-| `sampling` | When to use | Tradeoff |
-| ---------- | ---------- | -------- |
-| `1` | Fastest response, low noise | Higher noise |
-| `2–3` | Balanced stability and speed | Slight delay |
-| `4+` | Very noisy or unstable areas | Noticeable lag |
-
-#### Filter Window
-
-| `filter_window` | When to use | Tradeoff |
-| --------------- | ---------- | -------- |
-| `3` | General smoothing | Slightly slower response |
-| `5+` | Suppress false triggers | Laggy detection |
-| `1` | Maximum responsiveness | No noise rejection |
 
 ### Configuration Reference
 
@@ -607,25 +532,87 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
 | Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
 | Persistent calibration | Calibration data can persist in flash across reboots |
-| Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
-| Filtering options | Median/percentile filters smooth jitter with adjustable window |
+| [Dual-core tasking](#single-vs-dual-core) | Keeps polling responsive on ESP32 with automatic retry/fallback |
+| [Filtering options](#sampling-and-filtering) | Median/percentile filters smooth jitter with adjustable window |
 | FSM timeouts | Resets the state machine when a transition stalls |
 | CPU optimizations | Automatic optimizations when CPU usage exceeds 90% |
-| Interrupt fallback | Interrupt mode with graceful fallback to polling and logs |
+| [Interrupt fallback](#interrupt-vs-polling) | Interrupt mode with graceful fallback to polling and logs |
 | XSHUT multiplexing | Supports multiple sensors sharing I²C bus |
 | Feature text sensor | Reports enabled and fallback features for diagnostics |
 | Manual adjustment counter | Tracks user corrections to the people count |
 | Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
 | Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
 | Colored logs | Normal info in green, details in yellow, failures in red |
-| Scheduled recalibration | Periodically recalibrates to prevent sensor drift |
-| Ambient light learning | Learns lux patterns and suppresses sunlight spikes |
-| CPU resilience & multicore | Retries dual-core mode and recovers after failures |
-| INT pin robustness | Monitors missed interrupts and recovers via XSHUT |
-| Context-aware calibration | Suggests recalibration after repeated manual changes |
-| Adaptive filtering | Adjusts filter window based on motion & lighting |
+| [Scheduled recalibration](#scheduled-recalibration) | Periodically recalibrates to prevent sensor drift |
+| [Ambient light learning](#ambient-light-learning--sunlight-suppression) | Learns lux patterns and suppresses sunlight spikes |
+| [CPU resilience & multicore](#cpu-resilience--multicore) | Retries dual-core mode and recovers after failures |
+| [INT pin robustness](#int-pin-robustness) | Monitors missed interrupts and recovers via XSHUT |
+| [Context-aware calibration](#context-aware-calibration) | Suggests recalibration after repeated manual changes |
+| [Adaptive filtering](#adaptive-filtering) | Adjusts filter window based on motion & lighting |
 | Light control | Uses lux or location data to suppress sunlight spikes |
 | Temp control | Enables recalibration on significant temperature change |
+
+### Interrupt vs Polling
+
+Roode prefers the interrupt pin for efficient updates. When `interrupt` is defined and validated, the VL53L1X notifies the MCU whenever a new sample is ready. If the INT pin is missing or stops working, Roode falls back to a 10&nbsp;ms polling loop and tries interrupts again every 30&nbsp;min. Polling also acts as a safety net during startup.
+
+| Situation | Use INT | Use Polling |
+| --- | --- | --- |
+| Normal operation | ✅ | 🔁 (optional verify) |
+| INT not received in time | ⛔️ | ✅ |
+| Sensor just booted | ⛔️ | ✅ |
+| Interrupt unreliable | ⛔️ | ✅ |
+| Low-power mode handling | ⛔️ | ✅ |
+
+### Single vs Dual Core
+
+On ESP32 targets Roode tries to run the sensor loop on the second CPU core so Wi‑Fi and other ESPHome tasks stay responsive. If the task fails to start or when running on an ESP8266 the code automatically falls back to a single‑core loop. You can force single‑core mode with `force_single_core: true`.
+
+### Sampling and Filtering
+
+Roode smooths distance readings in two stages. The driver first averages multiple raw measurements using the `sampling` option. Each zone then applies a filter across the last few averaged values controlled by `filter_mode` and `filter_window`.
+
+Raising `sampling` makes each reading steadier while `filter_window` dictates how many of those readings must agree before an event fires. Because the filter operates on averaged data, the total number of raw readings considered is `sampling` multiplied by `filter_window`. This gives better noise rejection at the cost of reaction speed. Start with `sampling: 2` and `filter_window: 3` and increase them together if your environment is unstable. See the table below for how the available filter modes behave.
+
+| Mode | When to use | Pros | Cons |
+| --- | --- | --- | --- |
+| `min` | Very clean environments or quick response needed | Reacts instantly to changes | Sensitive to noise and outliers |
+| `median` | General use when noise is moderate | Ignores spikes for stable readings | Can lag behind fast motion |
+| `percentile10` | Noisy locations where some jitter must be ignored | Balances responsiveness and noise rejection | Slightly less stable than median |
+
+#### `sampling`
+
+*Averages consecutive raw measurements before filtering.* Increase above `2` only when noise causes flickering.
+
+**Recommended values** moved to the Quick Tips section below.
+
+#### `filter_window`
+
+*Number of past measurements considered by the filter.* `3` is responsive, while `5+` helps in harsh lighting or reflective areas.
+
+**Recommended values** moved to the Quick Tips section below.
+
+Filter mode tips: use `median` to ignore spikes or `percentile10` for gradual noise.
+
+### Quick Tips Summary
+
+The two settings work together: a window of `3` with `sampling: 2` means each reported value reflects six raw readings. Raise both when sunlight or reflections cause false triggers.
+
+#### Sampling
+
+| `sampling` | When to use | Tradeoff |
+| ---------- | ---------- | -------- |
+| `1` | Fastest response, low noise | Higher noise |
+| `2–3` | Balanced stability and speed | Slight delay |
+| `4+` | Very noisy or unstable areas | Noticeable lag |
+
+#### Filter Window
+
+| `filter_window` | When to use | Tradeoff |
+| --------------- | ---------- | -------- |
+| `3` | General smoothing | Slightly slower response |
+| `5+` | Suppress false triggers | Laggy detection |
+| `1` | Maximum responsiveness | No noise rejection |
 
 ### Scheduled Recalibration
 

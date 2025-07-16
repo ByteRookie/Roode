@@ -710,6 +710,12 @@ void Roode::publish_feature_list() {
   uint32_t last_cal_epoch =
       std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   features.push_back({"calibration", fmt_time(last_cal_epoch)});
+  features.push_back({"scheduled_recalibration", "supported"});
+  features.push_back({"ambient_light_learning", "supported"});
+  features.push_back({"cpu_resilience", "supported"});
+  features.push_back({"int_pin_robustness", "supported"});
+  features.push_back({"context_calibration", "supported"});
+  features.push_back({"adaptive_filtering", "supported"});
 
   std::string feature_list;
   for (size_t i = 0; i < features.size(); ++i) {

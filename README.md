@@ -414,6 +414,9 @@ text_sensor:
     entry_exit_event:
       name: $friendly_name last direction
   - platform: roode
+    sensor_status:
+      name: $friendly_name sensor status text
+  - platform: roode
     enabled_features:
       name: $friendly_name enabled features
       ## This sensor is a text_sensor that lists all enabled features
@@ -438,6 +441,35 @@ flash:16MB
 calibration_value:1399
 calibration:6:01PM
 ```
+
+#### Sensor Reference
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| `people_counter` | number | Adjustable tally of detected people |
+| `presence_sensor` | binary_sensor | True while movement is detected |
+| `sensor_xshut_state` | binary_sensor | Current level of the XSHUT power pin |
+| `distance_entry` | sensor | Measured distance in the entry zone |
+| `distance_exit` | sensor | Measured distance in the exit zone |
+| `max_threshold_entry` | sensor | Upper detection threshold for entry zone |
+| `max_threshold_exit` | sensor | Upper detection threshold for exit zone |
+| `min_threshold_entry` | sensor | Lower detection threshold for entry zone |
+| `min_threshold_exit` | sensor | Lower detection threshold for exit zone |
+| `roi_height_entry` | sensor | Height of the entry zone ROI (px) |
+| `roi_width_entry` | sensor | Width of the entry zone ROI (px) |
+| `roi_height_exit` | sensor | Height of the exit zone ROI (px) |
+| `roi_width_exit` | sensor | Width of the exit zone ROI (px) |
+| `loop_time` | sensor | Average loop time over recent readings |
+| `cpu_usage` | sensor | Estimated MCU CPU usage in percent |
+| `ram_free` | sensor | Free heap memory percent |
+| `flash_free` | sensor | Free flash storage percent |
+| `sensor_status` | sensor | Numeric VL53L1X status code (0=ok) |
+| `interrupt_status` | sensor | VL53L1X GPIO1 interrupt pin level |
+| `manual_adjustment_count` | sensor | Total manual people-count corrections |
+| `version` | text_sensor | Firmware version string |
+| `entry_exit_event` | text_sensor | Last entry or exit direction |
+| `sensor_status` (text) | text_sensor | "ok", "timeout", "reinitializing", "error" or "offline" |
+| `enabled_features` | text_sensor | List of active runtime features |
 
 ### Threshold distance
 
@@ -594,6 +626,8 @@ Optional sensors provide insight into Roode's operation:
 - `sensor_status` and `interrupt_status` show the current hardware state. The
   status sensor reports `ok`, `timeout`, `reinitializing`, `error` or `offline`
   so automations can react to issues.
+- `version`, `entry_exit_event` and `enabled_features` provide diagnostic text,
+  and a text-sensor `sensor_status` exposes the same status string.
 - ROI size and threshold sensors allow live tuning of each zone.
 - `manual_adjustment_count` records people-count corrections.
 

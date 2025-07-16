@@ -248,66 +248,189 @@ roode:
         max: 70%
 ```
 
-
 ### Configuration Reference
+
+| Section | Description |
+| --- | --- |
+| [VL53L1X Options](#vl53l1x-options) | Sensor hardware settings |
+| [General Options](#general-options) | Core behavior tuning |
+| [Recalibration Options](#recalibration-options) | Automatic recalibration triggers |
+| [Ambient Light Learning & Light Control](#ambient-light-learning--light-control) | Light suppression features |
+| [Zone Options](#zone-options) | Per-zone overrides |
+
 
 #### VL53L1X Options
 
-| Option(s) | Required? | Default | Purpose | When to change | Strategy | Conservative Example | Aggressive Example |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `vl53l1x.sensor_id` | Optional | `1` | Distinguish multiple sensors on one bus | Using multiple VL53L1X modules | Assign unique ID per sensor | `sensor_id: 1` | `sensor_id: 2` |
-| `vl53l1x.address` & `vl53l1x.pins.xshut` | Optional together | `0x29` | Change the sensor I²C address | Address conflict or multi-sensor setup | Provide an XSHUT pin and new address | *(not set)* | `address: 0x31`<br>`pins:`<br>`  xshut: GPIO3` |
-| `vl53l1x.timeout` | Optional | `2s` | How long to wait for a measurement | Long ranges may need more time | Increase in 500&nbsp;ms steps until errors stop | `timeout: 2s` | `timeout: 3s` |
-| `vl53l1x.pins.interrupt` | Optional | none | GPIO for data ready signal | Efficient updates | Use if you can spare a pin | *(not set)* | `interrupt: GPIO32` |
-| `vl53l1x.calibration.ranging` | Optional | `auto` | Measurement range preset | Known distance extremes | Pick the shortest range that works | `ranging: auto` | `ranging: long` |
-| `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration | *(not set)* | `offset: 20mm` |
-| `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Only adjust with ST's calibration output | *(not set)* | `crosstalk: 100000cps` |
+Minimal example
 
-#### Basic Options
+```yaml
+vl53l1x:
+  pins:
+    xshut: GPIO3
+    interrupt: GPIO1
+```
 
-| Option(s) | Required? | Default | Purpose | When to change | Strategy | Conservative Example | Aggressive Example |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `roode.sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Try 3–5 for noisy areas; above 5 adds lag | `sampling: 2` | `sampling: 5` |
-| `roode.orientation` | Optional | `parallel` | Sensor pad orientation | Sensor rotated 90° | Set to `perpendicular` | `orientation: parallel` | `orientation: perpendicular` |
-| `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Change by 2–4 units or use `auto` to learn | `roi: { height: 16, width: 6 }` | `roi: auto` |
-| `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% (or ~50 mm) each time | `detection_thresholds: { min: 5%, max: 85% }` | `detection_thresholds: { min: 50mm, max: 234cm }` |
-| `roode.calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning | `calibration_persistence: false` | `calibration_persistence: true` |
-| `roode.filter_mode` & `roode.filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows | `filter_mode: min`<br>`filter_window: 5` | `filter_mode: percentile10`<br>`filter_window: 9` |
-| `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | `log_fallback_events: false` | `log_fallback_events: true` |
-| `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: false` | `force_single_core: true` |
+Full example
+
+```yaml
+vl53l1x:
+  sensor_id: 1
+  address: 0x31
+  timeout: 2s
+  calibration:
+    ranging: auto
+    offset: 20mm
+    crosstalk: 100000cps
+  pins:
+    xshut: GPIO3
+    interrupt: GPIO32
+```
+
+| Option(s) | Required? | Default | Purpose | When to change | Strategy |
+| --- | --- | --- | --- | --- | --- |
+| `vl53l1x.sensor_id` | Optional | `1` | Distinguish multiple sensors on one bus | Using multiple VL53L1X modules | Assign unique ID per sensor |
+| `vl53l1x.address` & `vl53l1x.pins.xshut` | Optional together | `0x29` | Change the sensor I²C address | Address conflict or multi-sensor setup | Provide an XSHUT pin and new address |
+| `vl53l1x.timeout` | Optional | `2s` | How long to wait for a measurement | Long ranges may need more time | Increase in 500 ms steps until errors stop |
+| `vl53l1x.pins.interrupt` | Optional | none | GPIO for data ready signal | Efficient updates | Use if you can spare a pin |
+| `vl53l1x.calibration.ranging` | Optional | `auto` | Measurement range preset | Known distance extremes | Pick the shortest range that works |
+| `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration |
+| `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Only adjust with ST's calibration output |
+
+#### General Options
+
+Minimal example
+
+```yaml
+roode:
+  sampling: 2
+```
+
+Full example
+
+```yaml
+roode:
+  sampling: 2
+  orientation: perpendicular
+  roi: { height: 16, width: 6 }
+  detection_thresholds: { min: 5%, max: 85% }
+  calibration_persistence: true
+  filter_mode: median
+  filter_window: 5
+  log_fallback_events: true
+  force_single_core: false
+```
+
+| Option(s) | Required? | Default | Purpose | When to change | Strategy |
+| --- | --- | --- | --- | --- | --- |
+| `roode.sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Try 3–5 for noisy areas; above 5 adds lag |
+| `roode.orientation` | Optional | `parallel` | Sensor pad orientation | Sensor rotated 90° | Set to `perpendicular` |
+| `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Change by 2–4 units or use `auto` to learn |
+| `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% (or ~50 mm) each time |
+| `roode.calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning |
+| `roode.filter_mode` & `roode.filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows |
+| `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing |
+| `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur |
 
 #### Recalibration Options
 
-| Option(s) | Required? | Default | Purpose | When to change | Strategy | Conservative Example | Aggressive Example |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `roode.auto_recalibrate_interval` | Optional | `6h` | Time between automatic recalibrations | Sensor drifts gradually | Increase for stable temps or set to 0 to disable | `auto_recalibrate_interval: 6h` | `auto_recalibrate_interval: 12h` |
-| `roode.recalibrate_on_temp_change` | Optional | `false` | Recalibrate when temperature shifts | Use with a temperature sensor | Enable only if temps vary | `recalibrate_on_temp_change: true` | `recalibrate_on_temp_change: false` |
-| `roode.max_temp_delta_for_recalib` | Optional | `8` | Temperature change in °C that triggers recalibration | Rapid heat/cool cycles | Lower if drift occurs quickly, raise to avoid noise | `max_temp_delta_for_recalib: 8` | `max_temp_delta_for_recalib: 3` |
-| `roode.recalibrate_cooldown` | Optional | `30min` | Minimum time between automatic recalibrations | Multiple triggers in short time | Extend to prevent loops or shorten for responsiveness | `recalibrate_cooldown: 30min` | `recalibrate_cooldown: 5min` |
-| `roode.idle_recalibrate_interval` | Optional | `0` | Recalibrate after long idle period | Sensor rarely triggered | Set long interval like 12h to combat slow drift | `idle_recalibrate_interval: 12h` | `idle_recalibrate_interval: 4h` |
+Minimal example
+
+```yaml
+roode:
+  auto_recalibrate_interval: 6h
+```
+
+Full example
+
+```yaml
+roode:
+  auto_recalibrate_interval: 6h
+  recalibrate_on_temp_change: true
+  max_temp_delta_for_recalib: 8
+  recalibrate_cooldown: 30min
+  idle_recalibrate_interval: 12h
+```
+
+| Option(s) | Required? | Default | Purpose | When to change | Strategy |
+| --- | --- | --- | --- | --- | --- |
+| `roode.auto_recalibrate_interval` | Optional | `6h` | Time between automatic recalibrations | Sensor drifts gradually | Increase for stable temps or set to 0 to disable |
+| `roode.recalibrate_on_temp_change` | Optional | `false` | Recalibrate when temperature shifts | Use with a temperature sensor | Enable only if temps vary |
+| `roode.max_temp_delta_for_recalib` | Optional | `8` | Temperature change in °C that triggers recalibration | Rapid heat/cool cycles | Lower if drift occurs quickly, raise to avoid noise |
+| `roode.recalibrate_cooldown` | Optional | `30min` | Minimum time between automatic recalibrations | Multiple triggers in short time | Extend to prevent loops or shorten for responsiveness |
+| `roode.idle_recalibrate_interval` | Optional | `0` | Recalibrate after long idle period | Sensor rarely triggered | Set long interval like 12h to combat slow drift |
 
 #### Ambient Light Learning & Light Control
 
-| Option(s) | Required? | Default | Purpose | When to change | Strategy | Conservative Example | Aggressive Example |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `roode.use_light_sensor` | Optional | `false` | Enable lux learning to suppress sunlight events | Sensor near windows | Enable with a light sensor | `use_light_sensor: true` | `use_light_sensor: false` |
-| `roode.lux_learning_window` | Optional | `24h` | Time range for lux history | Slow lighting changes | Shorten for seasonal shifts | `lux_learning_window: 24h` | `lux_learning_window: 12h` |
-| `roode.lux_sample_interval` | Optional | `1min` | How often to sample lux | Battery savings | Increase for low-power setups | `lux_sample_interval: 1min` | `lux_sample_interval: 5min` |
-| `roode.use_sunrise_prediction` | Optional | `false` | Use sunrise & sunset times for lux suppression | Outdoors or bright windows | Enable with timezone/location data | `use_sunrise_prediction: true` | `use_sunrise_prediction: false` |
-| `roode.latitude` & `roode.longitude` | Optional | none | Manual override for location when predicting sunrise | No Home Assistant location or custom site | Supply decimal degrees for your location | `latitude: 37.7749`<br>`longitude: -122.4194` | `latitude: 51.05`<br>`longitude: -0.12` |
-| `roode.alpha` | Optional | `0.5` | Sensitivity of lux spike detection | Too many or too few suppressions | Increase for aggressive suppression, lower for gentle | `alpha: 0.5` | `alpha: 0.8` |
-| `roode.base_multiplier` | Optional | `1.0` | Minimum lux multiplier | Keep events with small spikes | Raise if suppression triggers too often | `base_multiplier: 1.0` | `base_multiplier: 2.0` |
-| `roode.max_multiplier` | Optional | `4.0` | Maximum lux multiplier | Hard limit on sunlight suppression | Lower for less effect | `max_multiplier: 4.0` | `max_multiplier: 6.0` |
-| `roode.time_multiplier` | Optional | `1.5` | Extra weighting near sunrise/sunset | Bright horizon light at dawn/dusk | Adjust if events still occur | `time_multiplier: 1.5` | `time_multiplier: 2.0` |
-| `roode.combined_multiplier` | Optional | `3.0` | Limit when both time & lux match | Balances lux and schedule inputs | Increase to enforce stricter suppression | `combined_multiplier: 3.0` | `combined_multiplier: 4.0` |
-| `roode.suppression_window` | Optional | `30min` | Ignore repeated light spikes | Sudden sunlight bursts | Reduce for indoor lights | `suppression_window: 30min` | `suppression_window: 5min` |
+Minimal example
+
+```yaml
+roode:
+  use_light_sensor: true
+```
+
+Full example
+
+```yaml
+roode:
+  use_light_sensor: true
+  lux_learning_window: 24h
+  lux_sample_interval: 1min
+  use_sunrise_prediction: true
+  latitude: 37.7749
+  longitude: -122.4194
+  alpha: 0.5
+  base_multiplier: 1.0
+  max_multiplier: 4.0
+  time_multiplier: 1.5
+  combined_multiplier: 3.0
+  suppression_window: 30min
+```
+
+| Option(s) | Required? | Default | Purpose | When to change | Strategy |
+| --- | --- | --- | --- | --- | --- |
+| `roode.use_light_sensor` | Optional | `false` | Enable lux learning to suppress sunlight events | Sensor near windows | Enable with a light sensor |
+| `roode.lux_learning_window` | Optional | `24h` | Time range for lux history | Slow lighting changes | Shorten for seasonal shifts |
+| `roode.lux_sample_interval` | Optional | `1min` | How often to sample lux | Battery savings | Increase for low-power setups |
+| `roode.use_sunrise_prediction` | Optional | `false` | Use sunrise & sunset times for lux suppression | Outdoors or bright windows | Enable with timezone/location data |
+| `roode.latitude` & `roode.longitude` | Optional | none | Manual override for location when predicting sunrise | No Home Assistant location or custom site | Supply decimal degrees for your location |
+| `roode.alpha` | Optional | `0.5` | Sensitivity of lux spike detection | Too many or too few suppressions | Increase for aggressive suppression, lower for gentle |
+| `roode.base_multiplier` | Optional | `1.0` | Minimum lux multiplier | Keep events with small spikes | Raise if suppression triggers too often |
+| `roode.max_multiplier` | Optional | `4.0` | Maximum lux multiplier | Hard limit on sunlight suppression | Lower for less effect |
+| `roode.time_multiplier` | Optional | `1.5` | Extra weighting near sunrise/sunset | Bright horizon light at dawn/dusk | Adjust if events still occur |
+| `roode.combined_multiplier` | Optional | `3.0` | Limit when both time & lux match | Balances lux and schedule inputs | Increase to enforce stricter suppression |
+| `roode.suppression_window` | Optional | `30min` | Ignore repeated light spikes | Sudden sunlight bursts | Reduce for indoor lights |
 
 #### Zone Options
 
-| Option(s) | Required? | Default | Purpose | When to change | Strategy | Conservative Example | Aggressive Example |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
-| `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
+Minimal example
+
+```yaml
+roode:
+  zones:
+    invert: false
+```
+
+Full example
+
+```yaml
+roode:
+  zones:
+    invert: true
+    entry:
+      roi: auto
+    exit:
+      roi:
+        height: 8
+        center: 124
+      detection_thresholds:
+        min: 5%
+        max: 70%
+```
+
+| Option(s) | Required? | Default | Purpose | When to change | Strategy |
+| --- | --- | --- | --- | --- | --- |
+| `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate |
+| `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed |
 
 
 ### Example Configurations

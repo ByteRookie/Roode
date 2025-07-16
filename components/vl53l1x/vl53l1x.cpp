@@ -466,6 +466,9 @@ void VL53L1X::soft_reset() {
     roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
     roode::Roode::log_event("sensor.recovered_via_xshut");
     recovery_count_++;
+  } else {
+    ESP_LOGW(TAG, "Restarting sensor without XSHUT pin");
+    this->init();
   }
 }
 

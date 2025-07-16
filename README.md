@@ -148,23 +148,6 @@ vl53l1x:
   # On boot the driver checks that the xshut and interrupt pins work and
   # prints the result to the log.
 
-### Interrupt vs Polling
-
-Roode prefers the interrupt pin for efficient updates when it is defined and
-validated. When `interrupt` is present the sensor notifies the MCU whenever a
-sample is ready, avoiding constant I\u00b2C traffic. If the INT pin is missing or
-stops working, Roode quietly falls back to a 10\u00a0ms polling loop and retries
-enabling interrupts every 30\u00a0minutes. Polling is also used as a safety net
-in case an interrupt is missed during startup or because of noise so distance
-readings remain reliable.
-
-| Situation | Use INT | Use Polling |
-| --- | --- | --- |
-| Normal operation | ✅ | 🔁 (optional verify) |
-| INT not received in time | ⛔️ | ✅ |
-| Sensor just booted | ⛔️ | ✅ |
-| Interrupt unreliable | ⛔️ | ✅ |
-| Low-power mode handling | ⛔️ | ✅ |
 # Roode people counting algorithm
 roode:
   # Smooth out measurements by using the minimum distance from this number of readings
@@ -240,6 +223,18 @@ For example, an entryway with a shelf on one side might need a smaller ROI or
 stricter thresholds only in that zone. Start with small adjustments—change the
 ROI height or width by one or two units or nudge thresholds 5 % at a time—and
 test before making larger changes.
+### Interrupt vs Polling
+
+Roode prefers the interrupt pin for efficient updates. When `interrupt` is defined and validated, the VL53L1X notifies the MCU whenever a new sample is ready. If the INT pin is missing or stops working, Roode falls back to a 10 ms polling loop and tries interrupts again every 30 minutes. Polling also acts as a safety net during startup.
+
+| Situation | Use INT | Use Polling |
+| --- | --- | --- |
+| Normal operation | ✅ | 🔁 (optional verify) |
+| INT not received in time | ⛔️ | ✅ |
+| Sensor just booted | ⛔️ | ✅ |
+| Interrupt unreliable | ⛔️ | ✅ |
+| Low-power mode handling | ⛔️ | ✅ |
+
 
 ### Single vs Dual Core
 

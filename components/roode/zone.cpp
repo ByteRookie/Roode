@@ -92,8 +92,12 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   } else {
     int avg = sum / zone_distances.size();
     threshold->idle = avg;
-    threshold->max = avg * 0.80;
-    threshold->min = avg * 0.15;
+    uint8_t max_pct = threshold->max_percentage.value_or(80);
+    uint8_t min_pct = threshold->min_percentage.value_or(15);
+    threshold->max_percentage = max_pct;
+    threshold->min_percentage = min_pct;
+    threshold->max = (avg * max_pct) / 100;
+    threshold->min = (avg * min_pct) / 100;
   }
 
   ESP_LOGI(CALIBRATION, "Calibrated threshold for zone. zoneId: %d, idle: %d, min: %d (%d%%), max: %d (%d%%)", id,
@@ -149,6 +153,14 @@ void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Or
 
 uint16_t Zone::getDistance() const { return this->last_distance; }
 uint16_t Zone::getMinDistance() const { return this->min_distance; }
+
+void Zone::set_threshold_percentages(uint8_t min_percent, uint8_t max_percent) {
+  threshold->min_percentage = min_percent;
+  threshold->max_percentage = max_percent;
+  if (threshold->idle > 0) {
+    threshold->min = (threshold->idle * min_percent) / 100;
+    threshold->max = (threshold->idle * max_percent) / 100;
+  }
+}
 }  // namespace roode
 }  // namespace esphome
-

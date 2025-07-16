@@ -602,6 +602,10 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Feature text sensor | Reports enabled and fallback features for diagnostics |
 | Manual adjustment counter | Tracks user corrections to the people count |
 | Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
+| Polling timeout recovery | Restarts the sensor if no data arrives for 30&nbsp;seconds |
+| Consecutive failure counter | Soft-resets the sensor after 10 read errors |
+| Recovery cooldown | Prevents another restart for 30&nbsp;seconds |
+| Sensor status reporting | Text sensor shows `ok`, `timeout`, `reinitializing`, `error` or `offline` |
 | Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
 | Colored logs | Normal info in green, details in yellow, failures in red |
 
@@ -631,6 +635,8 @@ Optional sensors provide insight into Roode's operation:
   and a text-sensor `sensor_status` exposes the same status string.
 - ROI size and threshold sensors allow live tuning of each zone.
 - `manual_adjustment_count` records people-count corrections.
+- The sensor automatically restarts if polling stops for 30&nbsp;seconds or
+  after 10 consecutive read errors. Reset attempts are throttled for 30&nbsp;seconds.
 
 See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
 these sensors.

@@ -609,6 +609,54 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Context-aware calibration | Suggests recalibration after repeated manual changes |
 | Adaptive filtering | Adjusts filter window based on motion & lighting |
 
+### Scheduled Recalibration
+
+Roode automatically runs the calibration routine on a schedule and when
+certain conditions are met.  The default interval is every **6&nbsp;h** and
+the recalibration can also be triggered by temperature shifts or long idle
+periods.  Automatic recalibrations respect a cooldown window (default
+30&nbsp;min) so multiple triggers only perform a single calibration. Manual
+recalibration via the API or button ignores this cooldown and executes
+immediately.
+
+### Ambient Light Learning & Sunlight Suppression
+
+When a light sensor is provided Roode learns the typical lux pattern over a
+24&nbsp;h window.  Sudden spikes beyond the learned 95&percnt; percentile are
+considered outliers.  If a lux spike occurs around sunrise or sunset it will be
+treated more aggressively to avoid false counts from direct sunlight.
+
+| Condition          | Suppression?  | Multiplier                                 | Log Event                   |
+| ------------------ | ------------- | ------------------------------------------ | --------------------------- |
+| Lux spike only     | ✅             | `dynamic_multiplier`                       | `lux_outlier_detected`      |
+| Time-only (no lux) | ❌             | –                                          | –                           |
+| Lux + time window  | ✅ (strongest) | `max(dynamic_multiplier, time_multiplier)` | `sunlight_suppressed_event` |
+
+### CPU Resilience & Multicore
+
+On multi‑core ESP32s Roode attempts to run the sensor loop on the second core
+for improved responsiveness.  If initialization fails it logs
+`dual_core_fallback` and retries every 5&nbsp;min until it succeeds, logging
+`dual_core_recovered` when normal operation resumes.
+
+### INT Pin Robustness
+
+Roode monitors the interrupt pin for missed events.  After three interrupt
+fallbacks within 30&nbsp;min it temporarily switches back to polling and resets
+the sensor via the XSHUT pin.
+
+### Context-Aware Calibration
+
+Repeated manual adjustments are tracked.  If more than five adjustments occur
+within an hour while the lux level is high Roode performs a soft recalibration
+and logs `manual_recalibrate_triggered`.
+
+### Adaptive Filtering
+
+The filter window dynamically expands when lux spikes four to six times above
+the learned maximum and returns to the default size once lighting stabilises.
+This change is recorded with the `filter_window_changed` log event.
+
 ## Logging and Diagnostics
 
 Roode prints key events to the ESPHome logger. Set `log_fallback_events: true`

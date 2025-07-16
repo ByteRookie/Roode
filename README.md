@@ -376,22 +376,38 @@ text_sensor:
 
 ### Threshold distance
 
-Another crucial choice is the one corresponding to the threshold. Indeed a movement is detected whenever the distance read by the sensor is below this value. The code contains a vector as threshold, as one (as myself) might need a different threshold for each zone.
+A crossing is detected when the measured distance for a zone falls between its
+configured minimum and maximum values. Roode determines starting thresholds
+automatically: after powering up, leave the area clear for about 10&nbsp;seconds so
+the idle distance can be measured. The default maximum threshold is 80&nbsp;% of this
+resting value.
 
-The threshold is automatically calculated by the sensor. After power on wait about 10 seconds without passing under it so the idle distance can be sampled. By default the maximum threshold is set to 80% of this distance and the minimum to 15%.  These percentages can be changed at runtime using the `set_entry_threshold_percentages()` and `set_exit_threshold_percentages()` methods.
 
-If you install the sensor e.g. 20 cm above a door you don't want to count the door opening and closing. In this case call `set_entry_threshold_percentages(10, 80)` so movements closer than 10 % are ignored.
 
-Example:
+To fine-tune detection, adjust the `detection_thresholds` option in your YAML or call the `recalibrate` service to re-measure the idle distance.
 
+By default, the sensor calculates thresholds after startup by sampling the idle distance for about 10 seconds. The maximum threshold is set to 80% of this distance and the minimum to 15%. These can be changed at runtime using the `set_entry_threshold_percentages()` and `set_exit_threshold_percentages()` methods.
+
+If you install the sensor \~20 cm above a door and want to ignore door movements, you might lower the minimum threshold:
+
+```yaml
+detection_thresholds:
+  min: 10%
+  max: 80%
 ```
-Mounting height:    2200mm
-Door height:        2000mm
-Person height:      1800mm
-set_entry_threshold_percentages(10, 80)
 
-All distances smaller than 200mm and greater than 1760mm will be ignored.
+Or in code:
+
+```cpp
+set_entry_threshold_percentages(10, 80);
 ```
+
+This ensures movements too close to the sensor (like door leaf motion) are filtered out while still detecting people passing underneath.
+
+
+
+
+See the [calibration instructions](calibration/) for further details.
 
 ## Algorithm
 

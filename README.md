@@ -51,7 +51,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
   - Black PCB chinese sensor
   - Pimoroni
 - 1A Power Supply **Do not use an USB port of your computer!**
-- Enclosure (see .stl files) - will be updated soon!
+- Enclosure (see models in [STL/](STL))
   Pins:
   SDA_PIN 4 (ESP8266) or 21 (ESP32)
   SCL_PIN 5 (ESP8266) or 22 (ESP32)
@@ -128,9 +128,11 @@ vl53l1x:
     # The longer the distance, the more time the sensor needs to take a measurement.
     # Available options are: auto, shortest, short, medium, long, longer, longest
     ranging: auto
-    # The offset correction distance. See calibration section (WIP) for more details.
+    # The offset correction distance. Run [calibration/OffsetAndXtalkCalibration](calibration/OffsetAndXtalkCalibration)
+    # with a 17% grey target 140 mm away and copy the reported value.
     offset: 8mm
-    # The corrected photon count in counts per second. See calibration section (WIP) for more details.
+    # The corrected photon count in counts per second. Use the same sketch in a
+    # dark room to measure crosstalk and copy the result.
     crosstalk: 53406cps
 
   # Hardware pins

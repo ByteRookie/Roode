@@ -159,6 +159,8 @@ class Roode : public PollingComponent {
   bool should_suppress_event();
   void adjust_filtering();
   void update_sun_times();
+  bool validate_lux_sensor();
+  bool validate_temperature_sensor();
   void check_context_calibration();
   void check_multicore_recovery();
   Zone *entry = new Zone(0);
@@ -229,6 +231,10 @@ class Roode : public PollingComponent {
   sensor::Sensor *temperature_sensor_{nullptr};
   sensor::Sensor *lux_sensor_{nullptr};
   bool use_light_sensor_{false};
+  bool lux_sensor_operational_{true};
+  uint32_t lux_sensor_retry_ts_{0};
+  bool temperature_sensor_operational_{true};
+  uint32_t temperature_sensor_retry_ts_{0};
   uint32_t lux_learning_window_sec_{86400};
   uint32_t lux_sample_interval_sec_{60};
   bool use_sunrise_prediction_{false};
@@ -243,12 +249,14 @@ class Roode : public PollingComponent {
   std::deque<float> lux_samples_{};
   uint32_t last_lux_sample_ts_{0};
   float lux_percentile95_{0};
+  float current_lux_{NAN};
   bool lux_learning_complete_{false};
   uint32_t last_suppression_ts_{0};
   int sunrise_sec_{21600};
   int sunset_sec_{64800};
   int sun_times_day_{-1};
   float last_temperature_{NAN};
+  float current_temperature_{NAN};
   uint32_t manual_adjust_window_start_{0};
   uint32_t last_multicore_retry_ms_{0};
 

@@ -447,6 +447,8 @@ The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
 `cpu_cores`, `ram`, `flash`, `calibration_value`, `calibration`,
 `scheduled_recalibration`, `ambient_light_learning`, `cpu_resilience`,
 `int_pin_robustness`, `context_calibration` and `adaptive_filtering`.
+Features that rely on sensors report `disabled` if a sensor error occurs and
+automatically switch back to `enabled` after the sensor recovers.
 Memory values are printed with **KB**, **MB** or **GB** units. Calibration time
 uses the device clock in `h:MMAM/PM` format or displays `unknown` if the clock
 has not been initialised.
@@ -618,7 +620,9 @@ the recalibration can also be triggered by temperature shifts or long idle
 periods.  Automatic recalibrations respect a cooldown window (default
 30&nbsp;min) so multiple triggers only perform a single calibration. Manual
 recalibration via the API or button ignores this cooldown and executes
-immediately.
+immediately. If the temperature sensor stops reporting valid data the
+temperature-based trigger disables itself and retries after
+30&nbsp;min.
 
 ### Ambient Light Learning & Sunlight Suppression
 
@@ -626,6 +630,9 @@ When a light sensor is provided Roode learns the typical lux pattern over a
 24&nbsp;h window.  Sudden spikes beyond the learned 95&percnt; percentile are
 considered outliers.  If a lux spike occurs around sunrise or sunset it will be
 treated more aggressively to avoid false counts from direct sunlight.
+If the configured light sensor fails to report valid lux values, the
+learning and suppression logic disables itself and automatically retries
+after 30&nbsp;min.
 
 | Condition          | Suppression?  | Multiplier                                 | Log Event                   |
 | ------------------ | ------------- | ------------------------------------------ | --------------------------- |

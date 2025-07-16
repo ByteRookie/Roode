@@ -110,6 +110,39 @@ void Roode::log_event(const std::string &msg) {
   }
 }
 
+static float deg_to_rad(float d) { return d * M_PI / 180.0f; }
+static float rad_to_deg(float r) { return r * 180.0f / M_PI; }
+
+static int calc_sun_time(const struct tm &date, float lat, float lon, bool sunrise) {
+  int n = date.tm_yday + 1;
+  float lngHour = lon / 15.0f;
+  float t = n + ((sunrise ? 6.0f : 18.0f) - lngHour) / 24.0f;
+  float M = (0.9856f * t) - 3.289f;
+  float L = M + (1.916f * sin(deg_to_rad(M))) + (0.020f * sin(2 * deg_to_rad(M))) + 282.634f;
+  while (L < 0) L += 360.0f;
+  while (L >= 360) L -= 360.0f;
+  float RA = rad_to_deg(atan(0.91764f * tan(deg_to_rad(L))));
+  while (RA < 0) RA += 360.0f;
+  while (RA >= 360) RA -= 360.0f;
+  float Lquadrant = floor(L / 90.0f) * 90.0f;
+  float RAquadrant = floor(RA / 90.0f) * 90.0f;
+  RA = RA + (Lquadrant - RAquadrant);
+  RA /= 15.0f;
+  float sinDec = 0.39782f * sin(deg_to_rad(L));
+  float cosDec = cos(asin(sinDec));
+  float cosH = (cos(deg_to_rad(90.833f)) - sinDec * sin(deg_to_rad(lat))) /
+               (cosDec * cos(deg_to_rad(lat)));
+  if (cosH > 1.0f || cosH < -1.0f)
+    return sunrise ? 21600 : 64800;  // fallback to default 6AM/6PM
+  float H = sunrise ? 360.0f - rad_to_deg(acos(cosH)) : rad_to_deg(acos(cosH));
+  H /= 15.0f;
+  float T = H + RA - (0.06571f * t) - 6.622f;
+  float UT = T - lngHour;
+  while (UT < 0) UT += 24.0f;
+  while (UT >= 24) UT -= 24.0f;
+  return static_cast<int>(UT * 3600.0f);
+}
+
 Roode::~Roode() {
   delete entry;
   delete exit;
@@ -243,6 +276,7 @@ void Roode::setup() {
   publish_feature_list();
   last_recalibrate_ts_ = static_cast<uint32_t>(time(nullptr));
   last_auto_recalibrate_ts_ = last_recalibrate_ts_;
+  update_sun_times();
 }
 
 void Roode::update() {
@@ -626,6 +660,24 @@ void Roode::update_metrics() {
   loop_window_start_ = now;
 }
 
+void Roode::update_sun_times() {
+  if (!use_sunrise_prediction_)
+    return;
+  time_t t = time(nullptr);
+  struct tm tm_time;
+  localtime_r(&t, &tm_time);
+  if (tm_time.tm_yday == sun_times_day_)
+    return;
+  sun_times_day_ = tm_time.tm_yday;
+  if (latitude_ != 0.0f || longitude_ != 0.0f) {
+    sunrise_sec_ = calc_sun_time(tm_time, latitude_, longitude_, true);
+    sunset_sec_ = calc_sun_time(tm_time, latitude_, longitude_, false);
+  } else {
+    sunrise_sec_ = 21600;
+    sunset_sec_ = 64800;
+  }
+}
+
 void Roode::sample_lux() {
   if (!use_light_sensor_ || lux_sensor_ == nullptr)
     return;
@@ -661,15 +713,17 @@ bool Roode::should_suppress_event() {
   if (std::isnan(lux))
     return false;
   uint32_t now = millis() / 1000;
-  bool time_window = false;
-  if (use_sunrise_prediction_) {
-    time_t t = time(nullptr);
-    struct tm tm_time;
-    localtime_r(&t, &tm_time);
-    int sec = tm_time.tm_hour * 3600 + tm_time.tm_min * 60 + tm_time.tm_sec;
-    if (abs(sec - 21600) <= 1800 || abs(sec - 64800) <= 1800)
-      time_window = true;
-  }
+  if (now - last_suppression_ts_ < suppression_window_sec_)
+    return true;
+  update_sun_times();
+  time_t t = time(nullptr);
+  struct tm tm_time;
+  localtime_r(&t, &tm_time);
+  int sec_of_day = tm_time.tm_hour * 3600 + tm_time.tm_min * 60 + tm_time.tm_sec;
+  bool time_window =
+      use_sunrise_prediction_ &&
+      (abs(sec_of_day - sunrise_sec_) <= (int)suppression_window_sec_ ||
+       abs(sec_of_day - sunset_sec_) <= (int)suppression_window_sec_);
   float dynamic_multiplier = 1.0f;
   if (lux_percentile95_ > 0)
     dynamic_multiplier =
@@ -677,7 +731,7 @@ bool Roode::should_suppress_event() {
                     base_multiplier_, max_multiplier_);
   float multiplier = dynamic_multiplier;
   if (time_window)
-    multiplier = std::max(dynamic_multiplier, time_multiplier_);
+    multiplier = std::max({dynamic_multiplier, time_multiplier_, combined_multiplier_});
   if (lux > lux_percentile95_ * multiplier) {
     if (time_window)
       log_event("sunlight_suppressed_event");

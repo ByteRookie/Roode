@@ -158,6 +158,7 @@ class Roode : public PollingComponent {
   void sample_lux();
   bool should_suppress_event();
   void adjust_filtering();
+  void update_sun_times();
   void check_context_calibration();
   void check_multicore_recovery();
   Zone *entry = new Zone(0);
@@ -244,6 +245,9 @@ class Roode : public PollingComponent {
   float lux_percentile95_{0};
   bool lux_learning_complete_{false};
   uint32_t last_suppression_ts_{0};
+  int sunrise_sec_{21600};
+  int sunset_sec_{64800};
+  int sun_times_day_{-1};
   float last_temperature_{NAN};
   uint32_t manual_adjust_window_start_{0};
   uint32_t last_multicore_retry_ms_{0};

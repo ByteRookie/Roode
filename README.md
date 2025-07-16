@@ -635,6 +635,16 @@ Optional sensors provide insight into Roode's operation:
 See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
 these sensors.
 
+### Logging Events Overview
+
+| Category | Events |
+| --- | --- |
+| **Lux/Light** | `lux_learning_complete`, `lux_outlier_detected`, `sunlight_suppressed_event`, `lux_model_bootstrapping` |
+| **Recalibration** | `auto_recalibrate_interval`, `temp_triggered_recalibration`, `idle_triggered_recalibration`, `recalibrate_cooldown_active`, `manual_recalibrate_triggered` |
+| **CPU/Core** | `dual_core_fallback`, `dual_core_recovered` |
+| **Interrupt** | `interrupt_fallback`, `int_pin_missed` |
+| **Filtering** | `filter_window_changed` |
+
 
 ## FAQ/Troubleshoot
 

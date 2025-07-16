@@ -196,13 +196,13 @@ roode:
   force_single_core: false
   # Scheduled sensor recalibration and ambient light suppression
   auto_recalibrate_interval: 6h
-  recalibrate_on_temp_change: true
+  recalibrate_on_temp_change: false
   max_temp_delta_for_recalib: 8
   recalibrate_cooldown: 30min
-  use_light_sensor: true
+  use_light_sensor: false
   lux_learning_window: 24h
   lux_sample_interval: 1min
-  use_sunrise_prediction: true
+  use_sunrise_prediction: false
   latitude: 37.7749
   longitude: -122.4194
   alpha: 0.5
@@ -342,10 +342,11 @@ reflections cause false triggers.
 | `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | `log_fallback_events: false` | `log_fallback_events: true` |
 | `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: false` | `force_single_core: true` |
 | `roode.auto_recalibrate_interval` | Optional | `6h` | Time between automatic recalibrations | Sensor drifts gradually | Increase for stable temps or set to 0 to disable | `auto_recalibrate_interval: 6h` | `auto_recalibrate_interval: 12h` |
-| `roode.recalibrate_on_temp_change` | Optional | `true` | Recalibrate when temperature shifts | Large indoor/outdoor swings | Disable if temps stable | `recalibrate_on_temp_change: true` | `recalibrate_on_temp_change: false` |
-| `roode.use_light_sensor` | Optional | `true` | Enable lux learning to suppress sunlight events | Sensor near windows | Disable if no light sensor | `use_light_sensor: true` | `use_light_sensor: false` |
+| `roode.recalibrate_on_temp_change` | Optional | `false` | Recalibrate when temperature shifts | Large indoor/outdoor swings | Enable only if temps vary | `recalibrate_on_temp_change: true` | `recalibrate_on_temp_change: false` |
+| `roode.use_light_sensor` | Optional | `false` | Enable lux learning to suppress sunlight events | Sensor near windows | Enable with a light sensor | `use_light_sensor: true` | `use_light_sensor: false` |
 | `roode.lux_learning_window` | Optional | `24h` | Time range for lux history | Slow lighting changes | Shorten for seasonal shifts | `lux_learning_window: 24h` | `lux_learning_window: 12h` |
 | `roode.lux_sample_interval` | Optional | `1min` | How often to sample lux | Battery savings | Increase for low-power setups | `lux_sample_interval: 1min` | `lux_sample_interval: 5min` |
+| `roode.use_sunrise_prediction` | Optional | `false` | Use sunrise & sunset times for lux suppression | Outdoors or bright windows | Enable with timezone/location data | `use_sunrise_prediction: true` | `use_sunrise_prediction: false` |
 | `roode.suppression_window` | Optional | `30min` | Ignore repeated light spikes | Sudden sunlight bursts | Reduce for indoor lights | `suppression_window: 30min` | `suppression_window: 5min` |
 | `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
 | `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
@@ -687,8 +688,8 @@ these sensors.
 
 | Category | Events |
 | --- | --- |
-| **Lux/Light** | `lux_learning_complete`, `lux_outlier_detected`, `sunlight_suppressed_event`, `lux_model_bootstrapping` |
-| **Recalibration** | `auto_recalibrate_interval`, `temp_triggered_recalibration`, `idle_triggered_recalibration`, `recalibrate_cooldown_active`, `manual_recalibrate_triggered` |
+| **Lux/Light** | `lux_learning_complete`, `lux_outlier_detected`, `sunlight_suppressed_event`, `lux_model_bootstrapping`, `lux_sensor_error` |
+| **Recalibration** | `auto_recalibrate_interval`, `temp_triggered_recalibration`, `idle_triggered_recalibration`, `recalibrate_cooldown_active`, `manual_recalibrate_triggered`, `temperature_sensor_error` |
 | **CPU/Core** | `dual_core_fallback`, `dual_core_recovered` |
 | **Interrupt** | `interrupt_fallback`, `int_pin_missed` |
 | **Filtering** | `filter_window_changed` |

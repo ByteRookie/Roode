@@ -525,22 +525,25 @@ void Roode::perform_recalibration(bool manual) {
 
 void Roode::check_auto_recalibration() {
   uint32_t now = static_cast<uint32_t>(time(nullptr));
-  if (recalibrate_on_temp_change_ && temperature_sensor_ != nullptr &&
-      !isnan(temperature_sensor_->state)) {
+  if (recalibrate_on_temp_change_ && temperature_sensor_ != nullptr) {
     float t = temperature_sensor_->state;
-    if (!isnan(last_temperature_) &&
-        fabs(t - last_temperature_) >= max_temp_delta_for_recalib_) {
-      if (now - last_recalibrate_ts_ < recalibrate_cooldown_sec_) {
-        log_event("recalibrate_cooldown_active");
-      } else {
-        log_event("temp_triggered_recalibration");
-        perform_recalibration(false);
+    if (isnan(t)) {
+      log_event("temperature_sensor_error");
+    } else {
+      if (!isnan(last_temperature_) &&
+          fabs(t - last_temperature_) >= max_temp_delta_for_recalib_) {
+        if (now - last_recalibrate_ts_ < recalibrate_cooldown_sec_) {
+          log_event("recalibrate_cooldown_active");
+        } else {
+          log_event("temp_triggered_recalibration");
+          perform_recalibration(false);
+        }
+        last_temperature_ = t;
+        return;
       }
-      last_temperature_ = t;
-      return;
+      if (isnan(last_temperature_))
+        last_temperature_ = t;
     }
-    if (isnan(last_temperature_))
-      last_temperature_ = t;
   }
 
   if (idle_recalib_interval_sec_ > 0 &&
@@ -686,8 +689,10 @@ void Roode::sample_lux() {
     return;
   last_lux_sample_ts_ = now;
   float lux = lux_sensor_->state;
-  if (std::isnan(lux))
+  if (std::isnan(lux)) {
+    log_event("lux_sensor_error");
     return;
+  }
   lux_samples_.push_back(lux);
   size_t max_samples = lux_learning_window_sec_ / lux_sample_interval_sec_;
   while (lux_samples_.size() > max_samples)
@@ -710,8 +715,10 @@ bool Roode::should_suppress_event() {
   if (!use_light_sensor_ || lux_sensor_ == nullptr || lux_samples_.empty())
     return false;
   float lux = lux_sensor_->state;
-  if (std::isnan(lux))
+  if (std::isnan(lux)) {
+    log_event("lux_sensor_error");
     return false;
+  }
   uint32_t now = millis() / 1000;
   if (now - last_suppression_ts_ < suppression_window_sec_)
     return true;
@@ -747,7 +754,11 @@ void Roode::adjust_filtering() {
   if (!use_light_sensor_ || lux_sensor_ == nullptr)
     return;
   float lux = lux_sensor_->state;
-  if (std::isnan(lux) || lux_percentile95_ == 0)
+  if (std::isnan(lux)) {
+    log_event("lux_sensor_error");
+    return;
+  }
+  if (lux_percentile95_ == 0)
     return;
   uint8_t new_win = filter_window_;
   if (lux > lux_percentile95_ * 4)
@@ -767,11 +778,14 @@ void Roode::check_context_calibration() {
   if (manual_adjustment_count_ == 1)
     manual_adjust_window_start_ = now;
   if (manual_adjustment_count_ > 5 &&
-      now - manual_adjust_window_start_ <= 3600 && lux_sensor_ != nullptr &&
-      !std::isnan(lux_sensor_->state) && lux_sensor_->state > lux_percentile95_) {
-    log_event("manual_recalibrate_triggered");
-    perform_recalibration(false);
-    manual_adjustment_count_ = 0;
+      now - manual_adjust_window_start_ <= 3600 && lux_sensor_ != nullptr) {
+    if (std::isnan(lux_sensor_->state)) {
+      log_event("lux_sensor_error");
+    } else if (lux_sensor_->state > lux_percentile95_) {
+      log_event("manual_recalibrate_triggered");
+      perform_recalibration(false);
+      manual_adjustment_count_ = 0;
+    }
   }
   if (now - manual_adjust_window_start_ > 3600)
     manual_adjustment_count_ = 0;

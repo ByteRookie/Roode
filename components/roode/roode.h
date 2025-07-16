@@ -220,7 +220,7 @@ class Roode : public PollingComponent {
   uint8_t multicore_retry_count_{0};
   // Scheduled recalibration tracking
   uint32_t auto_recalibrate_interval_sec_{21600};
-  bool recalibrate_on_temp_change_{true};
+  bool recalibrate_on_temp_change_{false};
   uint8_t max_temp_delta_for_recalib_{8};
   uint32_t recalibrate_cooldown_sec_{1800};
   uint32_t last_recalibrate_ts_{0};
@@ -231,7 +231,7 @@ class Roode : public PollingComponent {
   bool use_light_sensor_{false};
   uint32_t lux_learning_window_sec_{86400};
   uint32_t lux_sample_interval_sec_{60};
-  bool use_sunrise_prediction_{true};
+  bool use_sunrise_prediction_{false};
   float latitude_{0};
   float longitude_{0};
   float alpha_{0.5f};

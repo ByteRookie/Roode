@@ -278,8 +278,17 @@ void Roode::loop() {
     // Skip execution from main loop
     return;
   }
+  uint32_t now = millis();
+  if (last_loop_update_ts_ != 0 && (now - last_loop_update_ts_ > 30000) &&
+      (now - last_sensor_restart_ts_ > 30000)) {
+    ESP_LOGW(TAG, "Sensor unresponsive >30s, restarting...");
+    restart_sensor();
+    last_sensor_restart_ts_ = now;
+  }
   unsigned long start = micros();
-  this->current_zone->readDistance(distanceSensor);
+  VL53L1_Error status = this->current_zone->readDistance(distanceSensor);
+  if (status == VL53L1_ERROR_NONE)
+    last_loop_update_ts_ = millis();
   bool zone_trig = current_zone->getMinDistance() < current_zone->threshold->max &&
                    current_zone->getMinDistance() > current_zone->threshold->min;
   if (!cpu_optimizations_active_ || zone_trig)
@@ -722,12 +731,26 @@ void Roode::publish_feature_list() {
   log_event(std::string("features_enabled: ") + feature_list);
 }
 
+void Roode::restart_sensor() {
+  distanceSensor->restart();
+}
+
 void Roode::sensor_task(void *param) {
   auto *self = static_cast<Roode *>(param);
   for (;;) {
     self->use_sensor_task_ = true;
+    uint32_t now = millis();
+    if (self->last_loop_update_ts_ != 0 &&
+        (now - self->last_loop_update_ts_ > 30000) &&
+        (now - self->last_sensor_restart_ts_ > 30000)) {
+      ESP_LOGW(TAG, "Sensor unresponsive >30s, restarting...");
+      self->restart_sensor();
+      self->last_sensor_restart_ts_ = now;
+    }
     unsigned long start = micros();
-    self->current_zone->readDistance(self->distanceSensor);
+    VL53L1_Error status = self->current_zone->readDistance(self->distanceSensor);
+    if (status == VL53L1_ERROR_NONE)
+      self->last_loop_update_ts_ = millis();
     bool zone_trig = self->current_zone->getMinDistance() < self->current_zone->threshold->max &&
                      self->current_zone->getMinDistance() > self->current_zone->threshold->min;
     if (!self->cpu_optimizations_active_ || zone_trig)

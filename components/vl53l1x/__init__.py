@@ -10,6 +10,7 @@ from esphome.const import (
     CONF_I2C,
     CONF_I2C_ID,
     CONF_INTERRUPT,
+    CONF_ADDRESS,
     CONF_OFFSET,
     CONF_PINS,
     CONF_TIMEOUT,
@@ -20,7 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 
 DEPENDENCIES = ["i2c"]
 AUTO_LOAD = ["i2c"]
-MULTI_CONF = False  # TODO enable when we support multiple addresses
+MULTI_CONF = True
 
 vl53l1x_ns = cg.esphome_ns.namespace("vl53l1x")
 VL53L1X = vl53l1x_ns.class_("VL53L1X", cg.Component)
@@ -30,6 +31,7 @@ CONF_CALIBRATION = "calibration"
 CONF_RANGING_MODE = "ranging"
 CONF_XSHUT = "xshut"
 CONF_XTALK = "crosstalk"
+CONF_SENSOR_ID = "sensor_id"
 
 Ranging = vl53l1x_ns.namespace("Ranging")
 RANGING_MODES = {
@@ -77,6 +79,7 @@ CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(VL53L1X),
+            cv.Optional(CONF_SENSOR_ID, default=1): cv.int_range(min=1, max=16),
             cv.Optional(
                 CONF_TIMEOUT, default="2s"
             ): cv.positive_time_period_milliseconds,
@@ -113,6 +116,8 @@ async def to_code(config: Dict):
     vl53l1x = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(vl53l1x, config)
     await i2c.register_i2c_device(vl53l1x, config)
+    cg.add(vl53l1x.set_sensor_id(config[CONF_SENSOR_ID]))
+    cg.add(vl53l1x.set_desired_address(config[CONF_ADDRESS]))
 
     # If i2c frequency has not been explicitly set, then increase it to our recommended
     i2c_id = config[CONF_I2C_ID]

@@ -259,7 +259,7 @@ roode:
 | [Zone Options](#zone-options) | Per-zone overrides |
 
 
-#### VL53L1X Options
+#### VL53L1X Options · [Back to list](#configuration-reference)
 
 Minimal example
 
@@ -296,7 +296,7 @@ vl53l1x:
 | `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration |
 | `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Only adjust with ST's calibration output |
 
-#### General Options
+#### General Options · [Back to list](#configuration-reference)
 
 Minimal example
 
@@ -331,7 +331,7 @@ roode:
 | `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing |
 | `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur |
 
-#### Recalibration Options
+#### Recalibration Options · [Back to list](#configuration-reference)
 
 Minimal example
 
@@ -359,7 +359,7 @@ roode:
 | `roode.recalibrate_cooldown` | Optional | `30min` | Minimum time between automatic recalibrations | Multiple triggers in short time | Extend to prevent loops or shorten for responsiveness |
 | `roode.idle_recalibrate_interval` | Optional | `0` | Recalibrate after long idle period | Sensor rarely triggered | Set long interval like 12h to combat slow drift |
 
-#### Ambient Light Learning & Light Control
+#### Ambient Light Learning & Light Control · [Back to list](#configuration-reference)
 
 Minimal example
 
@@ -400,7 +400,7 @@ roode:
 | `roode.combined_multiplier` | Optional | `3.0` | Limit when both time & lux match | Balances lux and schedule inputs | Increase to enforce stricter suppression |
 | `roode.suppression_window` | Optional | `30min` | Ignore repeated light spikes | Sudden sunlight bursts | Reduce for indoor lights |
 
-#### Zone Options
+#### Zone Options · [Back to list](#configuration-reference)
 
 Minimal example
 
@@ -699,7 +699,7 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | [Light control](#light-control) | Uses lux or location data to suppress sunlight spikes |
 | [Temp control](#temp-control) | Enables recalibration on significant temperature change |
 
-### Interrupt vs Polling
+### Interrupt vs Polling · [Back to list](#features)
 
 Roode prefers the interrupt pin for efficient updates. When `interrupt` is defined and validated, the VL53L1X notifies the MCU whenever a new sample is ready. If the INT pin is missing or stops working, Roode falls back to a 10&nbsp;ms polling loop and tries interrupts again every 30&nbsp;min. Polling also acts as a safety net during startup.
 
@@ -711,11 +711,11 @@ Roode prefers the interrupt pin for efficient updates. When `interrupt` is defin
 | Interrupt unreliable | ⛔️ | ✅ |
 | Low-power mode handling | ⛔️ | ✅ |
 
-### Single vs Dual Core
+### Single vs Dual Core · [Back to list](#features)
 
 On ESP32 targets Roode tries to run the sensor loop on the second CPU core so Wi‑Fi and other ESPHome tasks stay responsive. If the task fails to start or when running on an ESP8266 the code automatically falls back to a single‑core loop. You can force single‑core mode with `force_single_core: true`.
 
-### Sampling and Filtering
+### Sampling and Filtering · [Back to list](#features)
 
 Roode smooths distance readings in two stages. The driver first averages multiple raw measurements using the `sampling` option. Each zone then applies a filter across the last few averaged values controlled by `filter_mode` and `filter_window`.
 
@@ -741,7 +741,7 @@ Raising `sampling` makes each reading steadier while `filter_window` dictates ho
 
 Filter mode tips: use `median` to ignore spikes or `percentile10` for gradual noise.
 
-### Quick Tips Summary
+### Quick Tips Summary · [Back to list](#features)
 
 The two settings work together: a window of `3` with `sampling: 2` means each reported value reflects six raw readings. Raise both when sunlight or reflections cause false triggers.
 
@@ -761,7 +761,7 @@ The two settings work together: a window of `3` with `sampling: 2` means each re
 | `5+` | Suppress false triggers | Laggy detection |
 | `1` | Maximum responsiveness | No noise rejection |
 
-### Scheduled Recalibration
+### Scheduled Recalibration · [Back to list](#features)
 
 Roode automatically runs the calibration routine on a schedule and when
 certain conditions are met.  The default interval is every **6&nbsp;h** and
@@ -775,7 +775,7 @@ temperature-based trigger disables itself and retries after
 The time-based schedule works on its own—you can disable temperature or idle
 triggers while still using the interval timer.
 
-### Ambient Light Learning & Sunlight Suppression
+### Ambient Light Learning & Sunlight Suppression · [Back to list](#features)
 
 When a light sensor is provided Roode learns the typical lux pattern over a
 24&nbsp;h window.  Sudden spikes beyond the learned 95&percnt; percentile are
@@ -798,39 +798,39 @@ one or both depending on available sensors.
 | Time-only (no lux) | ❌             | –                                          | –                           |
 | Lux + time window  | ✅ (strongest) | `max(dynamic_multiplier, time_multiplier)` | `sunlight_suppressed_event` |
 
-### CPU Resilience & Multicore
+### CPU Resilience & Multicore · [Back to list](#features)
 
 On multi‑core ESP32s Roode attempts to run the sensor loop on the second core
 for improved responsiveness.  If initialization fails it logs
 `dual_core_fallback` and retries every 5&nbsp;min until it succeeds, logging
 `dual_core_recovered` when normal operation resumes.
 
-### INT Pin Robustness
+### INT Pin Robustness · [Back to list](#features)
 
 Roode monitors the interrupt pin for missed events.  After three interrupt
 fallbacks within 30&nbsp;min it temporarily switches back to polling and resets
 the sensor via the XSHUT pin.
 
-### Context-Aware Calibration
+### Context-Aware Calibration · [Back to list](#features)
 
 Repeated manual adjustments are tracked.  If more than five adjustments occur
 within an hour while the lux level is high Roode performs a soft recalibration
 and logs `manual_recalibrate_triggered`.
 
-### Adaptive Filtering
+### Adaptive Filtering · [Back to list](#features)
 
 The filter window dynamically expands when lux spikes four to six times above
 the learned maximum and returns to the default size once lighting stabilises.
 This change is recorded with the `filter_window_changed` log event.
 
-### Light Control
+### Light Control · [Back to list](#features)
 
 Lux readings or sunrise predictions can suppress events when direct light would
 cause false counts. `light_control` reports the active mode as `lux`,
 `location` or `both` depending on which inputs are enabled. If neither the light
 sensor nor sunrise prediction is configured the offset value stays `0`.
 
-### Temp Control
+### Temp Control · [Back to list](#features)
 
 The counter can recalibrate when the ambient temperature changes drastically.
 Temperature-based recalibration is optional—scheduled recalibration works even

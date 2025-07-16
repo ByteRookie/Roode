@@ -68,8 +68,7 @@ vl53l1x:
       mode: INPUT_PULLUP
 roode:
   id: roode_platform
-  # I removed the { size: 1 } option here since it was redundant.
-  # Can always add back later if we have more sampling paramaters.
+  # --- General Options ---
   sampling: 2
   # defaults for both zones
   roi:
@@ -78,10 +77,15 @@ roode:
   detection_thresholds: # defaults for both zones. These also default to 0% & 85% as previously done.
     # min: 234mm # absolute distance
     max: 85% # percent based on idle distance
+
+  # --- Recalibration Options ---
   auto_recalibrate_interval: 6h
   recalibrate_on_temp_change: false
   max_temp_delta_for_recalib: 8
   recalibrate_cooldown: 30min
+  idle_recalibrate_interval: 12h
+
+  # --- Ambient Light Learning & Light Control ---
   use_light_sensor: false
   lux_learning_window: 24h
   lux_sample_interval: 1min
@@ -94,11 +98,12 @@ roode:
   time_multiplier: 1.5
   combined_multiplier: 3.0
   suppression_window: 30min
-  idle_recalibrate_interval: 12h
+
+  # --- Zone Options ---
   zones:
     invert: true
     entry:
-      roi: auto 
+      roi: auto
     exit:
       # roi:
       #   height: 4

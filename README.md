@@ -414,6 +414,9 @@ text_sensor:
     entry_exit_event:
       name: $friendly_name last direction
   - platform: roode
+    sensor_status:
+      name: $friendly_name sensor status text
+  - platform: roode
     enabled_features:
       name: $friendly_name enabled features
       ## This sensor is a text_sensor that lists all enabled features
@@ -438,6 +441,35 @@ flash:16MB
 calibration_value:1399
 calibration:6:01PM
 ```
+
+#### Sensor Reference
+
+| Name | Type | Description |
+| ---- | ---- | ----------- |
+| `people_counter` | number | Adjustable tally of detected people |
+| `presence_sensor` | binary_sensor | True when presence is detected |
+| `sensor_xshut_state` | binary_sensor | State of the XSHUT pin |
+| `distance_entry` | sensor | Distance measured for entry zone |
+| `distance_exit` | sensor | Distance measured for exit zone |
+| `max_threshold_entry` | sensor | Entry zone maximum threshold |
+| `max_threshold_exit` | sensor | Exit zone maximum threshold |
+| `min_threshold_entry` | sensor | Entry zone minimum threshold |
+| `min_threshold_exit` | sensor | Exit zone minimum threshold |
+| `roi_height_entry` | sensor | Entry zone ROI height in pixels |
+| `roi_width_entry` | sensor | Entry zone ROI width in pixels |
+| `roi_height_exit` | sensor | Exit zone ROI height in pixels |
+| `roi_width_exit` | sensor | Exit zone ROI width in pixels |
+| `loop_time` | sensor | Average loop execution time |
+| `cpu_usage` | sensor | MCU CPU usage percent |
+| `ram_free` | sensor | Free RAM percent |
+| `flash_free` | sensor | Free flash storage percent |
+| `sensor_status` | sensor | Numeric status code from VL53L1X |
+| `interrupt_status` | sensor | Interrupt pin state |
+| `manual_adjustment_count` | sensor | Count of manual people-count corrections |
+| `version` | text_sensor | Firmware version string |
+| `entry_exit_event` | text_sensor | Last detected direction |
+| `sensor_status` (text) | text_sensor | Human-readable sensor status |
+| `enabled_features` | text_sensor | List of enabled runtime features |
 
 ### Threshold distance
 
@@ -594,6 +626,8 @@ Optional sensors provide insight into Roode's operation:
 - `sensor_status` and `interrupt_status` show the current hardware state. The
   status sensor reports `ok`, `timeout`, `reinitializing`, `error` or `offline`
   so automations can react to issues.
+- `version`, `entry_exit_event` and `enabled_features` provide diagnostic text,
+  and a text-sensor `sensor_status` exposes the same status string.
 - ROI size and threshold sensors allow live tuning of each zone.
 - `manual_adjustment_count` records people-count corrections.
 

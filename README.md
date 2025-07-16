@@ -373,23 +373,26 @@ text_sensor:
 
 ### Threshold distance
 
-Another crucial choice is the one corresponding to the threshold. Indeed a movement is detected whenever the distance read by the sensor is below this value. The code contains a vector as threshold, as one (as myself) might need a different threshold for each zone.
+A crossing is detected when the measured distance for a zone falls between its
+configured minimum and maximum values. Roode determines starting thresholds
+automatically: after powering up, leave the area clear for about 10&nbsp;seconds so
+the idle distance can be measured. The default maximum threshold is 80&nbsp;% of this
+resting value.
 
-The threshold is automatically calculated by the sensor. To do so it is necessary to position the sensor and, after turning it on, wait for 10 seconds without passing under it. After this time, the average of the measures for each zone will be computed and the threshold for each ROI will correspond to 80% of the average value. Also the value of 80% can be modified in the code, by editing the variable `max_threshold_percentage` and `min_threshold_percentage`.
-
-If you install the sensor e.g 20cm over a door you don't want to count the door open and closing. In this case you should set the `min_threshold_percentage` to about `10`.
+To fine-tune detection, adjust the `detection_thresholds` option in your YAML or
+call the `recalibrate` service to re-measure the idle distance. For example, if
+the sensor sits about 20&nbsp;cm above a door you might ignore the door leaf by
+setting `detection_thresholds.min: 10%`.
 
 Example:
 
 ```
-Mounting height:    2200mm
-Door height:        2000mm
-Person height:      1800mm
-max_threshold_percentage: 80% = 1760
-min_threshold_percentage: 10% = 200
-
-All distances smaller than 200mm and greater than 1760mm will be ignored.
+detection_thresholds:
+  min: 10%
+  max: 80%
 ```
+
+See the [calibration instructions](calibration/) for further details.
 
 ## Algorithm
 

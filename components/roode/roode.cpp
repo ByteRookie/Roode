@@ -18,17 +18,16 @@ void Roode::log_event(const std::string &msg) {
       return;
     if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0)
       return;
-    if (msg == "xshut_toggled" || msg == "xshut_toggled_on" || msg == "xshut_toggled_off" ||
-        msg == "xshut_pulse_off" || msg == "xshut_reinitialize" ||
-        msg == "sensor.recovered_via_xshut" || msg.rfind("xshut_sensor_", 0) == 0 ||
+    if (msg == "xshut_toggled" || msg == "xshut_toggled_on" || msg == "xshut_toggled_off" || msg == "xshut_pulse_off" ||
+        msg == "xshut_reinitialize" || msg == "sensor.recovered_via_xshut" || msg.rfind("xshut_sensor_", 0) == 0 ||
         msg.rfind("xshut_pulse_off_sensor_", 0) == 0 || msg.rfind("xshut_reinitialize_sensor_", 0) == 0 ||
         (msg.rfind("sensor_", 0) == 0 && msg.find(".recovered_via_xshut") != std::string::npos))
       return;
   }
 
   static uint32_t last_int_log = 0;
-  if (msg == "interrupt_fallback" || msg == "interrupt_fallback_polling" ||
-      msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0) {
+  if (msg == "interrupt_fallback" || msg == "interrupt_fallback_polling" || msg == "int_pin_missed" ||
+      msg.rfind("int_pin_missed_sensor_", 0) == 0) {
     uint32_t now = millis();
     if (last_int_log != 0 && (now - last_int_log) < 5000)
       return;
@@ -101,9 +100,13 @@ void Roode::log_event(const std::string &msg) {
   std::string colored = std::string(color) + out + "\033[0m";
   ESP_LOGI(TAG, "%s", colored.c_str());
   if (instance_ != nullptr) {
-    if (msg == "dual_core_success" || msg == "fallback_single_core" ||
-        msg == "force_single_core" || msg == "interrupt_fallback_polling" ||
-        msg == "interrupt_recovered") {
+    if (msg.find("reinitialize") != std::string::npos) {
+      instance_->update_status_text("reinitializing");
+    } else if (msg.find("recovered_via_xshut") != std::string::npos) {
+      instance_->update_status_text("ok");
+    }
+    if (msg == "dual_core_success" || msg == "fallback_single_core" || msg == "force_single_core" ||
+        msg == "interrupt_fallback_polling" || msg == "interrupt_recovered") {
       instance_->publish_feature_list();
     }
   }
@@ -128,9 +131,9 @@ void Roode::setup() {
   }
   ESP_LOGI(SETUP, "Using sampling with sampling size: %d", samples);
 
-
   if (this->distanceSensor->is_failed()) {
     this->mark_failed();
+    update_status_text("offline");
     ESP_LOGE(TAG, "Roode cannot be setup without a valid VL53L1X sensor");
     return;
   }
@@ -155,7 +158,7 @@ void Roode::setup() {
         int valid_count = 0;
         for (int s = 0; s < 5; s++) {
           z->readDistance(distanceSensor);
-          if (abs((int)z->getDistance() - (int)z->threshold->idle) < (z->threshold->idle * 0.1))
+          if (abs((int) z->getDistance() - (int) z->threshold->idle) < (z->threshold->idle * 0.1))
             valid_count++;
         }
         if (valid_count < 5) {
@@ -240,6 +243,7 @@ void Roode::setup() {
     expected_counter_ = people_counter->state;
 
   publish_feature_list();
+  update_status_text("ok");
 }
 
 void Roode::update() {
@@ -308,18 +312,27 @@ void Roode::loop() {
 
 bool Roode::handle_sensor_status() {
   bool check_status = false;
-  if (last_sensor_status != sensor_status && sensor_status == VL53L1_ERROR_NONE) {
-    if (status_sensor != nullptr) {
-      status_sensor->publish_state(sensor_status);
+  std::string text_state;
+  if (distanceSensor->is_failed()) {
+    text_state = "offline";
+  } else if (sensor_status == VL53L1_ERROR_NONE) {
+    text_state = "ok";
+    if (last_sensor_status != sensor_status) {
+      if (status_sensor != nullptr)
+        status_sensor->publish_state(sensor_status);
+      check_status = true;
     }
-    check_status = true;
-  }
-  if (sensor_status < 28 && sensor_status != VL53L1_ERROR_NONE) {
-    ESP_LOGE(TAG, "Ranging failed with an error. status: %d", sensor_status);
-    status_sensor->publish_state(sensor_status);
-    check_status = false;
+  } else if (sensor_status == VL53L1_ERROR_TIME_OUT) {
+    text_state = "timeout";
+    if (status_sensor != nullptr)
+      status_sensor->publish_state(sensor_status);
+  } else {
+    text_state = "error";
+    if (status_sensor != nullptr)
+      status_sensor->publish_state(sensor_status);
   }
 
+  update_status_text(text_state);
   last_sensor_status = sensor_status;
   sensor_status = VL53L1_ERROR_NONE;
   return check_status;
@@ -341,8 +354,8 @@ void Roode::path_tracking(Zone *zone) {
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
 
-  ESP_LOGV(TAG, "Zone %d distance %u (min=%u max=%u)", zone->id, zone->getMinDistance(),
-           zone->threshold->min, zone->threshold->max);
+  ESP_LOGV(TAG, "Zone %d distance %u (min=%u max=%u)", zone->id, zone->getMinDistance(), zone->threshold->min,
+           zone->threshold->max);
 
   // PathTrack algorithm
   if (zone->getMinDistance() < zone->threshold->max && zone->getMinDistance() > zone->threshold->min) {
@@ -357,8 +370,7 @@ void Roode::path_tracking(Zone *zone) {
   }
   if (CurrentZoneStatus == NOBODY) {
     zone_triggered_start_[zone->id] = 0;
-  } else if (zone_triggered_start_[zone->id] != 0 &&
-             millis() - zone_triggered_start_[zone->id] >= 10000 &&
+  } else if (zone_triggered_start_[zone->id] != 0 && millis() - zone_triggered_start_[zone->id] >= 10000 &&
              millis() - last_valid_crossing_ts_ >= 120000) {
     run_zone_calibration(zone->id);
     fail_safe_triggered_ = true;
@@ -483,8 +495,7 @@ void Roode::recalibration() { calibrate_zones(); }
 void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;
-  z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195)
-                             : (orientation_ == Parallel ? 231 : 60));
+  z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
   z->calibrateThreshold(distanceSensor, 50);
   // Recalculate ROI sizes so thresholds remain consistent
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
@@ -574,7 +585,7 @@ void Roode::update_metrics() {
 }
 
 const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_distance,
-                                                uint16_t average_exit_zone_distance) {
+                                                 uint16_t average_exit_zone_distance) {
   uint16_t min = average_entry_zone_distance < average_exit_zone_distance ? average_entry_zone_distance
                                                                           : average_exit_zone_distance;
   uint16_t max = average_entry_zone_distance > average_exit_zone_distance ? average_entry_zone_distance
@@ -696,8 +707,7 @@ void Roode::publish_feature_list() {
     int hour = tm_time.tm_hour % 12;
     if (hour == 0)
       hour = 12;
-    snprintf(buf, sizeof(buf), "%d:%02d%cM", hour, tm_time.tm_min,
-             tm_time.tm_hour >= 12 ? 'P' : 'A');
+    snprintf(buf, sizeof(buf), "%d:%02d%cM", hour, tm_time.tm_min, tm_time.tm_hour >= 12 ? 'P' : 'A');
     return std::string(buf);
   };
 
@@ -716,8 +726,7 @@ void Roode::publish_feature_list() {
   features.push_back({"ram", fmt_bytes(ESP.getHeapSize())});
   features.push_back({"flash", fmt_bytes(ESP.getFlashChipSize())});
   features.push_back({"calibration_value", std::to_string(entry->threshold->idle)});
-  uint32_t last_cal_epoch =
-      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  uint32_t last_cal_epoch = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   features.push_back({"calibration", fmt_time(last_cal_epoch)});
 
   std::string feature_list;
@@ -731,8 +740,16 @@ void Roode::publish_feature_list() {
   log_event(std::string("features_enabled: ") + feature_list);
 }
 
+
+void Roode::update_status_text(const std::string &status) {
+  if (status_text_sensor != nullptr && status != last_status_text_) {
+    status_text_sensor->publish_state(status);
+    last_status_text_ = status;
+  }
+
 void Roode::restart_sensor() {
   distanceSensor->restart();
+
 }
 
 void Roode::sensor_task(void *param) {

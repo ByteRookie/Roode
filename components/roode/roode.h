@@ -110,6 +110,7 @@ class Roode : public PollingComponent {
   void set_sensor_xshut_state_binary_sensor(binary_sensor::BinarySensor *sens) { xshut_state_binary_sensor = sens; }
   void set_interrupt_status_sensor(sensor::Sensor *sens) { interrupt_status_sensor = sens; }
   void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
+  void set_sensor_status_text_sensor(text_sensor::TextSensor *sensor_) { status_text_sensor = sensor_; }
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
@@ -161,6 +162,7 @@ class Roode : public PollingComponent {
   text_sensor::TextSensor *version_sensor{nullptr};
   text_sensor::TextSensor *entry_exit_event_sensor{nullptr};
   text_sensor::TextSensor *enabled_features_sensor{nullptr};
+  text_sensor::TextSensor *status_text_sensor{nullptr};
   sensor::Sensor *manual_adjustment_sensor{nullptr};
   sensor::Sensor *interrupt_status_sensor{nullptr};
 
@@ -198,10 +200,13 @@ class Roode : public PollingComponent {
   unsigned long last_valid_crossing_ts_{0};
   unsigned long zone_triggered_start_[2]{0, 0};
 
+  std::string last_status_text_{};
+
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
   void path_tracking(Zone *zone);
   bool handle_sensor_status();
+  void update_status_text(const std::string &status);
   void calibrateDistance();
   void calibrate_zones();
   void publish_feature_list();

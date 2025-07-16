@@ -56,6 +56,8 @@ A people counter that works with any smart home system that supports ESPHome/MQT
   SDA_PIN 4 (ESP8266) or 21 (ESP32)
   SCL_PIN 5 (ESP8266) or 22 (ESP32)
 
+For setup details with Home Assistant, see the [Home Assistant integration](home_assistant.md).
+
 ## Wiring
 
 The sensors from Pololu, Adafruit and the GY-53 can also be connected to the 5v pin (VIN) as they have a voltage regulator.

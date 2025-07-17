@@ -306,10 +306,10 @@ void Roode::setup() {
   if (people_counter != nullptr)
     expected_counter_ = people_counter->state;
 
-  publish_feature_list();
   last_recalibrate_ts_ = static_cast<uint32_t>(time(nullptr));
   last_auto_recalibrate_ts_ = last_recalibrate_ts_;
   update_sun_times();
+  publish_feature_list();
 }
 
 void Roode::update() {
@@ -976,6 +976,7 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
 }
 
 void Roode::publish_feature_list() {
+  update_sun_times();
   auto fmt_bytes = [](uint32_t bytes) {
     char buf[16];
     if (bytes >= 1024UL * 1024UL * 1024UL)
@@ -1008,8 +1009,8 @@ void Roode::publish_feature_list() {
     int hour = tm_time.tm_hour % 12;
     if (hour == 0)
       hour = 12;
-    snprintf(buf, sizeof(buf), "%d:%02d%cM%s", hour, tm_time.tm_min,
-             tm_time.tm_hour >= 12 ? 'P' : 'A', use_utc ? " (UTC)" : "");
+    snprintf(buf, sizeof(buf), "%d:%02d%cM%s", hour, tm_time.tm_min, tm_time.tm_hour >= 12 ? 'P' : 'A',
+             use_utc ? " (UTC)" : "");
     return std::string(buf);
   };
 
@@ -1053,6 +1054,47 @@ void Roode::publish_feature_list() {
     features.push_back({"schedule_calibration", fmt_time(next_cal)});
   } else {
     features.push_back({"schedule_calibration", "disabled"});
+  }
+
+  if (use_light_sensor_ && lux_sensor_ != nullptr) {
+    size_t max_samples = lux_learning_window_sec_ / lux_sample_interval_sec_;
+    size_t cur_samples = lux_samples_.size();
+    if (max_samples == 0) {
+      features.push_back({"buffer", "error"});
+    } else {
+      char buf_perc[32];
+      float pct = (cur_samples * 100.0f) / max_samples;
+      snprintf(buf_perc, sizeof(buf_perc), "%.0f%% (%u/%u)", pct, (unsigned) cur_samples, (unsigned) max_samples);
+      features.push_back({"buffer", buf_perc});
+    }
+  } else {
+    features.push_back({"buffer", "error"});
+  }
+
+  if (use_sunrise_prediction_) {
+    time_t now = time(nullptr);
+    struct tm tm_time;
+    localtime_r(&now, &tm_time);
+    int sec_of_day = tm_time.tm_hour * 3600 + tm_time.tm_min * 60 + tm_time.tm_sec;
+    time_t midnight = now - sec_of_day;
+    uint32_t event_sec = 0;
+    bool next_is_sunrise = false;
+    if (sec_of_day < sunrise_sec_) {
+      event_sec = sunrise_sec_;
+      next_is_sunrise = true;
+    } else if (sec_of_day < sunset_sec_) {
+      event_sec = sunset_sec_;
+    } else {
+      event_sec = sunrise_sec_ + 86400;
+      next_is_sunrise = true;
+    }
+    time_t event_time = midnight + event_sec;
+    char event_buf[32];
+    snprintf(event_buf, sizeof(event_buf), "%s %s", next_is_sunrise ? "sunrise" : "sunset",
+             fmt_time(event_time).c_str());
+    features.push_back({"sun_event", event_buf});
+  } else {
+    features.push_back({"sun_event", "none"});
   }
 
   std::string feature_list;

@@ -353,13 +353,27 @@ number:
       name: People Count
     sampling_size:
       name: Sampling Size
+    filter_mode:
+      name: Filter Mode
+    filter_window:
+      name: Filter Window
+    entry_min_threshold:
+      name: Entry Min %
+    entry_max_threshold:
+      name: Entry Max %
+    exit_min_threshold:
+      name: Exit Min %
+    exit_max_threshold:
+      name: Exit Max %
 switch:
   - platform: roode
     log_fallback_events:
       name: Log Fallback Events
+    invert_direction:
+      name: Invert Direction
 ```
 
-The people counter value, sampling size, and logging switch can now be adjusted via Home Assistant without reflashing.
+The people counter value, sampling size, filter mode, filter window, detection thresholds and switches can now be adjusted via Home Assistant without reflashing.
 All entities are created automatically when the component is used.
 
 #### Other sensors available

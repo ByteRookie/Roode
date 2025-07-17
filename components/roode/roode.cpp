@@ -307,8 +307,22 @@ void Roode::setup() {
     expected_counter_ = people_counter->state;
   if (sampling_size_number != nullptr)
     sampling_size_number->publish_state(samples);
+  if (filter_mode_number != nullptr)
+    filter_mode_number->publish_state(filter_mode_);
+  if (filter_window_number != nullptr)
+    filter_window_number->publish_state(filter_window_);
+  if (entry_min_threshold_number != nullptr && entry->threshold->min_percentage.has_value())
+    entry_min_threshold_number->publish_state(*entry->threshold->min_percentage);
+  if (entry_max_threshold_number != nullptr && entry->threshold->max_percentage.has_value())
+    entry_max_threshold_number->publish_state(*entry->threshold->max_percentage);
+  if (exit_min_threshold_number != nullptr && exit->threshold->min_percentage.has_value())
+    exit_min_threshold_number->publish_state(*exit->threshold->min_percentage);
+  if (exit_max_threshold_number != nullptr && exit->threshold->max_percentage.has_value())
+    exit_max_threshold_number->publish_state(*exit->threshold->max_percentage);
   if (log_fallback_switch_ != nullptr)
     log_fallback_switch_->publish_state(log_fallback_events_);
+  if (invert_direction_switch_ != nullptr)
+    invert_direction_switch_->publish_state(invert_direction_);
 
   publish_feature_list();
   last_recalibrate_ts_ = static_cast<uint32_t>(time(nullptr));
@@ -337,9 +351,33 @@ void Roode::update() {
       log_fallback_switch_->state != log_fallback_events_) {
     set_log_fallback_events(log_fallback_switch_->state);
   }
+  if (invert_direction_switch_ != nullptr &&
+      invert_direction_switch_->state != invert_direction_) {
+    set_invert_direction(invert_direction_switch_->state);
+  }
   if (sampling_size_number != nullptr &&
       fabs(sampling_size_number->state - samples) > 0.001f) {
     set_sampling_size(static_cast<uint8_t>(sampling_size_number->state));
+  }
+  if (filter_mode_number != nullptr &&
+      fabs(filter_mode_number->state - filter_mode_) > 0.001f) {
+    set_filter_mode(static_cast<FilterMode>(static_cast<int>(filter_mode_number->state)));
+  }
+  if (filter_window_number != nullptr &&
+      fabs(filter_window_number->state - filter_window_) > 0.001f) {
+    set_filter_window(static_cast<uint8_t>(filter_window_number->state));
+  }
+  if (entry_min_threshold_number != nullptr && entry_max_threshold_number != nullptr &&
+      (fabs(entry_min_threshold_number->state - entry->threshold->min_percentage.value_or(0)) > 0.001f ||
+       fabs(entry_max_threshold_number->state - entry->threshold->max_percentage.value_or(0)) > 0.001f)) {
+    set_entry_threshold_percentages(static_cast<uint8_t>(entry_min_threshold_number->state),
+                                    static_cast<uint8_t>(entry_max_threshold_number->state));
+  }
+  if (exit_min_threshold_number != nullptr && exit_max_threshold_number != nullptr &&
+      (fabs(exit_min_threshold_number->state - exit->threshold->min_percentage.value_or(0)) > 0.001f ||
+       fabs(exit_max_threshold_number->state - exit->threshold->max_percentage.value_or(0)) > 0.001f)) {
+    set_exit_threshold_percentages(static_cast<uint8_t>(exit_min_threshold_number->state),
+                                   static_cast<uint8_t>(exit_max_threshold_number->state));
   }
   if (people_counter != nullptr && fabs(people_counter->state - expected_counter_) > 0.001f) {
     int diff = (int) roundf(people_counter->state - expected_counter_);

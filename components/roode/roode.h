@@ -118,6 +118,13 @@ class Roode : public PollingComponent {
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_log_fallback_switch(switch_::Switch *sw) { log_fallback_switch_ = sw; }
+  void set_invert_direction_switch(switch_::Switch *sw) { invert_direction_switch_ = sw; }
+  void set_filter_window_number(number::Number *num) { filter_window_number = num; }
+  void set_filter_mode_number(number::Number *num) { filter_mode_number = num; }
+  void set_entry_min_threshold_number(number::Number *num) { entry_min_threshold_number = num; }
+  void set_entry_max_threshold_number(number::Number *num) { entry_max_threshold_number = num; }
+  void set_exit_min_threshold_number(number::Number *num) { exit_min_threshold_number = num; }
+  void set_exit_max_threshold_number(number::Number *num) { exit_max_threshold_number = num; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
   void set_auto_recalibrate_interval(uint32_t seconds) { auto_recalibrate_interval_sec_ = seconds; }
   void set_recalibrate_on_temp_change(bool val) { recalibrate_on_temp_change_ = val; }
@@ -181,7 +188,14 @@ class Roode : public PollingComponent {
   sensor::Sensor *distance_exit{nullptr};
   number::Number *people_counter{nullptr};
   number::Number *sampling_size_number{nullptr};
+  number::Number *filter_mode_number{nullptr};
+  number::Number *filter_window_number{nullptr};
+  number::Number *entry_min_threshold_number{nullptr};
+  number::Number *entry_max_threshold_number{nullptr};
+  number::Number *exit_min_threshold_number{nullptr};
+  number::Number *exit_max_threshold_number{nullptr};
   switch_::Switch *log_fallback_switch_{nullptr};
+  switch_::Switch *invert_direction_switch_{nullptr};
   sensor::Sensor *max_threshold_entry_sensor{nullptr};
   sensor::Sensor *max_threshold_exit_sensor{nullptr};
   sensor::Sensor *min_threshold_entry_sensor{nullptr};

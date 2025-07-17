@@ -110,9 +110,7 @@ class Roode : public PollingComponent {
   void set_xshut_state_binary_sensor(binary_sensor::BinarySensor *sens) { xshut_state_binary_sensor = sens; }
   void set_sensor_xshut_state_binary_sensor(binary_sensor::BinarySensor *sens) { xshut_state_binary_sensor = sens; }
   void set_interrupt_status_sensor(sensor::Sensor *sens) { interrupt_status_sensor = sens; }
-  void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) {
-    enabled_features_sensor = sensor_;
-  }
+  void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
@@ -128,6 +126,7 @@ class Roode : public PollingComponent {
   void set_use_sunrise_prediction(bool val) { use_sunrise_prediction_ = val; }
   void set_latitude(float val) { latitude_ = val; }
   void set_longitude(float val) { longitude_ = val; }
+  void set_sun_entity_id(const std::string &id) { sun_entity_id_ = id; }
   void set_alpha(float val) { alpha_ = val; }
   void set_base_multiplier(float val) { base_multiplier_ = val; }
   void set_max_multiplier(float val) { max_multiplier_ = val; }
@@ -161,6 +160,7 @@ class Roode : public PollingComponent {
   bool should_suppress_event();
   void adjust_filtering();
   void update_sun_times();
+  bool fetch_sun_times_from_ha(int &rise, int &set);
   bool validate_lux_sensor();
   bool validate_temperature_sensor();
   void check_context_calibration();
@@ -195,7 +195,6 @@ class Roode : public PollingComponent {
   text_sensor::TextSensor *enabled_features_sensor{nullptr};
   sensor::Sensor *manual_adjustment_sensor{nullptr};
   sensor::Sensor *interrupt_status_sensor{nullptr};
-
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;
@@ -243,6 +242,7 @@ class Roode : public PollingComponent {
   bool use_sunrise_prediction_{false};
   float latitude_{0};
   float longitude_{0};
+  std::string sun_entity_id_{"sun.sun"};
   float alpha_{0.5f};
   float base_multiplier_{1.0f};
   float max_multiplier_{4.0f};

@@ -324,6 +324,7 @@ reflections cause false triggers.
 | `roode.filter_mode` & `roode.filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows | `filter_mode: min`<br>`filter_window: 5` | `filter_mode: percentile10`<br>`filter_window: 9` |
 | `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | `log_fallback_events: false` | `log_fallback_events: true` |
 | `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: false` | `force_single_core: true` |
+| `roode.sun_entity_id` | Optional | `sun.sun` | Use Home Assistant sun entity for sunrise/sunset | No coordinates available | Change if using a custom sun entity | *(not set)* | `sun_entity_id: sun.custom` |
 | `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
 | `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
 
@@ -591,6 +592,7 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Persistent calibration | Calibration data can persist in flash across reboots |
 | Scheduled recalibration | Periodically or temperature-based recalibration of thresholds |
 | Ambient light suppression | Learns lux levels with optional sunrise prediction |
+| Home Assistant sun fallback | Uses `sun.sun` when latitude/longitude omitted |
 | Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
 | Filtering options | Median/percentile filters smooth jitter with adjustable window |
 | FSM timeouts | Resets the state machine when a transition stalls |

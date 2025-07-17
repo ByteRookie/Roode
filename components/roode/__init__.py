@@ -61,6 +61,7 @@ CONF_LUX_SAMPLE_INTERVAL = "lux_sample_interval"
 CONF_USE_SUNRISE_PREDICTION = "use_sunrise_prediction"
 CONF_LATITUDE = "latitude"
 CONF_LONGITUDE = "longitude"
+CONF_SUN_ENTITY_ID = "sun_entity_id"
 CONF_ALPHA = "alpha"
 CONF_BASE_MULTIPLIER = "base_multiplier"
 CONF_MAX_MULTIPLIER = "max_multiplier"
@@ -109,21 +110,28 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ROI, default={}): ROI_SCHEMA,
         cv.Optional(CONF_DETECTION_THRESHOLDS, default={}): THRESHOLDS_SCHEMA,
         cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=False): cv.boolean,
-        cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(FILTER_MODES, upper=False),
+        cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(
+            FILTER_MODES, upper=False
+        ),
         cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_LOG_FALLBACK, default=False): cv.boolean,
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
         # Scheduled recalibration options
-        cv.Optional(CONF_AUTO_RECALIBRATE_INTERVAL, default="6h"): cv.positive_time_period,
+        cv.Optional(
+            CONF_AUTO_RECALIBRATE_INTERVAL, default="6h"
+        ): cv.positive_time_period,
         cv.Optional(CONF_RECALIBRATE_ON_TEMP_CHANGE, default=False): cv.boolean,
         cv.Optional(CONF_MAX_TEMP_DELTA_FOR_RECALIB, default=8): cv.int_,
-        cv.Optional(CONF_RECALIBRATE_COOLDOWN, default="30min"): cv.positive_time_period,
+        cv.Optional(
+            CONF_RECALIBRATE_COOLDOWN, default="30min"
+        ): cv.positive_time_period,
         cv.Optional(CONF_USE_LIGHT_SENSOR, default=False): cv.boolean,
         cv.Optional(CONF_LUX_LEARNING_WINDOW, default="24h"): cv.positive_time_period,
         cv.Optional(CONF_LUX_SAMPLE_INTERVAL, default="1min"): cv.positive_time_period,
         cv.Optional(CONF_USE_SUNRISE_PREDICTION, default=False): cv.boolean,
         cv.Optional(CONF_LATITUDE): cv.float_,
         cv.Optional(CONF_LONGITUDE): cv.float_,
+        cv.Optional(CONF_SUN_ENTITY_ID, default="sun.sun"): cv.string,
         cv.Optional(CONF_ALPHA, default=0.5): cv.float_,
         cv.Optional(CONF_BASE_MULTIPLIER, default=1.0): cv.float_,
         cv.Optional(CONF_MAX_MULTIPLIER, default=4.0): cv.float_,
@@ -163,39 +171,35 @@ async def to_code(config: Dict):
             config[CONF_AUTO_RECALIBRATE_INTERVAL].total_seconds
         )
     )
-    cg.add(roode.set_recalibrate_on_temp_change(config[CONF_RECALIBRATE_ON_TEMP_CHANGE]))
-    cg.add(roode.set_max_temp_delta_for_recalib(config[CONF_MAX_TEMP_DELTA_FOR_RECALIB]))
     cg.add(
-        roode.set_recalibrate_cooldown(
-            config[CONF_RECALIBRATE_COOLDOWN].total_seconds
-        )
+        roode.set_recalibrate_on_temp_change(config[CONF_RECALIBRATE_ON_TEMP_CHANGE])
+    )
+    cg.add(
+        roode.set_max_temp_delta_for_recalib(config[CONF_MAX_TEMP_DELTA_FOR_RECALIB])
+    )
+    cg.add(
+        roode.set_recalibrate_cooldown(config[CONF_RECALIBRATE_COOLDOWN].total_seconds)
     )
     cg.add(roode.set_use_light_sensor(config[CONF_USE_LIGHT_SENSOR]))
     cg.add(
-        roode.set_lux_learning_window(
-            config[CONF_LUX_LEARNING_WINDOW].total_seconds
-        )
+        roode.set_lux_learning_window(config[CONF_LUX_LEARNING_WINDOW].total_seconds)
     )
     cg.add(
-        roode.set_lux_sample_interval(
-            config[CONF_LUX_SAMPLE_INTERVAL].total_seconds
-        )
+        roode.set_lux_sample_interval(config[CONF_LUX_SAMPLE_INTERVAL].total_seconds)
     )
     cg.add(roode.set_use_sunrise_prediction(config[CONF_USE_SUNRISE_PREDICTION]))
     if CONF_LATITUDE in config:
         cg.add(roode.set_latitude(config[CONF_LATITUDE]))
     if CONF_LONGITUDE in config:
         cg.add(roode.set_longitude(config[CONF_LONGITUDE]))
+    if CONF_SUN_ENTITY_ID in config:
+        cg.add(roode.set_sun_entity_id(config[CONF_SUN_ENTITY_ID]))
     cg.add(roode.set_alpha(config[CONF_ALPHA]))
     cg.add(roode.set_base_multiplier(config[CONF_BASE_MULTIPLIER]))
     cg.add(roode.set_max_multiplier(config[CONF_MAX_MULTIPLIER]))
     cg.add(roode.set_time_multiplier(config[CONF_TIME_MULTIPLIER]))
     cg.add(roode.set_combined_multiplier(config[CONF_COMBINED_MULTIPLIER]))
-    cg.add(
-        roode.set_suppression_window(
-            config[CONF_SUPPRESSION_WINDOW].total_seconds
-        )
-    )
+    cg.add(roode.set_suppression_window(config[CONF_SUPPRESSION_WINDOW].total_seconds))
     if CONF_IDLE_RECALIB_INTERVAL in config:
         cg.add(
             roode.set_idle_recalib_interval(

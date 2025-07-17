@@ -7,6 +7,9 @@
 #include <ctime>
 #include <cstdlib>
 #include <cmath>
+#ifdef USE_API
+#include "esphome/components/api/api_server.h"
+#endif
 
 namespace esphome {
 namespace roode {
@@ -145,6 +148,36 @@ static int calc_sun_time(const struct tm &date, float lat, float lon, bool sunri
   while (UT >= 24)
     UT -= 24.0f;
   return static_cast<int>(UT * 3600.0f);
+}
+
+static bool parse_ha_time(const std::string &value, int &out_sec) {
+  int yy, MM, dd, hh, mm, ss;
+  if (sscanf(value.c_str(), "%d-%d-%dT%d:%d:%d", &yy, &MM, &dd, &hh, &mm, &ss) < 6)
+    return false;
+  out_sec = hh * 3600 + mm * 60 + ss;
+  return true;
+}
+
+bool Roode::fetch_sun_times_from_ha(int &rise, int &set) {
+#ifdef USE_API
+  if (sun_entity_id_.empty())
+    return false;
+  auto *api = api::global_api_server;
+  if (api == nullptr)
+    return false;
+  auto state = api->get_state(sun_entity_id_);
+  if (!state.has_value())
+    return false;
+  std::string sunrise = state->attributes["next_rising"].as<std::string>();
+  std::string sunset = state->attributes["next_setting"].as<std::string>();
+  if (!parse_ha_time(sunrise, rise) || !parse_ha_time(sunset, set))
+    return false;
+  return true;
+#else
+  (void) rise;
+  (void) set;
+  return false;
+#endif
 }
 
 Roode::~Roode() {
@@ -670,7 +703,7 @@ void Roode::update_sun_times() {
   if (latitude_ != 0.0f || longitude_ != 0.0f) {
     sunrise_sec_ = calc_sun_time(tm_time, latitude_, longitude_, true);
     sunset_sec_ = calc_sun_time(tm_time, latitude_, longitude_, false);
-  } else {
+  } else if (!fetch_sun_times_from_ha(sunrise_sec_, sunset_sec_)) {
     sunrise_sec_ = 21600;
     sunset_sec_ = 64800;
   }

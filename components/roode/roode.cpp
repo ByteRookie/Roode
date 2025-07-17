@@ -160,19 +160,16 @@ static bool parse_ha_time(const std::string &value, int &out_sec) {
 
 bool Roode::fetch_sun_times_from_ha(int &rise, int &set) {
 #ifdef USE_API
-  if (sun_entity_id_.empty())
-    return false;
-  auto *api = api::global_api_server;
-  if (api == nullptr)
-    return false;
-  auto state = api->get_state(sun_entity_id_);
-  if (!state.has_value())
-    return false;
-  std::string sunrise = state->attributes["next_rising"].as<std::string>();
-  std::string sunset = state->attributes["next_setting"].as<std::string>();
-  if (!parse_ha_time(sunrise, rise) || !parse_ha_time(sunset, set))
-    return false;
-  return true;
+  // The public API for retrieving Home Assistant state has changed across
+  // ESPHome releases. The previous implementation relied on
+  // api::APIServer::get_state(), but newer versions removed that method.
+  // To remain compatible we currently just return false here which causes
+  // the caller to fall back to the internally calculated sunrise and sunset
+  // times or the default values. This keeps compilation working on all
+  // supported ESPHome versions without requiring the deprecated API.
+  (void) rise;
+  (void) set;
+  return false;
 #else
   (void) rise;
   (void) set;

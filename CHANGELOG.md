@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.0
+- Scheduled recalibration based on time or temperature changes
+- Ambient light learning with optional sunrise prediction
+
 ## 1.6.0
 - Auto restart sensors via XSHUT with multiplexing support
 - Startup pin validation with built‑in pull-ups

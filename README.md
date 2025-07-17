@@ -1,6 +1,6 @@
 # RooDe
 
-[![GitHub release](https://img.shields.io/badge/release-1.6.0-blue?style=flat-square)](https://github.com/Lyr3x/Roode/releases/tag/1.6.0)
+[![GitHub release](https://img.shields.io/badge/release-1.7.0-blue?style=flat-square)](https://github.com/Lyr3x/Roode/releases/tag/1.7.0)
 [![Build](https://img.shields.io/github/actions/workflow/status/Lyr3x/Roode/ci.yml?style=flat-square)](https://github.com/Lyr3x/Roode/blob/master/.github/workflows/ci.yml)
 
 [![Roode community](https://img.shields.io/discord/879407995837087804.svg?label=Discord&logo=Discord&colorB=7289da&style=for-the-badge)](https://discord.gg/hU9SvSXMHs)
@@ -337,6 +337,7 @@ reflections cause false triggers.
 | [peopleCounter8266.yaml](peopleCounter8266.yaml) | Minimal setup for ESP8266 |
 | [peopleCounter8266Dev.yaml](peopleCounter8266Dev.yaml) | Most advanced ESP8266 configuration |
 | [extra_sensors_example.yaml](extra_sensors_example.yaml) | Additional diagnostic sensors |
+| [ambient_light_example.yaml](ambient_light_example.yaml) | Ambient light and temperature sensors |
 
 ### Sensors
 
@@ -417,6 +418,33 @@ text_sensor:
     enabled_features:
       name: $friendly_name enabled features
       ## This sensor is a text_sensor that lists all enabled features
+```
+
+#### Light and temperature sensors
+
+To use ambient light suppression and scheduled recalibration, define a lux and temperature sensor with IDs that Roode can reference:
+
+```yaml
+sensor:
+  - platform: bh1750
+    name: "Illuminance"
+    id: illuminance
+    address: 0x23
+    update_interval: 30s
+
+  - platform: shtcx
+    temperature:
+      name: "Temperature"
+      id: temperature
+    humidity:
+      name: "Humidity"
+    address: 0x70
+    update_interval: 60s
+
+roode:
+  use_light_sensor: true
+  lux_sensor: illuminance
+  temperature_sensor: temperature
 ```
 The features string lists items as `name:value` pairs separated by new lines.
 The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
@@ -560,6 +588,8 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
 | Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
 | Persistent calibration | Calibration data can persist in flash across reboots |
+| Scheduled recalibration | Periodically or temperature-based recalibration of thresholds |
+| Ambient light suppression | Learns lux levels with optional sunrise prediction |
 | Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
 | Filtering options | Median/percentile filters smooth jitter with adjustable window |
 | FSM timeouts | Resets the state machine when a transition stalls |

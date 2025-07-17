@@ -1,0 +1,52 @@
+substitutions:
+  devicename: roode-env-demo
+  friendly_name: $devicename
+
+external_components:
+  refresh: always
+  source:
+    type: git
+    url: https://github.com/Lyr3x/Roode
+    ref: master
+
+esphome:
+  name: $devicename
+
+esp32:
+  board: wemos_d1_mini32
+  framework:
+    type: arduino
+
+wifi:
+  ssid: "<YOUR_SSID>"
+  password: "<YOUR_PASSWORD>"
+
+i2c:
+  sda: 21
+  scl: 22
+
+vl53l1x:
+  timeout: 2s
+
+roode:
+  id: roode_platform
+  sampling: 2
+  use_light_sensor: true
+  lux_sensor: illuminance
+  temperature_sensor: temperature
+
+sensor:
+  - platform: bh1750
+    name: "Illuminance"
+    id: illuminance
+    address: 0x23
+    update_interval: 30s
+
+  - platform: shtcx
+    temperature:
+      name: "Temperature"
+      id: temperature
+    humidity:
+      name: "Humidity"
+    address: 0x70
+    update_interval: 60s

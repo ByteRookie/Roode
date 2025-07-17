@@ -112,10 +112,6 @@ class Roode : public PollingComponent {
   void set_interrupt_status_sensor(sensor::Sensor *sens) { interrupt_status_sensor = sens; }
   void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) {
     enabled_features_sensor = sensor_;
-    if (sensor_ != nullptr && !feature_list_cache_.empty()) {
-      sensor_->publish_state(feature_list_cache_);
-      feature_list_published_ = true;
-    }
   }
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
@@ -197,8 +193,6 @@ class Roode : public PollingComponent {
   text_sensor::TextSensor *version_sensor{nullptr};
   text_sensor::TextSensor *entry_exit_event_sensor{nullptr};
   text_sensor::TextSensor *enabled_features_sensor{nullptr};
-  bool feature_list_published_{false};
-  std::string feature_list_cache_{};
   sensor::Sensor *manual_adjustment_sensor{nullptr};
   sensor::Sensor *interrupt_status_sensor{nullptr};
 

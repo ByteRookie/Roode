@@ -157,8 +157,6 @@ void Roode::dump_config() {
 
 void Roode::setup() {
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
-  feature_list_published_ = false;
-  feature_list_cache_.clear();
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
   }
@@ -297,11 +295,6 @@ void Roode::update() {
     auto val = distanceSensor->get_interrupt_state();
     if (val.has_value())
       interrupt_status_sensor->publish_state(*val ? 1 : 0);
-  }
-  if (!feature_list_published_ && enabled_features_sensor != nullptr &&
-      !feature_list_cache_.empty()) {
-    enabled_features_sensor->publish_state(feature_list_cache_);
-    feature_list_published_ = true;
   }
   if (people_counter != nullptr && fabs(people_counter->state - expected_counter_) > 0.001f) {
     int diff = (int) roundf(people_counter->state - expected_counter_);
@@ -1036,13 +1029,8 @@ void Roode::publish_feature_list() {
     if (i + 1 < features.size())
       feature_list += "\n";
   }
-  feature_list_cache_ = feature_list;
-  if (enabled_features_sensor != nullptr) {
-    enabled_features_sensor->publish_state(feature_list_cache_);
-    feature_list_published_ = true;
-  } else {
-    feature_list_published_ = false;
-  }
+  if (enabled_features_sensor != nullptr)
+    enabled_features_sensor->publish_state(feature_list);
   log_event(std::string("features_enabled: ") + feature_list);
 }
 

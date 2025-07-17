@@ -418,13 +418,11 @@ text_sensor:
       name: $friendly_name enabled features
       ## This sensor is a text_sensor that lists all enabled features
 ```
-The features string lists items as `name:value` pairs separated by new lines and
-is published as soon as the text sensor becomes available. If Home Assistant
-connects after boot, Roode republishes the list so the state never shows
-`unknown`. The string includes additional capabilities such as scheduled
-recalibration and ambient light learning. Memory values are printed with
-**KB**, **MB** or **GB** units. Calibration time uses the device clock in
-`h:MMAM/PM` format or displays `unknown` if the clock has not been initialised.
+The features string lists items as `name:value` pairs separated by new lines.
+It now reports additional capabilities such as scheduled recalibration and
+ambient light learning. Memory values are printed with **KB**, **MB** or **GB**
+units. Calibration time uses the device clock in `h:MMAM/PM` format or displays
+`unknown` if the clock has not been initialised.
 
 Example output:
 

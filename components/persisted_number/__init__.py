@@ -17,7 +17,7 @@ PERSISTED_NUMBER_SCHEMA = number.number_schema(PersistedNumber).extend(
     {
         cv.GenerateID(): cv.declare_id(PersistedNumber),
         cv.Optional(CONF_RESTORE_VALUE, default=True): cv.boolean,
-        cv.Optional(CONF_MODE, default="box"): cv.enum(number.NUMBER_MODES, lower=True),
+        cv.Optional(CONF_MODE, default="BOX"): cv.enum(number.NUMBER_MODES),
     }
 )
 

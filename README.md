@@ -419,10 +419,11 @@ text_sensor:
       ## This sensor is a text_sensor that lists all enabled features
 ```
 The features string lists items as `name:value` pairs separated by new lines.
-It now reports additional capabilities such as scheduled recalibration and
-ambient light learning. Memory values are printed with **KB**, **MB** or **GB**
-units. Calibration time uses the device clock in `h:MMAM/PM` format or displays
-`unknown` if the clock has not been initialised.
+The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
+`cpu_cores`, `ram`, `flash`, `calibration_value` and `calibration`.
+Memory values are printed with **KB**, **MB** or **GB** units. Calibration time
+uses the device clock in `h:MMAM/PM` format or displays `unknown` if the clock
+has not been initialised.
 
 Example output:
 
@@ -436,15 +437,6 @@ ram:309KB
 flash:16MB
 calibration_value:1399
 calibration:6:01PM
-scheduled_recalibration:enabled
-ambient_light_learning:disabled
-light_control:off
-temp_control:disabled
-light_control_status:0
-cpu_resilience:enabled
-int_pin_robustness:enabled
-context_calibration:enabled
-adaptive_filtering:enabled
 ```
 
 ### Threshold distance
@@ -579,12 +571,6 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
 | Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
 | Colored logs | Normal info in green, details in yellow, failures in red |
-| Scheduled recalibration | Periodically recalibrates based on time, temperature or idle triggers |
-| Ambient light learning | Learns lux patterns and suppresses harsh sunlight spikes |
-| CPU resilience & multicore | Recovers dual-core mode after failures |
-| INT pin robustness | Retries interrupts and resets the sensor if needed |
-| Context-aware calibration | Suggests recalibration after repeated manual changes |
-| Adaptive filtering | Adjusts filter window in response to lighting |
 
 ## Logging and Diagnostics
 

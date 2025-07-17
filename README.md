@@ -449,9 +449,10 @@ roode:
 ```
 The features string lists items as `name:value` pairs separated by new lines.
 The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
-`cpu_cores`, `ram`, `flash`, `calibration_value` and `calibration`.
+`cpu_cores`, `ram`, `flash`, `calibration_value`, `calibration`,
+`schedule_calibration`, `buffer` and `sun_event`.
 Memory values are printed with **KB**, **MB** or **GB** units. Calibration time
-uses the device clock in `h:MMAM/PM` format or displays `unknown` if the clock
+uses the device clock in `h:MMAM/PM` format or displays `error` if the clock
 has not been initialised. When the device falls back to UTC because no time
 zone was provided by Home Assistant, the time is followed by `(UTC)`.
 
@@ -467,6 +468,9 @@ ram:309KB
 flash:16MB
 calibration_value:1399
 calibration:6:01PM (UTC)
+schedule_calibration:8:01PM (UTC)
+buffer:75% (18/24)
+sun_event:sunset 7:45PM
 ```
 
 ### Threshold distance

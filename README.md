@@ -193,6 +193,10 @@ roode:
   log_fallback_events: true
   # Disable dual core tasking if needed
   force_single_core: false
+  # Restart if readings are 0 or >4000mm too many times
+  invalid_distance_limit: 10
+  # Minimum time between automatic sensor restarts
+  restart_timeout: 30s
   # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
 
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
@@ -323,6 +327,8 @@ reflections cause false triggers.
 | `roode.filter_mode` & `roode.filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows | `filter_mode: min`<br>`filter_window: 5` | `filter_mode: percentile10`<br>`filter_window: 9` |
 | `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | `log_fallback_events: false` | `log_fallback_events: true` |
 | `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: false` | `force_single_core: true` |
+| `roode.invalid_distance_limit` | Optional | `10` | Consecutive suspect readings before restart | Sporadic zero/4 m values | Increase if noise triggers resets | `invalid_distance_limit: 10` | `invalid_distance_limit: 20` |
+| `roode.restart_timeout` | Optional | `30s` | Cooldown and timeout before restart | Slow updates or many resets | Shorten for faster recovery | `restart_timeout: 30s` | `restart_timeout: 15s` |
 | `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
 | `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
 
@@ -601,9 +607,10 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Feature text sensor | Reports enabled and fallback features for diagnostics |
 | Manual adjustment counter | Tracks user corrections to the people count |
 | Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
-| Polling timeout recovery | Restarts the sensor if no data arrives for 30&nbsp;seconds |
+| Polling timeout recovery | Restarts the sensor if no data arrives for `restart_timeout` |
 | Consecutive failure counter | Soft-resets the sensor after 10 read errors |
-| Recovery cooldown | Prevents another restart for 30&nbsp;seconds |
+| Consecutive invalid distance recovery | Restarts the sensor after too many suspect readings |
+| Recovery cooldown | Prevents another restart for `restart_timeout` |
 | Sensor status reporting | Text sensor shows `ok`, `timeout`, `reinitializing`, `error` or `offline` |
 | Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
 | Colored logs | Normal info in green, details in yellow, failures in red |
@@ -634,8 +641,8 @@ Optional sensors provide insight into Roode's operation:
   and a text-sensor `sensor_status` exposes the same status string.
 - ROI size and threshold sensors allow live tuning of each zone.
 - `manual_adjustment_count` records people-count corrections.
-- The sensor automatically restarts if polling stops for 30&nbsp;seconds or
-  after 10 consecutive read errors. Reset attempts are throttled for 30&nbsp;seconds.
+- The sensor automatically restarts if polling stops for the configured `restart_timeout`
+  or after 10 consecutive read errors. All restart triggers share this cooldown.
 
 See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
 these sensors.

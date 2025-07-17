@@ -127,6 +127,8 @@ class Roode : public PollingComponent {
     entry->set_filter_window(window);
     exit->set_filter_window(window);
   }
+  void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
+  void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
@@ -226,6 +228,9 @@ class Roode : public PollingComponent {
   uint32_t loop_count_{0};
   uint32_t last_loop_update_ts_{0};
   uint32_t last_sensor_restart_ts_{0};
+  uint32_t restart_timeout_ms_{30000};
+  uint8_t invalid_distance_limit_{10};
+  uint8_t invalid_read_count_{0};
   static void sensor_task(void *param);
   bool use_sensor_task_{false};
   void restart_sensor();

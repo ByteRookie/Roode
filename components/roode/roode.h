@@ -75,7 +75,10 @@ class Roode : public PollingComponent {
     samples = size;
     entry->set_max_samples(size);
     exit->set_max_samples(size);
+    if (sampling_size_number != nullptr)
+      sampling_size_number->publish_state(size);
   }
+  void set_sampling_size_number(number::Number *num) { sampling_size_number = num; }
   void set_distance_entry(sensor::Sensor *distance_entry_) { distance_entry = distance_entry_; }
   void set_distance_exit(sensor::Sensor *distance_exit_) { distance_exit = distance_exit_; }
   void set_people_counter(number::Number *counter) { this->people_counter = counter; }
@@ -175,6 +178,7 @@ class Roode : public PollingComponent {
   sensor::Sensor *distance_entry{nullptr};
   sensor::Sensor *distance_exit{nullptr};
   number::Number *people_counter{nullptr};
+  number::Number *sampling_size_number{nullptr};
   sensor::Sensor *max_threshold_entry_sensor{nullptr};
   sensor::Sensor *max_threshold_exit_sensor{nullptr};
   sensor::Sensor *min_threshold_entry_sensor{nullptr};

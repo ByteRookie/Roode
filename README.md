@@ -351,10 +351,12 @@ number:
   - platform: roode
     people_counter:
       name: People Count
+    sampling_size:
+      name: Sampling Size
 ```
 
-Regardless of how close we can get, people counting will never be perfect.
-This allows the current people count to be adjusted easily via Home Assistant.
+The people counter value and sampling size can now be adjusted via Home Assistant without reflashing.
+Both entities are created automatically when the component is used.
 
 #### Other sensors available
 

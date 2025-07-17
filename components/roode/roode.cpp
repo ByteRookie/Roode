@@ -1004,12 +1004,15 @@ void Roode::publish_feature_list() {
         return std::string("unknown");
     }
 
-    char buf[16];
+    char buf[32];
+    char tmp[16];
     int hour = tm_time.tm_hour % 12;
     if (hour == 0)
       hour = 12;
-    snprintf(buf, sizeof(buf), "%d:%02d%cM%s", hour, tm_time.tm_min,
-             tm_time.tm_hour >= 12 ? 'P' : 'A', use_utc ? " (UTC)" : "");
+    snprintf(tmp, sizeof(tmp), "%d:%02d%cM", hour, tm_time.tm_min,
+             tm_time.tm_hour >= 12 ? 'P' : 'A');
+    snprintf(buf, sizeof(buf), "%02d/%02d %s%s", tm_time.tm_mon + 1,
+             tm_time.tm_mday, tmp, use_utc ? " UTC" : "");
     return std::string(buf);
   };
 
@@ -1053,6 +1056,40 @@ void Roode::publish_feature_list() {
     features.push_back({"schedule_calibration", fmt_time(next_cal)});
   } else {
     features.push_back({"schedule_calibration", "disabled"});
+  }
+
+  if (lux_enabled) {
+    size_t total = lux_learning_window_sec_ / lux_sample_interval_sec_;
+    float pct = 0.0f;
+    if (total > 0)
+      pct = ((float) lux_samples_.size() / (float) total) * 100.0f;
+    char buf2[8];
+    snprintf(buf2, sizeof(buf2), "%.0f%%", pct);
+    features.push_back({"buffer", buf2});
+  } else {
+    features.push_back({"buffer", "none"});
+  }
+
+  if (use_sunrise_prediction_) {
+    time_t now_t = time(nullptr);
+    struct tm tm_time;
+    localtime_r(&now_t, &tm_time);
+    int sec_of_day = tm_time.tm_hour * 3600 + tm_time.tm_min * 60 + tm_time.tm_sec;
+    int event_sec;
+    const char *event_name;
+    if (sec_of_day >= sunrise_sec_ && sec_of_day < sunset_sec_) {
+      event_sec = sunset_sec_;
+      event_name = "sunset";
+    } else {
+      event_sec = sunrise_sec_;
+      event_name = "sunrise";
+      if (sec_of_day >= sunset_sec_)
+        now_t += 86400;
+    }
+    uint32_t event_epoch = (uint32_t) (now_t - sec_of_day + event_sec);
+    features.push_back({"sun_event", std::string(event_name) + " " + fmt_time(event_epoch)});
+  } else {
+    features.push_back({"sun_event", "none"});
   }
 
   std::string feature_list;

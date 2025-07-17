@@ -274,12 +274,17 @@ void Roode::setup() {
     expected_counter_ = people_counter->state;
 
   publish_feature_list();
+  feature_list_published_ = enabled_features_sensor != nullptr;
   last_recalibrate_ts_ = static_cast<uint32_t>(time(nullptr));
   last_auto_recalibrate_ts_ = last_recalibrate_ts_;
   update_sun_times();
 }
 
 void Roode::update() {
+  if (!feature_list_published_ && enabled_features_sensor != nullptr) {
+    publish_feature_list();
+    feature_list_published_ = true;
+  }
   if (distance_entry != nullptr) {
     distance_entry->publish_state(entry->getDistance());
   }

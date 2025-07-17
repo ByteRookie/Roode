@@ -998,6 +998,31 @@ void Roode::publish_feature_list() {
       std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   features.push_back({"calibration", fmt_time(last_cal_epoch)});
 
+  // New capability flags
+  bool sched_enabled = auto_recalibrate_interval_sec_ > 0 ||
+                       idle_recalib_interval_sec_ > 0 ||
+                       recalibrate_on_temp_change_;
+  features.push_back({"scheduled_recalibration", sched_enabled ? "enabled" : "disabled"});
+  features.push_back({"ambient_light_learning", use_light_sensor_ ? "enabled" : "disabled"});
+
+  std::string light_mode = "off";
+  if (use_light_sensor_ && use_sunrise_prediction_)
+    light_mode = "both";
+  else if (use_light_sensor_)
+    light_mode = "lux";
+  else if (use_sunrise_prediction_)
+    light_mode = "location";
+  features.push_back({"light_control", light_mode});
+  std::string temp_control =
+      (recalibrate_on_temp_change_ && temperature_sensor_ != nullptr) ? "enabled" : "disabled";
+  features.push_back({"temp_control", temp_control});
+  features.push_back({"light_control_status", std::to_string(static_cast<int>(light_control_offset_))});
+
+  features.push_back({"cpu_resilience", "enabled"});
+  features.push_back({"int_pin_robustness", "enabled"});
+  features.push_back({"context_calibration", "enabled"});
+  features.push_back({"adaptive_filtering", "enabled"});
+
   std::string feature_list;
   for (size_t i = 0; i < features.size(); ++i) {
     feature_list += features[i].first + ":" + features[i].second;

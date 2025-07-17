@@ -319,23 +319,27 @@ void Roode::setup() {
   if (people_counter != nullptr)
     expected_counter_ = people_counter->state;
   if (sampling_size_number != nullptr)
-    sampling_size_number->publish_state(samples);
-  if (filter_mode_select != nullptr)
-    filter_mode_select->publish_state(filter_mode_to_string(filter_mode_));
+    set_sampling_size(static_cast<uint8_t>(sampling_size_number->state));
+  if (filter_mode_select != nullptr) {
+    if (filter_mode_select->state == "median")
+      set_filter_mode(FILTER_MEDIAN);
+    else if (filter_mode_select->state == "percentile10")
+      set_filter_mode(FILTER_PERCENTILE10);
+    else
+      set_filter_mode(FILTER_MIN);
+  }
   if (filter_window_number != nullptr)
-    filter_window_number->publish_state(filter_window_);
-  if (entry_min_threshold_number != nullptr && entry->threshold->min_percentage.has_value())
-    entry_min_threshold_number->publish_state(*entry->threshold->min_percentage);
-  if (entry_max_threshold_number != nullptr && entry->threshold->max_percentage.has_value())
-    entry_max_threshold_number->publish_state(*entry->threshold->max_percentage);
-  if (exit_min_threshold_number != nullptr && exit->threshold->min_percentage.has_value())
-    exit_min_threshold_number->publish_state(*exit->threshold->min_percentage);
-  if (exit_max_threshold_number != nullptr && exit->threshold->max_percentage.has_value())
-    exit_max_threshold_number->publish_state(*exit->threshold->max_percentage);
+    set_filter_window(static_cast<uint8_t>(filter_window_number->state));
+  if (entry_min_threshold_number != nullptr && entry_max_threshold_number != nullptr)
+    set_entry_threshold_percentages(static_cast<uint8_t>(entry_min_threshold_number->state),
+                                   static_cast<uint8_t>(entry_max_threshold_number->state));
+  if (exit_min_threshold_number != nullptr && exit_max_threshold_number != nullptr)
+    set_exit_threshold_percentages(static_cast<uint8_t>(exit_min_threshold_number->state),
+                                   static_cast<uint8_t>(exit_max_threshold_number->state));
   if (log_fallback_switch_ != nullptr)
-    log_fallback_switch_->publish_state(log_fallback_events_);
+    set_log_fallback_events(log_fallback_switch_->state);
   if (invert_direction_switch_ != nullptr)
-    invert_direction_switch_->publish_state(invert_direction_);
+    set_invert_direction(invert_direction_switch_->state);
 
   publish_feature_list();
   last_recalibrate_ts_ = static_cast<uint32_t>(time(nullptr));

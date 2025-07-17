@@ -3,6 +3,7 @@
 ## 1.7.0
 - Scheduled recalibration based on time or temperature changes
 - Ambient light learning with optional sunrise prediction
+- Feature sensor shows last and next calibration, buffer fill and next sun event
 
 ## 1.6.0
 - Auto restart sensors via XSHUT with multiplexing support

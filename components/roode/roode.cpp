@@ -313,6 +313,15 @@ void Roode::setup() {
 }
 
 void Roode::update() {
+  uint32_t now = static_cast<uint32_t>(time(nullptr));
+  if (!calibration_time_validated_ && now > 946684800UL) {
+    if (last_recalibrate_ts_ < 946684800UL)
+      last_recalibrate_ts_ = now;
+    if (last_auto_recalibrate_ts_ < 946684800UL)
+      last_auto_recalibrate_ts_ = now;
+    calibration_time_validated_ = true;
+    publish_feature_list();
+  }
   if (distance_entry != nullptr) {
     distance_entry->publish_state(entry->getDistance());
   }

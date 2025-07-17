@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <ctime>
+#include <cstdlib>
 #include <cmath>
 
 namespace esphome {
@@ -961,13 +962,24 @@ void Roode::publish_feature_list() {
       return std::string("unknown");
     time_t t = epoch;
     struct tm tm_time;
-    if (!localtime_r(&t, &tm_time))
-      return std::string("unknown");
-    char buf[8];
+
+    const char *tz = getenv("TZ");
+    bool use_utc = (tz == nullptr || tz[0] == '\0');
+
+    if (use_utc) {
+      if (!gmtime_r(&t, &tm_time))
+        return std::string("unknown");
+    } else {
+      if (!localtime_r(&t, &tm_time))
+        return std::string("unknown");
+    }
+
+    char buf[16];
     int hour = tm_time.tm_hour % 12;
     if (hour == 0)
       hour = 12;
-    snprintf(buf, sizeof(buf), "%d:%02d%cM", hour, tm_time.tm_min, tm_time.tm_hour >= 12 ? 'P' : 'A');
+    snprintf(buf, sizeof(buf), "%d:%02d%cM%s", hour, tm_time.tm_min,
+             tm_time.tm_hour >= 12 ? 'P' : 'A', use_utc ? " (UTC)" : "");
     return std::string(buf);
   };
 

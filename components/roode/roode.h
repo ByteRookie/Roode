@@ -110,7 +110,11 @@ class Roode : public PollingComponent {
   void set_xshut_state_binary_sensor(binary_sensor::BinarySensor *sens) { xshut_state_binary_sensor = sens; }
   void set_sensor_xshut_state_binary_sensor(binary_sensor::BinarySensor *sens) { xshut_state_binary_sensor = sens; }
   void set_interrupt_status_sensor(sensor::Sensor *sens) { interrupt_status_sensor = sens; }
-  void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
+  void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) {
+    enabled_features_sensor = sensor_;
+    if (sensor_ != nullptr)
+      publish_feature_list();
+  }
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }

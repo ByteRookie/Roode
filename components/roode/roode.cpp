@@ -19,17 +19,16 @@ void Roode::log_event(const std::string &msg) {
       return;
     if (msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0)
       return;
-    if (msg == "xshut_toggled" || msg == "xshut_toggled_on" || msg == "xshut_toggled_off" ||
-        msg == "xshut_pulse_off" || msg == "xshut_reinitialize" ||
-        msg == "sensor.recovered_via_xshut" || msg.rfind("xshut_sensor_", 0) == 0 ||
+    if (msg == "xshut_toggled" || msg == "xshut_toggled_on" || msg == "xshut_toggled_off" || msg == "xshut_pulse_off" ||
+        msg == "xshut_reinitialize" || msg == "sensor.recovered_via_xshut" || msg.rfind("xshut_sensor_", 0) == 0 ||
         msg.rfind("xshut_pulse_off_sensor_", 0) == 0 || msg.rfind("xshut_reinitialize_sensor_", 0) == 0 ||
         (msg.rfind("sensor_", 0) == 0 && msg.find(".recovered_via_xshut") != std::string::npos))
       return;
   }
 
   static uint32_t last_int_log = 0;
-  if (msg == "interrupt_fallback" || msg == "interrupt_fallback_polling" ||
-      msg == "int_pin_missed" || msg.rfind("int_pin_missed_sensor_", 0) == 0) {
+  if (msg == "interrupt_fallback" || msg == "interrupt_fallback_polling" || msg == "int_pin_missed" ||
+      msg.rfind("int_pin_missed_sensor_", 0) == 0) {
     uint32_t now = millis();
     if (last_int_log != 0 && (now - last_int_log) < 5000)
       return;
@@ -102,9 +101,8 @@ void Roode::log_event(const std::string &msg) {
   std::string colored = std::string(color) + out + "\033[0m";
   ESP_LOGI(TAG, "%s", colored.c_str());
   if (instance_ != nullptr) {
-    if (msg == "dual_core_success" || msg == "fallback_single_core" ||
-        msg == "force_single_core" || msg == "interrupt_fallback_polling" ||
-        msg == "interrupt_recovered") {
+    if (msg == "dual_core_success" || msg == "fallback_single_core" || msg == "force_single_core" ||
+        msg == "interrupt_fallback_polling" || msg == "interrupt_recovered") {
       instance_->publish_feature_list();
     }
   }
@@ -119,27 +117,32 @@ static int calc_sun_time(const struct tm &date, float lat, float lon, bool sunri
   float t = n + ((sunrise ? 6.0f : 18.0f) - lngHour) / 24.0f;
   float M = (0.9856f * t) - 3.289f;
   float L = M + (1.916f * sin(deg_to_rad(M))) + (0.020f * sin(2 * deg_to_rad(M))) + 282.634f;
-  while (L < 0) L += 360.0f;
-  while (L >= 360) L -= 360.0f;
+  while (L < 0)
+    L += 360.0f;
+  while (L >= 360)
+    L -= 360.0f;
   float RA = rad_to_deg(atan(0.91764f * tan(deg_to_rad(L))));
-  while (RA < 0) RA += 360.0f;
-  while (RA >= 360) RA -= 360.0f;
+  while (RA < 0)
+    RA += 360.0f;
+  while (RA >= 360)
+    RA -= 360.0f;
   float Lquadrant = floor(L / 90.0f) * 90.0f;
   float RAquadrant = floor(RA / 90.0f) * 90.0f;
   RA = RA + (Lquadrant - RAquadrant);
   RA /= 15.0f;
   float sinDec = 0.39782f * sin(deg_to_rad(L));
   float cosDec = cos(asin(sinDec));
-  float cosH = (cos(deg_to_rad(90.833f)) - sinDec * sin(deg_to_rad(lat))) /
-               (cosDec * cos(deg_to_rad(lat)));
+  float cosH = (cos(deg_to_rad(90.833f)) - sinDec * sin(deg_to_rad(lat))) / (cosDec * cos(deg_to_rad(lat)));
   if (cosH > 1.0f || cosH < -1.0f)
     return sunrise ? 21600 : 64800;  // fallback to default 6AM/6PM
   float H = sunrise ? 360.0f - rad_to_deg(acos(cosH)) : rad_to_deg(acos(cosH));
   H /= 15.0f;
   float T = H + RA - (0.06571f * t) - 6.622f;
   float UT = T - lngHour;
-  while (UT < 0) UT += 24.0f;
-  while (UT >= 24) UT -= 24.0f;
+  while (UT < 0)
+    UT += 24.0f;
+  while (UT >= 24)
+    UT -= 24.0f;
   return static_cast<int>(UT * 3600.0f);
 }
 
@@ -161,7 +164,6 @@ void Roode::setup() {
     version_sensor->publish_state(VERSION);
   }
   ESP_LOGI(SETUP, "Using sampling with sampling size: %d", samples);
-
 
   if (this->distanceSensor->is_failed()) {
     this->mark_failed();
@@ -189,7 +191,7 @@ void Roode::setup() {
         int valid_count = 0;
         for (int s = 0; s < 5; s++) {
           z->readDistance(distanceSensor);
-          if (abs((int)z->getDistance() - (int)z->threshold->idle) < (z->threshold->idle * 0.1))
+          if (abs((int) z->getDistance() - (int) z->threshold->idle) < (z->threshold->idle * 0.1))
             valid_count++;
         }
         if (valid_count < 5) {
@@ -374,8 +376,8 @@ void Roode::path_tracking(Zone *zone) {
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
 
-  ESP_LOGV(TAG, "Zone %d distance %u (min=%u max=%u)", zone->id, zone->getMinDistance(),
-           zone->threshold->min, zone->threshold->max);
+  ESP_LOGV(TAG, "Zone %d distance %u (min=%u max=%u)", zone->id, zone->getMinDistance(), zone->threshold->min,
+           zone->threshold->max);
 
   // PathTrack algorithm
   if (zone->getMinDistance() < zone->threshold->max && zone->getMinDistance() > zone->threshold->min) {
@@ -390,8 +392,7 @@ void Roode::path_tracking(Zone *zone) {
   }
   if (CurrentZoneStatus == NOBODY) {
     zone_triggered_start_[zone->id] = 0;
-  } else if (zone_triggered_start_[zone->id] != 0 &&
-             millis() - zone_triggered_start_[zone->id] >= 10000 &&
+  } else if (zone_triggered_start_[zone->id] != 0 && millis() - zone_triggered_start_[zone->id] >= 10000 &&
              millis() - last_valid_crossing_ts_ >= 120000) {
     run_zone_calibration(zone->id);
     fail_safe_triggered_ = true;
@@ -527,23 +528,21 @@ void Roode::check_auto_recalibration() {
   uint32_t now = static_cast<uint32_t>(time(nullptr));
   if (validate_temperature_sensor()) {
     float t = current_temperature_;
-    if (!isnan(last_temperature_) &&
-        fabs(t - last_temperature_) >= max_temp_delta_for_recalib_) {
-        if (now - last_recalibrate_ts_ < recalibrate_cooldown_sec_) {
-          log_event("recalibrate_cooldown_active");
-        } else {
-          log_event("temp_triggered_recalibration");
-          perform_recalibration(false);
-        }
-        last_temperature_ = t;
-        return;
+    if (!isnan(last_temperature_) && fabs(t - last_temperature_) >= max_temp_delta_for_recalib_) {
+      if (now - last_recalibrate_ts_ < recalibrate_cooldown_sec_) {
+        log_event("recalibrate_cooldown_active");
+      } else {
+        log_event("temp_triggered_recalibration");
+        perform_recalibration(false);
+      }
+      last_temperature_ = t;
+      return;
     }
     if (isnan(last_temperature_))
       last_temperature_ = t;
   }
 
-  if (idle_recalib_interval_sec_ > 0 &&
-      now - last_valid_crossing_ts_ >= idle_recalib_interval_sec_) {
+  if (idle_recalib_interval_sec_ > 0 && now - last_valid_crossing_ts_ >= idle_recalib_interval_sec_) {
     if (now - last_recalibrate_ts_ < recalibrate_cooldown_sec_) {
       log_event("recalibrate_cooldown_active");
     } else {
@@ -569,8 +568,7 @@ void Roode::check_auto_recalibration() {
 void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;
-  z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195)
-                             : (orientation_ == Parallel ? 231 : 60));
+  z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
   z->calibrateThreshold(distanceSensor, 50);
   // Recalculate ROI sizes so thresholds remain consistent
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
@@ -749,7 +747,7 @@ void Roode::sample_lux() {
   }
   std::vector<float> tmp(lux_samples_.begin(), lux_samples_.end());
   std::sort(tmp.begin(), tmp.end());
-  size_t idx = (size_t)(0.95f * (tmp.size() - 1));
+  size_t idx = (size_t) (0.95f * (tmp.size() - 1));
   lux_percentile95_ = tmp[idx];
   if (!lux_learning_complete_) {
     lux_learning_complete_ = true;
@@ -771,15 +769,12 @@ bool Roode::should_suppress_event() {
   struct tm tm_time;
   localtime_r(&t, &tm_time);
   int sec_of_day = tm_time.tm_hour * 3600 + tm_time.tm_min * 60 + tm_time.tm_sec;
-  bool time_window =
-      use_sunrise_prediction_ &&
-      (abs(sec_of_day - sunrise_sec_) <= (int)suppression_window_sec_ ||
-       abs(sec_of_day - sunset_sec_) <= (int)suppression_window_sec_);
+  bool time_window = use_sunrise_prediction_ && (abs(sec_of_day - sunrise_sec_) <= (int) suppression_window_sec_ ||
+                                                 abs(sec_of_day - sunset_sec_) <= (int) suppression_window_sec_);
   float dynamic_multiplier = 1.0f;
   if (lux_percentile95_ > 0)
     dynamic_multiplier =
-        esphome::clamp(1 + alpha_ * ((lux - lux_percentile95_) / lux_percentile95_),
-                        base_multiplier_, max_multiplier_);
+        esphome::clamp(1 + alpha_ * ((lux - lux_percentile95_) / lux_percentile95_), base_multiplier_, max_multiplier_);
   float multiplier = dynamic_multiplier;
   if (time_window)
     multiplier = std::max({dynamic_multiplier, time_multiplier_, combined_multiplier_});
@@ -820,8 +815,7 @@ void Roode::check_context_calibration() {
   uint32_t now = millis() / 1000;
   if (manual_adjustment_count_ == 1)
     manual_adjust_window_start_ = now;
-  if (manual_adjustment_count_ > 5 &&
-      now - manual_adjust_window_start_ <= 3600 && validate_lux_sensor()) {
+  if (manual_adjustment_count_ > 5 && now - manual_adjust_window_start_ <= 3600 && validate_lux_sensor()) {
     if (current_lux_ > lux_percentile95_) {
       log_event("manual_recalibrate_triggered");
       perform_recalibration(false);
@@ -838,8 +832,7 @@ void Roode::check_multicore_recovery() {
     uint32_t now = millis();
     if (now - last_multicore_retry_ms_ >= 300000) {
       last_multicore_retry_ms_ = now;
-      BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 4096,
-                                              this, 1, &sensor_task_handle_, 1);
+      BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 4096, this, 1, &sensor_task_handle_, 1);
       if (res == pdPASS) {
         use_sensor_task_ = true;
         log_event("dual_core_recovered");
@@ -852,7 +845,7 @@ void Roode::check_multicore_recovery() {
 }
 
 const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_distance,
-                                                uint16_t average_exit_zone_distance) {
+                                                 uint16_t average_exit_zone_distance) {
   uint16_t min = average_entry_zone_distance < average_exit_zone_distance ? average_entry_zone_distance
                                                                           : average_exit_zone_distance;
   uint16_t max = average_entry_zone_distance > average_exit_zone_distance ? average_entry_zone_distance
@@ -974,8 +967,7 @@ void Roode::publish_feature_list() {
     int hour = tm_time.tm_hour % 12;
     if (hour == 0)
       hour = 12;
-    snprintf(buf, sizeof(buf), "%d:%02d%cM", hour, tm_time.tm_min,
-             tm_time.tm_hour >= 12 ? 'P' : 'A');
+    snprintf(buf, sizeof(buf), "%d:%02d%cM", hour, tm_time.tm_min, tm_time.tm_hour >= 12 ? 'P' : 'A');
     return std::string(buf);
   };
 
@@ -994,9 +986,32 @@ void Roode::publish_feature_list() {
   features.push_back({"ram", fmt_bytes(ESP.getHeapSize())});
   features.push_back({"flash", fmt_bytes(ESP.getFlashChipSize())});
   features.push_back({"calibration_value", std::to_string(entry->threshold->idle)});
-  uint32_t last_cal_epoch =
-      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  uint32_t last_cal_epoch = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   features.push_back({"calibration", fmt_time(last_cal_epoch)});
+
+  std::string light_ctrl;
+  bool lux_enabled = use_light_sensor_ && lux_sensor_ != nullptr;
+  bool loc_enabled = use_sunrise_prediction_ && latitude_ != 0 && longitude_ != 0;
+  if (!lux_enabled && !loc_enabled)
+    light_ctrl = "disabled";
+  else if (lux_enabled && loc_enabled)
+    light_ctrl = "both";
+  else if (lux_enabled)
+    light_ctrl = "lux";
+  else
+    light_ctrl = "location";
+  features.push_back({"light_control", light_ctrl});
+  features.push_back(
+      {"temp_control", (recalibrate_on_temp_change_ && temperature_sensor_ != nullptr) ? "enabled" : "disabled"});
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%.1f", light_control_offset_);
+  features.push_back({"light_control_status", buf});
+  if (auto_recalibrate_interval_sec_ > 0) {
+    uint32_t next_cal = last_auto_recalibrate_ts_ + auto_recalibrate_interval_sec_;
+    features.push_back({"schedule_calibration", fmt_time(next_cal)});
+  } else {
+    features.push_back({"schedule_calibration", "disabled"});
+  }
 
   std::string feature_list;
   for (size_t i = 0; i < features.size(); ++i) {

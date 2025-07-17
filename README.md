@@ -603,6 +603,7 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
 | Polling timeout recovery | Restarts the sensor if no data arrives for 30&nbsp;seconds |
 | Consecutive failure counter | Soft-resets the sensor after 10 read errors |
+| Consecutive invalid distance recovery | Restarts the sensor after 10 suspect readings |
 | Recovery cooldown | Prevents another restart for 30&nbsp;seconds |
 | Sensor status reporting | Text sensor shows `ok`, `timeout`, `reinitializing`, `error` or `offline` |
 | Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |

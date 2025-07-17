@@ -293,6 +293,18 @@ void Roode::loop() {
   VL53L1_Error status = this->current_zone->readDistance(distanceSensor);
   if (status == VL53L1_ERROR_NONE)
     last_loop_update_ts_ = millis();
+  uint16_t dist = this->current_zone->getDistance();
+  if (status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
+    invalid_read_count_++;
+  } else {
+    invalid_read_count_ = 0;
+  }
+  if (invalid_read_count_ > 10 && (now - last_sensor_restart_ts_ > 30000)) {
+    ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
+    restart_sensor();
+    last_sensor_restart_ts_ = now;
+    invalid_read_count_ = 0;
+  }
   bool zone_trig = current_zone->getMinDistance() < current_zone->threshold->max &&
                    current_zone->getMinDistance() > current_zone->threshold->min;
   if (!cpu_optimizations_active_ || zone_trig)
@@ -769,6 +781,18 @@ void Roode::sensor_task(void *param) {
     VL53L1_Error status = self->current_zone->readDistance(self->distanceSensor);
     if (status == VL53L1_ERROR_NONE)
       self->last_loop_update_ts_ = millis();
+    uint16_t dist = self->current_zone->getDistance();
+    if (status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
+      self->invalid_read_count_++;
+    } else {
+      self->invalid_read_count_ = 0;
+    }
+    if (self->invalid_read_count_ > 10 && (now - self->last_sensor_restart_ts_ > 30000)) {
+      ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
+      self->restart_sensor();
+      self->last_sensor_restart_ts_ = now;
+      self->invalid_read_count_ = 0;
+    }
     bool zone_trig = self->current_zone->getMinDistance() < self->current_zone->threshold->max &&
                      self->current_zone->getMinDistance() > self->current_zone->threshold->min;
     if (!self->cpu_optimizations_active_ || zone_trig)

@@ -353,10 +353,14 @@ number:
       name: People Count
     sampling_size:
       name: Sampling Size
+switch:
+  - platform: roode
+    log_fallback_events:
+      name: Log Fallback Events
 ```
 
-The people counter value and sampling size can now be adjusted via Home Assistant without reflashing.
-Both entities are created automatically when the component is used.
+The people counter value, sampling size, and logging switch can now be adjusted via Home Assistant without reflashing.
+All entities are created automatically when the component is used.
 
 #### Other sensors available
 

@@ -17,9 +17,12 @@ CONF_SAMPLING_SIZE = "sampling_size"
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
-        cv.Optional(CONF_PEOPLE_COUNTER): PERSISTED_NUMBER_SCHEMA.extend(
+        cv.Optional(
+            CONF_PEOPLE_COUNTER,
+            default={CONF_NAME: "People Count"},
+        ): PERSISTED_NUMBER_SCHEMA.extend(
             {
-                cv.Optional(CONF_ICON, default="mdi:counter"): cv.icon,  # new default
+                cv.Optional(CONF_ICON, default="mdi:counter"): cv.icon,
                 cv.Optional(CONF_MAX_VALUE, 10): cv.int_range(-128, 128),
             }
         ),
@@ -52,7 +55,5 @@ async def setup_sampling_size(config: OrderedDict, hub: MockObj):
 
 async def to_code(config: OrderedDict):
     hub = await cg.get_variable(config[CONF_ROODE_ID])
-    if CONF_PEOPLE_COUNTER in config:
-        await setup_people_counter(config[CONF_PEOPLE_COUNTER], hub)
-    if CONF_SAMPLING_SIZE in config:
-        await setup_sampling_size(config[CONF_SAMPLING_SIZE], hub)
+    await setup_people_counter(config[CONF_PEOPLE_COUNTER], hub)
+    await setup_sampling_size(config[CONF_SAMPLING_SIZE], hub)

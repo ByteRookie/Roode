@@ -6,6 +6,7 @@
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/switch/switch.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
@@ -116,6 +117,7 @@ class Roode : public PollingComponent {
   void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
+  void set_log_fallback_switch(switch_::Switch *sw) { log_fallback_switch_ = sw; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
   void set_auto_recalibrate_interval(uint32_t seconds) { auto_recalibrate_interval_sec_ = seconds; }
   void set_recalibrate_on_temp_change(bool val) { recalibrate_on_temp_change_ = val; }
@@ -179,6 +181,7 @@ class Roode : public PollingComponent {
   sensor::Sensor *distance_exit{nullptr};
   number::Number *people_counter{nullptr};
   number::Number *sampling_size_number{nullptr};
+  switch_::Switch *log_fallback_switch_{nullptr};
   sensor::Sensor *max_threshold_entry_sensor{nullptr};
   sensor::Sensor *max_threshold_exit_sensor{nullptr};
   sensor::Sensor *min_threshold_entry_sensor{nullptr};

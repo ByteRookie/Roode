@@ -307,6 +307,8 @@ void Roode::setup() {
     expected_counter_ = people_counter->state;
   if (sampling_size_number != nullptr)
     sampling_size_number->publish_state(samples);
+  if (log_fallback_switch_ != nullptr)
+    log_fallback_switch_->publish_state(log_fallback_events_);
 
   publish_feature_list();
   last_recalibrate_ts_ = static_cast<uint32_t>(time(nullptr));
@@ -330,6 +332,10 @@ void Roode::update() {
     auto val = distanceSensor->get_interrupt_state();
     if (val.has_value())
       interrupt_status_sensor->publish_state(*val ? 1 : 0);
+  }
+  if (log_fallback_switch_ != nullptr &&
+      log_fallback_switch_->state != log_fallback_events_) {
+    set_log_fallback_events(log_fallback_switch_->state);
   }
   if (sampling_size_number != nullptr &&
       fabs(sampling_size_number->state - samples) > 0.001f) {

@@ -12,7 +12,14 @@ from esphome.const import (
 from ..vl53l1x import distance_as_mm, NullableSchema, VL53L1X
 
 DEPENDENCIES = ["vl53l1x"]
-AUTO_LOAD = ["vl53l1x", "sensor", "binary_sensor", "text_sensor", "number"]
+AUTO_LOAD = [
+    "vl53l1x",
+    "sensor",
+    "binary_sensor",
+    "text_sensor",
+    "number",
+    "switch",
+]
 MULTI_CONF = True
 
 CONF_ROODE_ID = "roode_id"

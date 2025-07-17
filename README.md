@@ -17,23 +17,15 @@ A people counter that works with any smart home system that supports ESPHome/MQT
   - [ESP8266](#esp8266)
 - [Configuration](#configuration)
   - [Platform Setup](#platform-setup)
+  - [Interrupt vs Polling](#interrupt-vs-polling)
+  - [Single vs Dual Core](#single-vs-dual-core)
+  - [Sampling and Filtering](#sampling-and-filtering)
 - [Configuration Reference](#configuration-reference)
   - [Example Configurations](#example-configurations)
   - [Sensors](#sensors)
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
 - [Features](#features)
-  - [Interrupt vs Polling](#interrupt-vs-polling)
-  - [Single vs Dual Core](#single-vs-dual-core)
-  - [Sampling and Filtering](#sampling-and-filtering)
-  - [Scheduled Recalibration](#scheduled-recalibration)
-  - [Ambient Light Learning & Sunlight Suppression](#ambient-light-learning--sunlight-suppression)
-  - [CPU Resilience & Multicore](#cpu-resilience--multicore)
-  - [INT Pin Robustness](#int-pin-robustness)
-  - [Context-Aware Calibration](#context-aware-calibration)
-  - [Adaptive Filtering](#adaptive-filtering)
-  - [Light Control](#light-control)
-  - [Temp Control](#temp-control)
 - [Logging and Diagnostics](#logging-and-diagnostics)
 - [FAQ/Troubleshoot](#faqtroubleshoot)
 - [License](#license)
@@ -202,23 +194,6 @@ roode:
   log_fallback_events: true
   # Disable dual core tasking if needed
   force_single_core: false
-  # Scheduled sensor recalibration and ambient light suppression
-  auto_recalibrate_interval: 6h
-  recalibrate_on_temp_change: false
-  max_temp_delta_for_recalib: 8
-  recalibrate_cooldown: 30min
-  use_light_sensor: false
-  lux_learning_window: 24h
-  lux_sample_interval: 1min
-  use_sunrise_prediction: false
-  latitude: 37.7749
-  longitude: -122.4194
-  alpha: 0.5
-  base_multiplier: 1.0
-  max_multiplier: 4.0
-  time_multiplier: 1.5
-  combined_multiplier: 3.0
-  suppression_window: 30min
   # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
 
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
@@ -248,189 +223,109 @@ roode:
         max: 70%
 ```
 
+The `entry` and `exit` blocks allow tuning each zone when they behave differently.
+For example, an entryway with a shelf on one side might need a smaller ROI or
+stricter thresholds only in that zone. Start with small adjustments—change the
+ROI height or width by one or two units or nudge thresholds 5 % at a time—and
+test before making larger changes.
+### Interrupt vs Polling
+
+Roode prefers the interrupt pin for efficient updates. When `interrupt` is defined and validated, the VL53L1X notifies the MCU whenever a new sample is ready. If the INT pin is missing or stops working, Roode falls back to a 10 ms polling loop and tries interrupts again every 30 minutes. Polling also acts as a safety net during startup.
+
+| Situation | Use INT | Use Polling |
+| --- | --- | --- |
+| Normal operation | ✅ | 🔁 (optional verify) |
+| INT not received in time | ⛔️ | ✅ |
+| Sensor just booted | ⛔️ | ✅ |
+| Interrupt unreliable | ⛔️ | ✅ |
+| Low-power mode handling | ⛔️ | ✅ |
+
+
+### Single vs Dual Core
+
+On ESP32 targets Roode tries to run the sensor loop on the second CPU core so
+Wi‑Fi and other ESPHome tasks stay responsive.  If the task fails to start or
+when running on an ESP8266 the code automatically falls back to a single‑core
+loop.  You can force single‑core mode with `force_single_core: true`.
+
+### Sampling and Filtering
+
+Roode smooths distance readings in two stages. The driver first averages
+multiple raw measurements using the `sampling` option. Each zone then applies a
+filter across the last few averaged values controlled by `filter_mode` and
+`filter_window`.
+
+Raising `sampling` makes each reading steadier while `filter_window` dictates
+how many of those readings must agree before an event fires. Because the filter
+operates on averaged data, the total number of raw readings considered is
+`sampling` multiplied by `filter_window`. This gives better noise rejection at
+the cost of reaction speed. Start with `sampling: 2` and `filter_window: 3` and
+increase them together if your environment is unstable. See the table below for
+how the available filter modes behave.
+
+| Mode | When to use | Pros | Cons |
+| --- | --- | --- | --- |
+| `min` | Very clean environments or quick response needed | Reacts instantly to changes | Sensitive to noise and outliers |
+| `median` | General use when noise is moderate | Ignores spikes for stable readings | Can lag behind fast motion |
+| `percentile10` | Noisy locations where some jitter must be ignored | Balances responsiveness and noise rejection | Slightly less stable than median |
+
+#### `sampling`
+
+*Averages consecutive raw measurements before filtering.* Increase above `2` only when noise causes flickering.
+
+**Recommended values** moved to the Quick Tips section below.
+
+#### `filter_window`
+
+*Number of past measurements considered by the filter.* `3` is responsive, while `5+` helps in harsh lighting or reflective areas.
+
+**Recommended values** moved to the Quick Tips section below.
+
+Filter mode tips: use `median` to ignore spikes or `percentile10` for gradual noise.
+
+### Quick Tips Summary
+
+The two settings work together: a window of `3` with `sampling: 2` means each
+reported value reflects six raw readings. Raise both when sunlight or
+reflections cause false triggers.
+
+#### Sampling
+
+| `sampling` | When to use | Tradeoff |
+| ---------- | ---------- | -------- |
+| `1` | Fastest response, low noise | Higher noise |
+| `2–3` | Balanced stability and speed | Slight delay |
+| `4+` | Very noisy or unstable areas | Noticeable lag |
+
+#### Filter Window
+
+| `filter_window` | When to use | Tradeoff |
+| --------------- | ---------- | -------- |
+| `3` | General smoothing | Slightly slower response |
+| `5+` | Suppress false triggers | Laggy detection |
+| `1` | Maximum responsiveness | No noise rejection |
+
 ### Configuration Reference
 
-| Section | Description |
-| --- | --- |
-| [VL53L1X Options](#vl53l1x-options) | Sensor hardware settings |
-| [General Options](#general-options) | Core behavior tuning |
-| [Recalibration Options](#recalibration-options) | Automatic recalibration triggers |
-| [Ambient Light Learning & Light Control](#ambient-light-learning--light-control) | Light suppression features |
-| [Zone Options](#zone-options) | Per-zone overrides |
-
-
-#### VL53L1X Options · [Back to list](#configuration-reference)
-
-Minimal example
-
-```yaml
-vl53l1x:
-  pins:
-    xshut: GPIO3
-    interrupt: GPIO1
-```
-
-Full example
-
-```yaml
-vl53l1x:
-  sensor_id: 1
-  address: 0x31
-  timeout: 2s
-  calibration:
-    ranging: auto
-    offset: 20mm
-    crosstalk: 100000cps
-  pins:
-    xshut: GPIO3
-    interrupt: GPIO32
-```
-
-| Option(s) | Required? | Default | Purpose | When to change | Strategy |
-| --- | --- | --- | --- | --- | --- |
-| `vl53l1x.sensor_id` | Optional | `1` | Distinguish multiple sensors on one bus | Using multiple VL53L1X modules | Assign unique ID per sensor |
-| `vl53l1x.address` & `vl53l1x.pins.xshut` | Optional together | `0x29` | Change the sensor I²C address | Address conflict or multi-sensor setup | Provide an XSHUT pin and new address |
-| `vl53l1x.timeout` | Optional | `2s` | How long to wait for a measurement | Long ranges may need more time | Increase in 500 ms steps until errors stop |
-| `vl53l1x.pins.interrupt` | Optional | none | GPIO for data ready signal | Efficient updates | Use if you can spare a pin |
-| `vl53l1x.calibration.ranging` | Optional | `auto` | Measurement range preset | Known distance extremes | Pick the shortest range that works |
-| `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration |
-| `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Only adjust with ST's calibration output |
-
-#### General Options · [Back to list](#configuration-reference)
-
-Minimal example
-
-```yaml
-roode:
-  sampling: 2
-```
-
-Full example
-
-```yaml
-roode:
-  sampling: 2
-  orientation: perpendicular
-  roi: { height: 16, width: 6 }
-  detection_thresholds: { min: 5%, max: 85% }
-  calibration_persistence: true
-  filter_mode: median
-  filter_window: 5
-  log_fallback_events: true
-  force_single_core: false
-```
-
-| Option(s) | Required? | Default | Purpose | When to change | Strategy |
-| --- | --- | --- | --- | --- | --- |
-| `roode.sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Try 3–5 for noisy areas; above 5 adds lag |
-| `roode.orientation` | Optional | `parallel` | Sensor pad orientation | Sensor rotated 90° | Set to `perpendicular` |
-| `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Change by 2–4 units or use `auto` to learn |
-| `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% (or ~50 mm) each time |
-| `roode.calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning |
-| `roode.filter_mode` & `roode.filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows |
-| `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing |
-| `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur |
-
-#### Recalibration Options · [Back to list](#configuration-reference)
-
-Minimal example
-
-```yaml
-roode:
-  auto_recalibrate_interval: 6h
-```
-
-Full example
-
-```yaml
-roode:
-  auto_recalibrate_interval: 6h
-  recalibrate_on_temp_change: true
-  max_temp_delta_for_recalib: 8
-  recalibrate_cooldown: 30min
-  idle_recalibrate_interval: 12h
-```
-
-| Option(s) | Required? | Default | Purpose | When to change | Strategy |
-| --- | --- | --- | --- | --- | --- |
-| `roode.auto_recalibrate_interval` | Optional | `6h` | Time between automatic recalibrations | Sensor drifts gradually | Increase for stable temps or set to 0 to disable |
-| `roode.recalibrate_on_temp_change` | Optional | `false` | Recalibrate when temperature shifts | Use with a temperature sensor | Enable only if temps vary |
-| `roode.max_temp_delta_for_recalib` | Optional | `8` | Temperature change in °C that triggers recalibration | Rapid heat/cool cycles | Lower if drift occurs quickly, raise to avoid noise |
-| `roode.recalibrate_cooldown` | Optional | `30min` | Minimum time between automatic recalibrations | Multiple triggers in short time | Extend to prevent loops or shorten for responsiveness |
-| `roode.idle_recalibrate_interval` | Optional | `0` | Recalibrate after long idle period | Sensor rarely triggered | Set long interval like 12h to combat slow drift |
-
-#### Ambient Light Learning & Light Control · [Back to list](#configuration-reference)
-
-Minimal example
-
-```yaml
-roode:
-  use_light_sensor: true
-```
-
-Full example
-
-```yaml
-roode:
-  use_light_sensor: true
-  lux_learning_window: 24h
-  lux_sample_interval: 1min
-  use_sunrise_prediction: true
-  latitude: 37.7749
-  longitude: -122.4194
-  alpha: 0.5
-  base_multiplier: 1.0
-  max_multiplier: 4.0
-  time_multiplier: 1.5
-  combined_multiplier: 3.0
-  suppression_window: 30min
-```
-
-| Option(s) | Required? | Default | Purpose | When to change | Strategy |
-| --- | --- | --- | --- | --- | --- |
-| `roode.use_light_sensor` | Optional | `false` | Enable lux learning to suppress sunlight events | Sensor near windows | Enable with a light sensor |
-| `roode.lux_learning_window` | Optional | `24h` | Time range for lux history | Slow lighting changes | Shorten for seasonal shifts |
-| `roode.lux_sample_interval` | Optional | `1min` | How often to sample lux | Battery savings | Increase for low-power setups |
-| `roode.use_sunrise_prediction` | Optional | `false` | Use sunrise & sunset times for lux suppression | Outdoors or bright windows | Enable with timezone/location data |
-| `roode.latitude` & `roode.longitude` | Optional | none | Manual override for location when predicting sunrise | No Home Assistant location or custom site | Supply decimal degrees for your location |
-| `roode.alpha` | Optional | `0.5` | Sensitivity of lux spike detection | Too many or too few suppressions | Increase for aggressive suppression, lower for gentle |
-| `roode.base_multiplier` | Optional | `1.0` | Minimum lux multiplier | Keep events with small spikes | Raise if suppression triggers too often |
-| `roode.max_multiplier` | Optional | `4.0` | Maximum lux multiplier | Hard limit on sunlight suppression | Lower for less effect |
-| `roode.time_multiplier` | Optional | `1.5` | Extra weighting near sunrise/sunset | Bright horizon light at dawn/dusk | Adjust if events still occur |
-| `roode.combined_multiplier` | Optional | `3.0` | Limit when both time & lux match | Balances lux and schedule inputs | Increase to enforce stricter suppression |
-| `roode.suppression_window` | Optional | `30min` | Ignore repeated light spikes | Sudden sunlight bursts | Reduce for indoor lights |
-
-#### Zone Options · [Back to list](#configuration-reference)
-
-Minimal example
-
-```yaml
-roode:
-  zones:
-    invert: false
-```
-
-Full example
-
-```yaml
-roode:
-  zones:
-    invert: true
-    entry:
-      roi: auto
-    exit:
-      roi:
-        height: 8
-        center: 124
-      detection_thresholds:
-        min: 5%
-        max: 70%
-```
-
-| Option(s) | Required? | Default | Purpose | When to change | Strategy |
-| --- | --- | --- | --- | --- | --- |
-| `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate |
-| `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed |
+| Option(s) | Required? | Default | Purpose | When to change | Strategy | Conservative Example | Aggressive Example |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `vl53l1x.sensor_id` | Optional | `1` | Distinguish multiple sensors on one bus | Using multiple VL53L1X modules | Assign unique ID per sensor | `sensor_id: 1` | `sensor_id: 2` |
+| `vl53l1x.address` & `vl53l1x.pins.xshut` | Optional together | `0x29` | Change the sensor I²C address | Address conflict or multi-sensor setup | Provide an XSHUT pin and new address | *(not set)* | `address: 0x31`<br>`pins:`<br>`  xshut: GPIO3` |
+| `vl53l1x.timeout` | Optional | `2s` | How long to wait for a measurement | Long ranges may need more time | Increase in 500&nbsp;ms steps until errors stop | `timeout: 2s` | `timeout: 3s` |
+| `vl53l1x.pins.interrupt` | Optional | none | GPIO for data ready signal | Efficient updates | Use if you can spare a pin | *(not set)* | `interrupt: GPIO32` |
+| `vl53l1x.calibration.ranging` | Optional | `auto` | Measurement range preset | Known distance extremes | Pick the shortest range that works | `ranging: auto` | `ranging: long` |
+| `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration | *(not set)* | `offset: 20mm` |
+| `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Only adjust with ST's calibration output | *(not set)* | `crosstalk: 100000cps` |
+| `roode.sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Try 3–5 for noisy areas; above 5 adds lag | `sampling: 2` | `sampling: 5` |
+| `roode.orientation` | Optional | `parallel` | Sensor pad orientation | Sensor rotated 90° | Set to `perpendicular` | `orientation: parallel` | `orientation: perpendicular` |
+| `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Change by 2–4 units or use `auto` to learn | `roi: { height: 16, width: 6 }` | `roi: auto` |
+| `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% (or ~50 mm) each time | `detection_thresholds: { min: 5%, max: 85% }` | `detection_thresholds: { min: 50mm, max: 234cm }` |
+| `roode.calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning | `calibration_persistence: false` | `calibration_persistence: true` |
+| `roode.filter_mode` & `roode.filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows | `filter_mode: min`<br>`filter_window: 5` | `filter_mode: percentile10`<br>`filter_window: 9` |
+| `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | `log_fallback_events: false` | `log_fallback_events: true` |
+| `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: false` | `force_single_core: true` |
+| `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
+| `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
 
 
 ### Example Configurations
@@ -522,16 +417,10 @@ text_sensor:
     enabled_features:
       name: $friendly_name enabled features
       ## This sensor is a text_sensor that lists all enabled features
-      ## The state publishes on startup so Home Assistant never shows "unknown"
 ```
 The features string lists items as `name:value` pairs separated by new lines.
 The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
-`cpu_cores`, `ram`, `flash`, `calibration_value`, `calibration`,
-`scheduled_recalibration`, `ambient_light_learning`, `light_control`,
-`temp_control`, `light_control_status`, `cpu_resilience`,
-`int_pin_robustness`, `context_calibration` and `adaptive_filtering`.
-Features that rely on sensors report `disabled` if a sensor error occurs and
-automatically switch back to `enabled` after the sensor recovers.
+`cpu_cores`, `ram`, `flash`, `calibration_value` and `calibration`.
 Memory values are printed with **KB**, **MB** or **GB** units. Calibration time
 uses the device clock in `h:MMAM/PM` format or displays `unknown` if the clock
 has not been initialised.
@@ -548,15 +437,6 @@ ram:309KB
 flash:16MB
 calibration_value:1399
 calibration:6:01PM
-scheduled_recalibration:supported
-ambient_light_learning:supported
-light_control:lux
-temp_control:disabled
-light_control_status:0
-cpu_resilience:supported
-int_pin_robustness:supported
-context_calibration:supported
-adaptive_filtering:supported
 ```
 
 ### Threshold distance
@@ -680,163 +560,17 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
 | Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
 | Persistent calibration | Calibration data can persist in flash across reboots |
-| [Dual-core tasking](#single-vs-dual-core) | Keeps polling responsive on ESP32 with automatic retry/fallback |
-| [Filtering options](#sampling-and-filtering) | Median/percentile filters smooth jitter with adjustable window |
+| Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
+| Filtering options | Median/percentile filters smooth jitter with adjustable window |
 | FSM timeouts | Resets the state machine when a transition stalls |
 | CPU optimizations | Automatic optimizations when CPU usage exceeds 90% |
-| [Interrupt fallback](#interrupt-vs-polling) | Interrupt mode with graceful fallback to polling and logs |
+| Interrupt fallback | Interrupt mode with graceful fallback to polling and logs |
 | XSHUT multiplexing | Supports multiple sensors sharing I²C bus |
 | Feature text sensor | Reports enabled and fallback features for diagnostics |
 | Manual adjustment counter | Tracks user corrections to the people count |
 | Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
 | Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
 | Colored logs | Normal info in green, details in yellow, failures in red |
-| [Scheduled recalibration](#scheduled-recalibration) | Periodically recalibrates to prevent sensor drift |
-| [Ambient light learning](#ambient-light-learning--sunlight-suppression) | Learns lux patterns and suppresses sunlight spikes |
-| [CPU resilience & multicore](#cpu-resilience--multicore) | Retries dual-core mode and recovers after failures |
-| [INT pin robustness](#int-pin-robustness) | Monitors missed interrupts and recovers via XSHUT |
-| [Context-aware calibration](#context-aware-calibration) | Suggests recalibration after repeated manual changes |
-| [Adaptive filtering](#adaptive-filtering) | Adjusts filter window based on motion & lighting |
-| [Light control](#light-control) | Uses lux or location data to suppress sunlight spikes |
-| [Temp control](#temp-control) | Enables recalibration on significant temperature change |
-
-### Interrupt vs Polling · [Back to list](#features)
-
-Roode prefers the interrupt pin for efficient updates. When `interrupt` is defined and validated, the VL53L1X notifies the MCU whenever a new sample is ready. If the INT pin is missing or stops working, Roode falls back to a 10&nbsp;ms polling loop and tries interrupts again every 30&nbsp;min. Polling also acts as a safety net during startup.
-
-| Situation | Use INT | Use Polling |
-| --- | --- | --- |
-| Normal operation | ✅ | 🔁 (optional verify) |
-| INT not received in time | ⛔️ | ✅ |
-| Sensor just booted | ⛔️ | ✅ |
-| Interrupt unreliable | ⛔️ | ✅ |
-| Low-power mode handling | ⛔️ | ✅ |
-
-### Single vs Dual Core · [Back to list](#features)
-
-On ESP32 targets Roode tries to run the sensor loop on the second CPU core so Wi‑Fi and other ESPHome tasks stay responsive. If the task fails to start or when running on an ESP8266 the code automatically falls back to a single‑core loop. You can force single‑core mode with `force_single_core: true`.
-
-### Sampling and Filtering · [Back to list](#features)
-
-Roode smooths distance readings in two stages. The driver first averages multiple raw measurements using the `sampling` option. Each zone then applies a filter across the last few averaged values controlled by `filter_mode` and `filter_window`.
-
-Raising `sampling` makes each reading steadier while `filter_window` dictates how many of those readings must agree before an event fires. Because the filter operates on averaged data, the total number of raw readings considered is `sampling` multiplied by `filter_window`. This gives better noise rejection at the cost of reaction speed. Start with `sampling: 2` and `filter_window: 3` and increase them together if your environment is unstable. See the table below for how the available filter modes behave.
-
-| Mode | When to use | Pros | Cons |
-| --- | --- | --- | --- |
-| `min` | Very clean environments or quick response needed | Reacts instantly to changes | Sensitive to noise and outliers |
-| `median` | General use when noise is moderate | Ignores spikes for stable readings | Can lag behind fast motion |
-| `percentile10` | Noisy locations where some jitter must be ignored | Balances responsiveness and noise rejection | Slightly less stable than median |
-
-#### `sampling`
-
-*Averages consecutive raw measurements before filtering.* Increase above `2` only when noise causes flickering.
-
-**Recommended values** moved to the Quick Tips section below.
-
-#### `filter_window`
-
-*Number of past measurements considered by the filter.* `3` is responsive, while `5+` helps in harsh lighting or reflective areas.
-
-**Recommended values** moved to the Quick Tips section below.
-
-Filter mode tips: use `median` to ignore spikes or `percentile10` for gradual noise.
-
-### Quick Tips Summary · [Back to list](#features)
-
-The two settings work together: a window of `3` with `sampling: 2` means each reported value reflects six raw readings. Raise both when sunlight or reflections cause false triggers.
-
-#### Sampling
-
-| `sampling` | When to use | Tradeoff |
-| ---------- | ---------- | -------- |
-| `1` | Fastest response, low noise | Higher noise |
-| `2–3` | Balanced stability and speed | Slight delay |
-| `4+` | Very noisy or unstable areas | Noticeable lag |
-
-#### Filter Window
-
-| `filter_window` | When to use | Tradeoff |
-| --------------- | ---------- | -------- |
-| `3` | General smoothing | Slightly slower response |
-| `5+` | Suppress false triggers | Laggy detection |
-| `1` | Maximum responsiveness | No noise rejection |
-
-### Scheduled Recalibration · [Back to list](#features)
-
-Roode automatically runs the calibration routine on a schedule and when
-certain conditions are met.  The default interval is every **6&nbsp;h** and
-the recalibration can also be triggered by temperature shifts or long idle
-periods.  Automatic recalibrations respect a cooldown window (default
-30&nbsp;min) so multiple triggers only perform a single calibration. Manual
-recalibration via the API or button ignores this cooldown and executes
-immediately. If the temperature sensor stops reporting valid data the
-temperature-based trigger disables itself and retries after
-30&nbsp;min.
-The time-based schedule works on its own—you can disable temperature or idle
-triggers while still using the interval timer.
-
-### Ambient Light Learning & Sunlight Suppression · [Back to list](#features)
-
-When a light sensor is provided Roode learns the typical lux pattern over a
-24&nbsp;h window.  Sudden spikes beyond the learned 95&percnt; percentile are
-considered outliers.  If a lux spike occurs around sunrise or sunset it will be
-treated more aggressively to avoid false counts from direct sunlight.
-If the configured light sensor fails to report valid lux values, the
-learning and suppression logic disables itself and automatically retries
-after 30&nbsp;min.
-Sunrise prediction and lux learning operate independently—you can enable either
-one or both depending on available sensors.
-
-> **Note**: Storing a full 24&nbsp;h lux history at one‑minute intervals keeps
-> roughly 1,440 samples in memory (about 6&nbsp;kB). Extended windows or faster
-> sampling require even more RAM, so an ESP32 is recommended when using a large
-> buffer.
-
-| Condition          | Suppression?  | Multiplier                                 | Log Event                   |
-| ------------------ | ------------- | ------------------------------------------ | --------------------------- |
-| Lux spike only     | ✅             | `dynamic_multiplier`                       | `lux_outlier_detected`      |
-| Time-only (no lux) | ❌             | –                                          | –                           |
-| Lux + time window  | ✅ (strongest) | `max(dynamic_multiplier, time_multiplier)` | `sunlight_suppressed_event` |
-
-### CPU Resilience & Multicore · [Back to list](#features)
-
-On multi‑core ESP32s Roode attempts to run the sensor loop on the second core
-for improved responsiveness.  If initialization fails it logs
-`dual_core_fallback` and retries every 5&nbsp;min until it succeeds, logging
-`dual_core_recovered` when normal operation resumes.
-
-### INT Pin Robustness · [Back to list](#features)
-
-Roode monitors the interrupt pin for missed events.  After three interrupt
-fallbacks within 30&nbsp;min it temporarily switches back to polling and resets
-the sensor via the XSHUT pin.
-
-### Context-Aware Calibration · [Back to list](#features)
-
-Repeated manual adjustments are tracked.  If more than five adjustments occur
-within an hour while the lux level is high Roode performs a soft recalibration
-and logs `manual_recalibrate_triggered`.
-
-### Adaptive Filtering · [Back to list](#features)
-
-The filter window dynamically expands when lux spikes four to six times above
-the learned maximum and returns to the default size once lighting stabilises.
-This change is recorded with the `filter_window_changed` log event.
-
-### Light Control · [Back to list](#features)
-
-Lux readings or sunrise predictions can suppress events when direct light would
-cause false counts. `light_control` reports the active mode as `lux`,
-`location` or `both` depending on which inputs are enabled. If neither the light
-sensor nor sunrise prediction is configured the offset value stays `0`.
-
-### Temp Control · [Back to list](#features)
-
-The counter can recalibrate when the ambient temperature changes drastically.
-Temperature-based recalibration is optional—scheduled recalibration works even
-without a temperature sensor. The feature disables itself if the sensor reports
-errors and automatically retries after 30&nbsp;min.
 
 ## Logging and Diagnostics
 
@@ -863,16 +597,6 @@ Optional sensors provide insight into Roode's operation:
 
 See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
 these sensors.
-
-### Logging Events Overview
-
-| Category | Events |
-| --- | --- |
-| **Lux/Light** | `lux_learning_complete`, `lux_outlier_detected`, `sunlight_suppressed_event`, `lux_model_bootstrapping`, `lux_sensor_error` |
-| **Recalibration** | `auto_recalibrate_interval`, `temp_triggered_recalibration`, `idle_triggered_recalibration`, `recalibrate_cooldown_active`, `manual_recalibrate_triggered`, `temperature_sensor_error` |
-| **CPU/Core** | `dual_core_fallback`, `dual_core_recovered` |
-| **Interrupt** | `interrupt_fallback`, `int_pin_missed` |
-| **Filtering** | `filter_window_changed` |
 
 
 ## FAQ/Troubleshoot

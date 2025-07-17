@@ -274,17 +274,12 @@ void Roode::setup() {
     expected_counter_ = people_counter->state;
 
   publish_feature_list();
-  feature_list_published_ = enabled_features_sensor != nullptr;
   last_recalibrate_ts_ = static_cast<uint32_t>(time(nullptr));
   last_auto_recalibrate_ts_ = last_recalibrate_ts_;
   update_sun_times();
 }
 
 void Roode::update() {
-  if (!feature_list_published_ && enabled_features_sensor != nullptr) {
-    publish_feature_list();
-    feature_list_published_ = true;
-  }
   if (distance_entry != nullptr) {
     distance_entry->publish_state(entry->getDistance());
   }
@@ -1002,27 +997,6 @@ void Roode::publish_feature_list() {
   uint32_t last_cal_epoch =
       std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   features.push_back({"calibration", fmt_time(last_cal_epoch)});
-  bool sched_enabled = auto_recalibrate_interval_sec_ > 0 ||
-                       idle_recalib_interval_sec_ > 0 ||
-                       (recalibrate_on_temp_change_ && temperature_sensor_operational_);
-  features.push_back({"scheduled_recalibration", sched_enabled ? "enabled" : "disabled"});
-  bool light_enabled = use_light_sensor_ && lux_sensor_ != nullptr && lux_sensor_operational_;
-  features.push_back({"ambient_light_learning", light_enabled ? "enabled" : "disabled"});
-  std::string light_ctrl = "off";
-  if (light_enabled && use_sunrise_prediction_)
-    light_ctrl = "both";
-  else if (light_enabled)
-    light_ctrl = "lux";
-  else if (use_sunrise_prediction_)
-    light_ctrl = "location";
-  features.push_back({"light_control", light_ctrl});
-  std::string temp_ctrl = (recalibrate_on_temp_change_ && temperature_sensor_operational_) ? "enabled" : "disabled";
-  features.push_back({"temp_control", temp_ctrl});
-  features.push_back({"light_control_status", std::to_string(light_control_offset_)});
-  features.push_back({"cpu_resilience", "supported"});
-  features.push_back({"int_pin_robustness", "supported"});
-  features.push_back({"context_calibration", "supported"});
-  features.push_back({"adaptive_filtering", "supported"});
 
   std::string feature_list;
   for (size_t i = 0; i < features.size(); ++i) {

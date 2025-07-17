@@ -215,6 +215,11 @@ void Roode::setup() {
   loop_window_start_ = millis();
   loop_time_sum_ = 0;
   loop_count_ = 0;
+  sample_buffer_total_ = (86400UL * 1000UL) / polling_interval_ms_;
+  sample_buffer_count_ = 0;
+  uint32_t last_cal_epoch = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  if (last_cal_epoch != 0)
+    next_calibration_ts_ = last_cal_epoch + 86400;
   if (status_sensor != nullptr)
     status_sensor->publish_state(sensor_status);
 
@@ -291,8 +296,11 @@ void Roode::loop() {
   }
   unsigned long start = micros();
   VL53L1_Error status = this->current_zone->readDistance(distanceSensor);
-  if (status == VL53L1_ERROR_NONE)
+  if (status == VL53L1_ERROR_NONE) {
     last_loop_update_ts_ = millis();
+    if (sample_buffer_count_ < sample_buffer_total_)
+      sample_buffer_count_++;
+  }
   bool zone_trig = current_zone->getMinDistance() < current_zone->threshold->max &&
                    current_zone->getMinDistance() > current_zone->threshold->min;
   if (!cpu_optimizations_active_ || zone_trig)
@@ -510,6 +518,7 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   if (calibration_persistence_) {
     calibration_prefs_[zone_id].save(&calibration_data_[zone_id]);
   }
+  next_calibration_ts_ = calibration_data_[zone_id].last_calibrated_ts + 86400;
 
   // Publish the updated calibration data so Home Assistant sees the new
   // thresholds and ROI values immediately after a fail-safe recalibration
@@ -626,6 +635,7 @@ void Roode::calibrate_zones() {
                           static_cast<uint32_t>(time(nullptr))};
   calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max,
                           static_cast<uint32_t>(time(nullptr))};
+  next_calibration_ts_ = calibration_data_[0].last_calibrated_ts + 86400;
 
   if (calibration_persistence_) {
     calibration_prefs_[0].save(&calibration_data_[0]);
@@ -728,6 +738,24 @@ void Roode::publish_feature_list() {
   features.push_back({"calibration_value", std::to_string(entry->threshold->idle)});
   uint32_t last_cal_epoch = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   features.push_back({"calibration", fmt_time(last_cal_epoch)});
+  if (next_calibration_ts_ == 0)
+    features.push_back({"scheduled_calibration", "error"});
+  else
+    features.push_back({"scheduled_calibration", fmt_time(next_calibration_ts_)});
+  if (sample_buffer_total_ == 0)
+    features.push_back({"buffer", "error"});
+  else {
+    char buf[8];
+    float pct = ((float) sample_buffer_count_ / (float) sample_buffer_total_) * 100.0f;
+    snprintf(buf, sizeof(buf), "%.0f%%", pct);
+    features.push_back({"buffer", buf});
+  }
+  if (!sun_tracking_enabled_)
+    features.push_back({"sun_event", "none"});
+  else if (next_sun_event_ts_ == 0)
+    features.push_back({"sun_event", "error"});
+  else
+    features.push_back({"sun_event", fmt_time(next_sun_event_ts_)});
 
   std::string feature_list;
   for (size_t i = 0; i < features.size(); ++i) {
@@ -767,8 +795,11 @@ void Roode::sensor_task(void *param) {
     }
     unsigned long start = micros();
     VL53L1_Error status = self->current_zone->readDistance(self->distanceSensor);
-    if (status == VL53L1_ERROR_NONE)
+    if (status == VL53L1_ERROR_NONE) {
       self->last_loop_update_ts_ = millis();
+      if (self->sample_buffer_count_ < self->sample_buffer_total_)
+        self->sample_buffer_count_++;
+    }
     bool zone_trig = self->current_zone->getMinDistance() < self->current_zone->threshold->max &&
                      self->current_zone->getMinDistance() > self->current_zone->threshold->min;
     if (!self->cpu_optimizations_active_ || zone_trig)

@@ -112,6 +112,9 @@ class Roode : public PollingComponent {
   void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
   void set_sensor_status_text_sensor(text_sensor::TextSensor *sensor_) { status_text_sensor = sensor_; }
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
+  void set_next_calibration_time(uint32_t ts) { next_calibration_ts_ = ts; }
+  void set_sun_event_time(uint32_t ts) { next_sun_event_ts_ = ts; }
+  void enable_sun_tracking(bool en) { sun_tracking_enabled_ = en; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
@@ -226,6 +229,11 @@ class Roode : public PollingComponent {
   uint32_t loop_count_{0};
   uint32_t last_loop_update_ts_{0};
   uint32_t last_sensor_restart_ts_{0};
+  uint32_t next_calibration_ts_{0};
+  uint32_t sample_buffer_count_{0};
+  uint32_t sample_buffer_total_{0};
+  bool sun_tracking_enabled_{false};
+  uint32_t next_sun_event_ts_{0};
   static void sensor_task(void *param);
   bool use_sensor_task_{false};
   void restart_sensor();

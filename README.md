@@ -422,7 +422,8 @@ text_sensor:
 ```
 The features string lists items as `name:value` pairs separated by new lines.
 The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
-`cpu_cores`, `ram`, `flash`, `calibration_value` and `calibration`.
+`cpu_cores`, `ram`, `flash`, `calibration_value`, `calibration`,
+`scheduled_calibration`, `buffer` and `sun_event`.
 Memory values are printed with **KB**, **MB** or **GB** units. Calibration time
 uses the device clock in `h:MMAM/PM` format or displays `unknown` if the clock
 has not been initialised.
@@ -439,6 +440,9 @@ ram:309KB
 flash:16MB
 calibration_value:1399
 calibration:6:01PM
+scheduled_calibration:6:01PM
+buffer:100%
+sun_event:none
 ```
 
 #### Sensor Reference

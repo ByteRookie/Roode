@@ -367,6 +367,10 @@ select:
   - platform: roode
     filter_mode:
       name: Filter Mode
+      options:
+        - min
+        - median
+        - percentile10
 switch:
   - platform: roode
     log_fallback_events:

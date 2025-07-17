@@ -3,6 +3,7 @@
 #include "esphome/components/select/select.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
+#include <string>
 
 namespace esphome {
 namespace select {

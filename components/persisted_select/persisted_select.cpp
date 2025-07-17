@@ -1,5 +1,6 @@
 #include "persisted_select.h"
 #include "esphome/core/log.h"
+#include <string>
 
 namespace esphome {
 namespace select {

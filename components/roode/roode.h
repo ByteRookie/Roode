@@ -129,7 +129,17 @@ class Roode : public PollingComponent {
     if (num != nullptr)
       num->publish_state(filter_window_);
   }
-  void set_filter_mode_select(select::Select *sel) { filter_mode_select = sel; }
+  void set_filter_mode_select(select::Select *sel) {
+    filter_mode_select = sel;
+    if (sel != nullptr) {
+      const char *mode_str = "min";
+      if (filter_mode_ == FILTER_MEDIAN)
+        mode_str = "median";
+      else if (filter_mode_ == FILTER_PERCENTILE10)
+        mode_str = "percentile10";
+      sel->publish_state(mode_str);
+    }
+  }
   void set_entry_min_threshold_number(number::Number *num) {
     entry_min_threshold_number = num;
     if (num != nullptr && entry->threshold->min_percentage.has_value())

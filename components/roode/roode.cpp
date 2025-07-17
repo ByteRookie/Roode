@@ -999,7 +999,7 @@ void Roode::publish_feature_list() {
 
   auto fmt_time = [](uint32_t epoch) {
     if (epoch == 0)
-      return std::string("unknown");
+      return std::string("error");
     time_t t = epoch;
     struct tm tm_time;
 
@@ -1008,10 +1008,10 @@ void Roode::publish_feature_list() {
 
     if (use_utc) {
       if (!gmtime_r(&t, &tm_time))
-        return std::string("unknown");
+        return std::string("error");
     } else {
       if (!localtime_r(&t, &tm_time))
-        return std::string("unknown");
+        return std::string("error");
     }
 
     char buf[16];
@@ -1062,6 +1062,8 @@ void Roode::publish_feature_list() {
   features.push_back({"light_control_status", buf});
   if (auto_recalibrate_interval_sec_ > 0) {
     uint32_t next_cal = last_auto_recalibrate_ts_ + auto_recalibrate_interval_sec_;
+    if (last_auto_recalibrate_ts_ == 0)
+      next_cal = 0;
     features.push_back({"schedule_calibration", fmt_time(next_cal)});
   } else {
     features.push_back({"schedule_calibration", "disabled"});

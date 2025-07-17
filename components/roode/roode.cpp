@@ -299,7 +299,8 @@ void Roode::loop() {
   } else {
     invalid_read_count_ = 0;
   }
-  if (invalid_read_count_ > 10 && (now - last_sensor_restart_ts_ > 30000)) {
+  if (invalid_read_count_ > invalid_distance_limit_ &&
+      (now - last_sensor_restart_ts_ > 30000)) {
     ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
     restart_sensor();
     last_sensor_restart_ts_ = now;
@@ -787,7 +788,8 @@ void Roode::sensor_task(void *param) {
     } else {
       self->invalid_read_count_ = 0;
     }
-    if (self->invalid_read_count_ > 10 && (now - self->last_sensor_restart_ts_ > 30000)) {
+    if (self->invalid_read_count_ > self->invalid_distance_limit_ &&
+        (now - self->last_sensor_restart_ts_ > 30000)) {
       ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
       self->restart_sensor();
       self->last_sensor_restart_ts_ = now;

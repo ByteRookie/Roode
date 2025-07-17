@@ -6,6 +6,7 @@ from esphome.components import number
 from esphome.const import (
     CONF_ID,
     CONF_RESTORE_VALUE,
+    CONF_MODE,
 )
 
 PersistedNumber = number.number_ns.class_(
@@ -16,6 +17,7 @@ PERSISTED_NUMBER_SCHEMA = number.number_schema(PersistedNumber).extend(
     {
         cv.GenerateID(): cv.declare_id(PersistedNumber),
         cv.Optional(CONF_RESTORE_VALUE, default=True): cv.boolean,
+        cv.Optional(CONF_MODE, default="box"): cv.enum(number.NUMBER_MODES, lower=True),
     }
 )
 

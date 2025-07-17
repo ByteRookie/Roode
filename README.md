@@ -375,7 +375,7 @@ switch:
       name: Invert Direction
 ```
 
-The people counter value, sampling size, filter mode, filter window, detection thresholds and switches can now be adjusted via Home Assistant without reflashing.
+The people counter value, sampling size, filter mode, filter window, detection thresholds and switches can now be adjusted via Home Assistant without reflashing. All numbers are shown as input boxes for direct entry.
 All entities are created automatically when the component is used.
 
 #### Other sensors available

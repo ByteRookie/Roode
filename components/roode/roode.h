@@ -80,7 +80,11 @@ class Roode : public PollingComponent {
     if (sampling_size_number != nullptr)
       sampling_size_number->publish_state(size);
   }
-  void set_sampling_size_number(number::Number *num) { sampling_size_number = num; }
+  void set_sampling_size_number(number::Number *num) {
+    sampling_size_number = num;
+    if (num != nullptr)
+      num->publish_state(samples);
+  }
   void set_distance_entry(sensor::Sensor *distance_entry_) { distance_entry = distance_entry_; }
   void set_distance_exit(sensor::Sensor *distance_exit_) { distance_exit = distance_exit_; }
   void set_people_counter(number::Number *counter) { this->people_counter = counter; }
@@ -120,12 +124,32 @@ class Roode : public PollingComponent {
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_log_fallback_switch(switch_::Switch *sw) { log_fallback_switch_ = sw; }
   void set_invert_direction_switch(switch_::Switch *sw) { invert_direction_switch_ = sw; }
-  void set_filter_window_number(number::Number *num) { filter_window_number = num; }
+  void set_filter_window_number(number::Number *num) {
+    filter_window_number = num;
+    if (num != nullptr)
+      num->publish_state(filter_window_);
+  }
   void set_filter_mode_select(select::Select *sel) { filter_mode_select = sel; }
-  void set_entry_min_threshold_number(number::Number *num) { entry_min_threshold_number = num; }
-  void set_entry_max_threshold_number(number::Number *num) { entry_max_threshold_number = num; }
-  void set_exit_min_threshold_number(number::Number *num) { exit_min_threshold_number = num; }
-  void set_exit_max_threshold_number(number::Number *num) { exit_max_threshold_number = num; }
+  void set_entry_min_threshold_number(number::Number *num) {
+    entry_min_threshold_number = num;
+    if (num != nullptr && entry->threshold->min_percentage.has_value())
+      num->publish_state(*entry->threshold->min_percentage);
+  }
+  void set_entry_max_threshold_number(number::Number *num) {
+    entry_max_threshold_number = num;
+    if (num != nullptr && entry->threshold->max_percentage.has_value())
+      num->publish_state(*entry->threshold->max_percentage);
+  }
+  void set_exit_min_threshold_number(number::Number *num) {
+    exit_min_threshold_number = num;
+    if (num != nullptr && exit->threshold->min_percentage.has_value())
+      num->publish_state(*exit->threshold->min_percentage);
+  }
+  void set_exit_max_threshold_number(number::Number *num) {
+    exit_max_threshold_number = num;
+    if (num != nullptr && exit->threshold->max_percentage.has_value())
+      num->publish_state(*exit->threshold->max_percentage);
+  }
   void set_force_single_core(bool val) { force_single_core_ = val; }
   void set_auto_recalibrate_interval(uint32_t seconds) { auto_recalibrate_interval_sec_ = seconds; }
   void set_recalibrate_on_temp_change(bool val) { recalibrate_on_temp_change_ = val; }

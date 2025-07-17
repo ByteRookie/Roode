@@ -1030,6 +1030,8 @@ void Roode::publish_feature_list() {
   features.push_back({"flash", fmt_bytes(ESP.getFlashChipSize())});
   features.push_back({"calibration_value", std::to_string(entry->threshold->idle)});
   uint32_t last_cal_epoch = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  if (last_cal_epoch == 0)
+    last_cal_epoch = last_recalibrate_ts_;
   features.push_back({"calibration", fmt_time(last_cal_epoch)});
 
   std::string light_ctrl;

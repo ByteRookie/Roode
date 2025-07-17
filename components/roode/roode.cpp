@@ -298,8 +298,7 @@ void Roode::update() {
     if (val.has_value())
       interrupt_status_sensor->publish_state(*val ? 1 : 0);
   }
-  if (!feature_list_published_ && enabled_features_sensor != nullptr &&
-      !feature_list_cache_.empty()) {
+  if (enabled_features_sensor != nullptr && !feature_list_cache_.empty()) {
     enabled_features_sensor->publish_state(feature_list_cache_);
     feature_list_published_ = true;
   }

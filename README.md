@@ -363,14 +363,6 @@ number:
       name: Exit Min %
     exit_max_threshold:
       name: Exit Max %
-select:
-  - platform: roode
-    filter_mode:
-      name: Filter Mode
-      options:
-        - min
-        - median
-        - percentile10
 switch:
   - platform: roode
     log_fallback_events:
@@ -379,7 +371,7 @@ switch:
       name: Invert Direction
 ```
 
-The people counter value, sampling size, filter mode, filter window, detection thresholds and switches can now be adjusted via Home Assistant without reflashing. All numbers are shown as input boxes for direct entry.
+The people counter value, sampling size, filter mode, filter window, detection thresholds and switches can now be adjusted via Home Assistant without reflashing. All numbers are shown as input boxes for direct entry. The Filter Mode select is also created automatically.
 All entities are created automatically when the component is used.
 
 #### Other sensors available

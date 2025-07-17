@@ -8,8 +8,12 @@ from esphome.const import (
     CONF_INVERT,
     CONF_SENSOR,
     CONF_WIDTH,
+    CONF_NAME,
+    CONF_OPTIONS,
+    CONF_ICON,
 )
 from ..vl53l1x import distance_as_mm, NullableSchema, VL53L1X
+from ..persisted_select import PERSISTED_SELECT_SCHEMA, new_persisted_select
 
 DEPENDENCIES = ["vl53l1x"]
 AUTO_LOAD = [
@@ -44,6 +48,7 @@ CONF_FILTER_MODE = "filter_mode"
 CONF_FILTER_WINDOW = "filter_window"
 CONF_LOG_FALLBACK = "log_fallback_events"
 CONF_FORCE_SINGLE_CORE = "force_single_core"
+CONF_FILTER_MODE_SELECT = "filter_mode_select"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -121,6 +126,12 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(
             FILTER_MODES, upper=False
         ),
+        cv.Optional(
+            CONF_FILTER_MODE_SELECT,
+            default={CONF_NAME: "Filter Mode", CONF_OPTIONS: list(FILTER_MODES.keys())},
+        ): PERSISTED_SELECT_SCHEMA.extend(
+            {cv.Optional(CONF_ICON, default="mdi:filter"): cv.icon}
+        ),
         cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_LOG_FALLBACK, default=False): cv.boolean,
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
@@ -171,6 +182,8 @@ async def to_code(config: Dict):
     cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
     cg.add(roode.set_calibration_persistence(config[CONF_CALIBRATION_PERSISTENCE]))
     cg.add(roode.set_filter_mode(config[CONF_FILTER_MODE]))
+    sel = await new_persisted_select(config[CONF_FILTER_MODE_SELECT])
+    cg.add(roode.set_filter_mode_select(sel))
     cg.add(roode.set_filter_window(config[CONF_FILTER_WINDOW]))
     cg.add(roode.set_log_fallback_events(config[CONF_LOG_FALLBACK]))
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))

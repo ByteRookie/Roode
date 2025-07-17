@@ -448,12 +448,13 @@ roode:
   temperature_sensor: temperature
 ```
 The features string lists items as `name:value` pairs separated by new lines.
-The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
-`cpu_cores`, `ram`, `flash`, `calibration_value` and `calibration`.
-Memory values are printed with **KB**, **MB** or **GB** units. Calibration time
-uses the device clock in `h:MMAM/PM` format or displays `unknown` if the clock
-has not been initialised. When the device falls back to UTC because no time
-zone was provided by Home Assistant, the time is followed by `(UTC)`.
+Fields include `xshut`, `refresh`, `cpu_mode`, `cpu`,
+`cpu_cores`, `ram`, `flash`, `calibration_value`, `calibration` and
+`schedule_calibration`. When ambient light learning is enabled you will also see
+`buffer` and `sun_event`. Memory values are printed with **KB**, **MB** or **GB**
+units. Calibration time uses the device clock in `M/D h:MMAM/PM` format or
+displays `unknown` if the clock has not been initialised. When the device falls
+back to UTC because no time zone was provided, the time is followed by `UTC`.
 
 Example output:
 
@@ -467,6 +468,9 @@ ram:309KB
 flash:16MB
 calibration_value:1399
 calibration:6:01PM (UTC)
+schedule_calibration:01/01 12:06AM UTC
+buffer:80%
+sun_event:sunset 01/01 05:00PM UTC
 ```
 
 ### Threshold distance
@@ -616,8 +620,10 @@ interrupt and polling mode, and manual adjustments to the people count.
 
 The `enabled_features` text sensor summarizes which runtime features are active.
 Typical values include `dual_core` or `single_core`, `xshut` or `no_xshut`, and
-`interrupt` or `polling`. This helps verify that the hardware pins and options
-are detected correctly.
+`interrupt` or `polling`. Additional fields show the last calibration time, the
+next scheduled calibration, the fill level of the ambient light buffer and the
+upcoming sunrise or sunset when tracking is enabled. This helps verify that the
+hardware pins and options are detected correctly.
 
 ### Diagnostic sensors
 

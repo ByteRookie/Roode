@@ -295,6 +295,7 @@ class Roode : public PollingComponent {
   static void sensor_task(void *param);
   bool use_sensor_task_{false};
   bool calibration_time_validated_{false};
+  uint32_t last_feature_retry_ts_{0};
 };
 
 }  // namespace roode

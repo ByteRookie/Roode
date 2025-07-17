@@ -354,6 +354,13 @@ void Roode::update() {
   check_context_calibration();
   check_multicore_recovery();
   check_auto_recalibration();
+  if (enabled_features_sensor != nullptr &&
+      (enabled_features_sensor->state.empty() || enabled_features_sensor->state == "unknown")) {
+    uint32_t now_s = millis() / 1000;
+    if (now_s - last_feature_retry_ts_ >= 30) {
+      publish_feature_list();
+    }
+  }
 }
 
 void Roode::loop() {
@@ -985,6 +992,7 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
 }
 
 void Roode::publish_feature_list() {
+  last_feature_retry_ts_ = millis() / 1000;
   update_sun_times();
   auto fmt_bytes = [](uint32_t bytes) {
     char buf[16];
@@ -1061,8 +1069,8 @@ void Roode::publish_feature_list() {
   snprintf(buf, sizeof(buf), "%.1f", light_control_offset_);
   features.push_back({"light_control_status", buf});
   if (auto_recalibrate_interval_sec_ > 0) {
-    uint32_t next_cal = last_auto_recalibrate_ts_ + auto_recalibrate_interval_sec_;
-    if (last_auto_recalibrate_ts_ == 0)
+    uint32_t next_cal = last_recalibrate_ts_ + auto_recalibrate_interval_sec_;
+    if (last_recalibrate_ts_ == 0)
       next_cal = 0;
     features.push_back({"schedule_calibration", fmt_time(next_cal)});
   } else {

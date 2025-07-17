@@ -455,6 +455,7 @@ Memory values are printed with **KB**, **MB** or **GB** units. Calibration time
 uses the device clock in `h:MMAM/PM` format or displays `error` if the clock
 has not been initialised. When the device falls back to UTC because no time
 zone was provided by Home Assistant, the time is followed by `(UTC)`.
+If the text sensor starts as `unknown` it retries after 30&nbsp;seconds.
 
 Example output:
 

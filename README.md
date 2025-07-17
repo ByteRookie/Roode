@@ -616,10 +616,8 @@ interrupt and polling mode, and manual adjustments to the people count.
 
 The `enabled_features` text sensor summarizes which runtime features are active.
 Typical values include `dual_core` or `single_core`, `xshut` or `no_xshut`, and
-`interrupt` or `polling`. Additional fields show the last calibration time, the
-next scheduled calibration, the fill level of the ambient light buffer and the
-upcoming sunrise or sunset when tracking is enabled. This helps verify that the
-hardware pins and options are detected correctly.
+`interrupt` or `polling`. This helps verify that the hardware pins and options
+are detected correctly.
 
 ### Diagnostic sensors
 

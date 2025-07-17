@@ -21,7 +21,6 @@ CONF_ENTRY_MIN_THRESHOLD = "entry_min_threshold"
 CONF_ENTRY_MAX_THRESHOLD = "entry_max_threshold"
 CONF_EXIT_MIN_THRESHOLD = "exit_min_threshold"
 CONF_EXIT_MAX_THRESHOLD = "exit_max_threshold"
-CONF_FILTER_MODE_NUMBER = "filter_mode"
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -42,15 +41,6 @@ CONFIG_SCHEMA = cv.Schema(
             {
                 cv.Optional(CONF_ICON, default="mdi:chart-histogram"): cv.icon,
                 cv.Optional(CONF_MAX_VALUE, 10): cv.int_range(1, 10),
-            }
-        ),
-        cv.Optional(
-            CONF_FILTER_MODE_NUMBER,
-            default={CONF_NAME: "Filter Mode"},
-        ): PERSISTED_NUMBER_SCHEMA.extend(
-            {
-                cv.Optional(CONF_ICON, default="mdi:filter" ): cv.icon,
-                cv.Optional(CONF_MAX_VALUE, 2): cv.int_range(0, 2),
             }
         ),
         cv.Optional(
@@ -116,13 +106,6 @@ async def setup_sampling_size(config: OrderedDict, hub: MockObj):
     cg.add(hub.set_sampling_size_number(sampler))
 
 
-async def setup_filter_mode(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(
-        config, min_value=0, step=1, max_value=config[CONF_MAX_VALUE]
-    )
-    cg.add(hub.set_filter_mode_number(num))
-
-
 async def setup_filter_window(config: OrderedDict, hub: MockObj):
     win = await new_persisted_number(
         config, min_value=1, step=1, max_value=config[CONF_MAX_VALUE]
@@ -162,7 +145,6 @@ async def to_code(config: OrderedDict):
     hub = await cg.get_variable(config[CONF_ROODE_ID])
     await setup_people_counter(config[CONF_PEOPLE_COUNTER], hub)
     await setup_sampling_size(config[CONF_SAMPLING_SIZE], hub)
-    await setup_filter_mode(config[CONF_FILTER_MODE_NUMBER], hub)
     await setup_filter_window(config[CONF_FILTER_WINDOW], hub)
     await setup_entry_threshold_min(config[CONF_ENTRY_MIN_THRESHOLD], hub)
     await setup_entry_threshold_max(config[CONF_ENTRY_MAX_THRESHOLD], hub)

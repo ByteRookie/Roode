@@ -353,8 +353,6 @@ number:
       name: People Count
     sampling_size:
       name: Sampling Size
-    filter_mode:
-      name: Filter Mode
     filter_window:
       name: Filter Window
     entry_min_threshold:
@@ -365,6 +363,10 @@ number:
       name: Exit Min %
     exit_max_threshold:
       name: Exit Max %
+select:
+  - platform: roode
+    filter_mode:
+      name: Filter Mode
 switch:
   - platform: roode
     log_fallback_events:

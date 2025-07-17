@@ -7,6 +7,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
+#include "esphome/components/select/select.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
@@ -120,7 +121,7 @@ class Roode : public PollingComponent {
   void set_log_fallback_switch(switch_::Switch *sw) { log_fallback_switch_ = sw; }
   void set_invert_direction_switch(switch_::Switch *sw) { invert_direction_switch_ = sw; }
   void set_filter_window_number(number::Number *num) { filter_window_number = num; }
-  void set_filter_mode_number(number::Number *num) { filter_mode_number = num; }
+  void set_filter_mode_select(select::Select *sel) { filter_mode_select = sel; }
   void set_entry_min_threshold_number(number::Number *num) { entry_min_threshold_number = num; }
   void set_entry_max_threshold_number(number::Number *num) { entry_max_threshold_number = num; }
   void set_exit_min_threshold_number(number::Number *num) { exit_min_threshold_number = num; }
@@ -188,7 +189,7 @@ class Roode : public PollingComponent {
   sensor::Sensor *distance_exit{nullptr};
   number::Number *people_counter{nullptr};
   number::Number *sampling_size_number{nullptr};
-  number::Number *filter_mode_number{nullptr};
+  select::Select *filter_mode_select{nullptr};
   number::Number *filter_window_number{nullptr};
   number::Number *entry_min_threshold_number{nullptr};
   number::Number *entry_max_threshold_number{nullptr};

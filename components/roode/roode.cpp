@@ -14,6 +14,19 @@
 namespace esphome {
 namespace roode {
 
+static const char *filter_mode_to_string(FilterMode mode) {
+  switch (mode) {
+    case FILTER_MIN:
+      return "min";
+    case FILTER_MEDIAN:
+      return "median";
+    case FILTER_PERCENTILE10:
+      return "percentile10";
+    default:
+      return "min";
+  }
+}
+
 // When disabled, fallback diagnostics are omitted from the log to reduce noise.
 bool Roode::log_fallback_events_ = false;
 Roode *Roode::instance_ = nullptr;
@@ -307,8 +320,8 @@ void Roode::setup() {
     expected_counter_ = people_counter->state;
   if (sampling_size_number != nullptr)
     sampling_size_number->publish_state(samples);
-  if (filter_mode_number != nullptr)
-    filter_mode_number->publish_state(filter_mode_);
+  if (filter_mode_select != nullptr)
+    filter_mode_select->publish_state(filter_mode_to_string(filter_mode_));
   if (filter_window_number != nullptr)
     filter_window_number->publish_state(filter_window_);
   if (entry_min_threshold_number != nullptr && entry->threshold->min_percentage.has_value())
@@ -359,9 +372,14 @@ void Roode::update() {
       fabs(sampling_size_number->state - samples) > 0.001f) {
     set_sampling_size(static_cast<uint8_t>(sampling_size_number->state));
   }
-  if (filter_mode_number != nullptr &&
-      fabs(filter_mode_number->state - filter_mode_) > 0.001f) {
-    set_filter_mode(static_cast<FilterMode>(static_cast<int>(filter_mode_number->state)));
+  if (filter_mode_select != nullptr &&
+      filter_mode_select->state != filter_mode_to_string(filter_mode_)) {
+    if (filter_mode_select->state == "median")
+      set_filter_mode(FILTER_MEDIAN);
+    else if (filter_mode_select->state == "percentile10")
+      set_filter_mode(FILTER_PERCENTILE10);
+    else
+      set_filter_mode(FILTER_MIN);
   }
   if (filter_window_number != nullptr &&
       fabs(filter_window_number->state - filter_window_) > 0.001f) {

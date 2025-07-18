@@ -24,7 +24,8 @@ PERSISTED_SELECT_SCHEMA = select.select_schema(PersistedSelect).extend(
 
 
 async def new_persisted_select(config):
-    var = await select.new_select(config, options=config[CONF_OPTIONS])
+    var = cg.new_Pvariable(config[CONF_ID], PersistedSelect)
+    await select.register_select(var, config, options=config[CONF_OPTIONS])
     await cg.register_component(var, config)
     if CONF_RESTORE_VALUE in config:
         cg.add(var.set_restore_value(config[CONF_RESTORE_VALUE]))

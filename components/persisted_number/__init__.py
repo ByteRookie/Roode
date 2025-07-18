@@ -30,8 +30,13 @@ async def new_persisted_number(
     max_value: float,
     step: Optional[float] = None,
 ):
-    var = await number.new_number(
-        config, min_value=min_value, max_value=max_value, step=step
+    var = cg.new_Pvariable(config[CONF_ID], PersistedNumber)
+    await number.register_number(
+        var,
+        config,
+        min_value=min_value,
+        max_value=max_value,
+        step=step,
     )
     await cg.register_component(var, config)
     if CONF_RESTORE_VALUE in config:

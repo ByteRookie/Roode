@@ -17,7 +17,9 @@ PERSISTED_NUMBER_SCHEMA = number.number_schema(PersistedNumber).extend(
     {
         cv.GenerateID(): cv.declare_id(PersistedNumber),
         cv.Optional(CONF_RESTORE_VALUE, default=True): cv.boolean,
-        cv.Optional(CONF_MODE, default="BOX"): cv.enum(number.NUMBER_MODES),
+        # Accept common lowercase values like "box" as well as the official
+        # ESPHome constants
+        cv.Optional(CONF_MODE, default="BOX"): cv.enum(number.NUMBER_MODES, upper=True),
     }
 )
 

@@ -27,7 +27,7 @@ PERSISTED_SELECT_SCHEMA = cv.Schema(
 
 
 async def new_persisted_select(config):
-    var = await select.new_select(config)
+    var = await select.new_select(config, options=config[CONF_OPTIONS])
     await cg.register_component(var, config)
     if CONF_RESTORE_VALUE in config:
         cg.add(var.set_restore_value(config[CONF_RESTORE_VALUE]))

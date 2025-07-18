@@ -5,7 +5,7 @@
 #include "esphome/core/preferences.h"
 
 namespace esphome {
-namespace switch_ {
+namespace persisted_switch {
 
 class PersistedSwitch : public switch_::Switch, public Component {
  public:
@@ -19,5 +19,5 @@ class PersistedSwitch : public switch_::Switch, public Component {
   ESPPreferenceObject pref_;
 };
 
-}  // namespace switch_
+}  // namespace persisted_switch
 }  // namespace esphome

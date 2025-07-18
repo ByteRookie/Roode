@@ -6,7 +6,7 @@
 #include <string>
 
 namespace esphome {
-namespace select {
+namespace persisted_select {
 
 class PersistedSelect : public select::Select, public Component {
  public:
@@ -20,5 +20,5 @@ class PersistedSelect : public select::Select, public Component {
   ESPPreferenceObject pref_;
 };
 
-}  // namespace select
+}  // namespace persisted_select
 }  // namespace esphome

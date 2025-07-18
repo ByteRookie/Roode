@@ -2,7 +2,7 @@
 #include "esphome/core/log.h"
 
 namespace esphome {
-namespace number {
+namespace persisted_number {
 
 auto PersistedNumber::control(float newValue) -> void {
   this->publish_state(newValue);
@@ -27,5 +27,5 @@ auto PersistedNumber::setup() -> void {
   this->publish_state(value);
 }
 
-}  // namespace number
+}  // namespace persisted_number
 }  // namespace esphome

@@ -5,7 +5,7 @@
 #include "esphome/core/preferences.h"
 
 namespace esphome {
-namespace number {
+namespace persisted_number {
 
 class PersistedNumber : public number::Number, public Component {
  public:
@@ -20,5 +20,5 @@ class PersistedNumber : public number::Number, public Component {
   ESPPreferenceObject pref_;
 };
 
-}  // namespace number
+}  // namespace persisted_number
 }  // namespace esphome

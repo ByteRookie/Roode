@@ -2,7 +2,7 @@
 #include "esphome/core/log.h"
 
 namespace esphome {
-namespace switch_ {
+namespace persisted_switch {
 
 void PersistedSwitch::write_state(bool state) {
   this->publish_state(state);
@@ -24,5 +24,5 @@ void PersistedSwitch::setup() {
   this->publish_state(value);
 }
 
-}  // namespace switch_
+}  // namespace persisted_switch
 }  // namespace esphome

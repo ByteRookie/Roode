@@ -9,8 +9,11 @@ from esphome.const import (
     CONF_MODE,
 )
 
-PersistedNumber = number.number_ns.class_(
-    "PersistedNumber", number.Number, cg.Component
+persisted_number_ns = cg.esphome_ns.namespace("persisted_number")
+PersistedNumber = persisted_number_ns.class_(
+    "PersistedNumber",
+    number.Number,
+    cg.Component,
 )
 
 PERSISTED_NUMBER_SCHEMA = number.number_schema(PersistedNumber).extend(

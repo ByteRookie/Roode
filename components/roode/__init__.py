@@ -24,6 +24,9 @@ AUTO_LOAD = [
     "number",
     "switch",
     "select",
+    "persisted_number",
+    "persisted_switch",
+    "persisted_select",
 ]
 MULTI_CONF = True
 

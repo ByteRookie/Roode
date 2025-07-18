@@ -10,8 +10,11 @@ from esphome.const import (
     CONF_RESTORE_VALUE,
 )
 
-PersistedSelect = select.select_ns.class_(
-    "PersistedSelect", select.Select, cg.Component
+persisted_select_ns = cg.esphome_ns.namespace("persisted_select")
+PersistedSelect = persisted_select_ns.class_(
+    "PersistedSelect",
+    select.Select,
+    cg.Component,
 )
 
 PERSISTED_SELECT_SCHEMA = select.select_schema(PersistedSelect).extend(

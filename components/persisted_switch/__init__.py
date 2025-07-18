@@ -3,7 +3,12 @@ import esphome.config_validation as cv
 from esphome.components import switch
 from esphome.const import CONF_ID, CONF_RESTORE_VALUE
 
-PersistedSwitch = switch.switch_ns.class_("PersistedSwitch", switch.Switch, cg.Component)
+persisted_switch_ns = cg.esphome_ns.namespace("persisted_switch")
+PersistedSwitch = persisted_switch_ns.class_(
+    "PersistedSwitch",
+    switch.Switch,
+    cg.Component,
+)
 
 PERSISTED_SWITCH_SCHEMA = switch.switch_schema(PersistedSwitch).extend(
     {

@@ -31,7 +31,7 @@ CONFIG_SCHEMA = cv.Schema(
         ): PERSISTED_NUMBER_SCHEMA.extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:counter"): cv.icon,
-                cv.Optional(CONF_MAX_VALUE, 10): cv.int_range(-128, 128),
+                cv.Optional(CONF_MAX_VALUE, 10): cv.int_range(min=-128, max=128),
             }
         ),
         cv.Optional(
@@ -40,7 +40,7 @@ CONFIG_SCHEMA = cv.Schema(
         ): PERSISTED_NUMBER_SCHEMA.extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:chart-histogram"): cv.icon,
-                cv.Optional(CONF_MAX_VALUE, 10): cv.int_range(1, 10),
+                cv.Optional(CONF_MAX_VALUE, 10): cv.int_range(min=1, max=10),
             }
         ),
         cv.Optional(
@@ -49,7 +49,7 @@ CONFIG_SCHEMA = cv.Schema(
         ): PERSISTED_NUMBER_SCHEMA.extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:filter"): cv.icon,
-                cv.Optional(CONF_MAX_VALUE, 10): cv.int_range(1, 10),
+                cv.Optional(CONF_MAX_VALUE, 10): cv.int_range(min=1, max=10),
             }
         ),
         cv.Optional(
@@ -58,7 +58,7 @@ CONFIG_SCHEMA = cv.Schema(
         ): PERSISTED_NUMBER_SCHEMA.extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:arrow-collapse-down"): cv.icon,
-                cv.Optional(CONF_MAX_VALUE, 100): cv.int_range(0, 100),
+                cv.Optional(CONF_MAX_VALUE, 100): cv.int_range(min=0, max=100),
             }
         ),
         cv.Optional(
@@ -67,7 +67,7 @@ CONFIG_SCHEMA = cv.Schema(
         ): PERSISTED_NUMBER_SCHEMA.extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:arrow-collapse-up"): cv.icon,
-                cv.Optional(CONF_MAX_VALUE, 100): cv.int_range(0, 100),
+                cv.Optional(CONF_MAX_VALUE, 100): cv.int_range(min=0, max=100),
             }
         ),
         cv.Optional(
@@ -76,7 +76,7 @@ CONFIG_SCHEMA = cv.Schema(
         ): PERSISTED_NUMBER_SCHEMA.extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:arrow-collapse-down"): cv.icon,
-                cv.Optional(CONF_MAX_VALUE, 100): cv.int_range(0, 100),
+                cv.Optional(CONF_MAX_VALUE, 100): cv.int_range(min=0, max=100),
             }
         ),
         cv.Optional(
@@ -85,7 +85,7 @@ CONFIG_SCHEMA = cv.Schema(
         ): PERSISTED_NUMBER_SCHEMA.extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:arrow-collapse-up"): cv.icon,
-                cv.Optional(CONF_MAX_VALUE, 100): cv.int_range(0, 100),
+                cv.Optional(CONF_MAX_VALUE, 100): cv.int_range(min=0, max=100),
             }
         ),
     }

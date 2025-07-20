@@ -283,16 +283,26 @@ void Roode::loop() {
     return;
   }
   uint32_t now = millis();
-  if (last_loop_update_ts_ != 0 && (now - last_loop_update_ts_ > 30000) &&
-      (now - last_sensor_restart_ts_ > 30000)) {
-    ESP_LOGW(TAG, "Sensor unresponsive >30s, restarting...");
+  if (last_loop_update_ts_ != 0 && (now - last_loop_update_ts_ > restart_timeout_ms_) &&
+      (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
+    ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", restart_timeout_ms_ / 1000);
     restart_sensor();
-    last_sensor_restart_ts_ = now;
   }
   unsigned long start = micros();
   VL53L1_Error status = this->current_zone->readDistance(distanceSensor);
   if (status == VL53L1_ERROR_NONE)
     last_loop_update_ts_ = millis();
+  uint16_t dist = this->current_zone->getDistance();
+  if (status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
+    invalid_read_count_++;
+  } else {
+    invalid_read_count_ = 0;
+  }
+  if (invalid_read_count_ > invalid_distance_limit_ &&
+      (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
+    ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
+    restart_sensor();
+  }
   bool zone_trig = current_zone->getMinDistance() < current_zone->threshold->max &&
                    current_zone->getMinDistance() > current_zone->threshold->min;
   if (!cpu_optimizations_active_ || zone_trig)
@@ -750,7 +760,8 @@ void Roode::update_status_text(const std::string &status) {
 
 void Roode::restart_sensor() {
   distanceSensor->restart();
-
+  last_sensor_restart_ts_ = millis();
+  invalid_read_count_ = 0;
 }
 
 void Roode::sensor_task(void *param) {
@@ -759,16 +770,26 @@ void Roode::sensor_task(void *param) {
     self->use_sensor_task_ = true;
     uint32_t now = millis();
     if (self->last_loop_update_ts_ != 0 &&
-        (now - self->last_loop_update_ts_ > 30000) &&
-        (now - self->last_sensor_restart_ts_ > 30000)) {
-      ESP_LOGW(TAG, "Sensor unresponsive >30s, restarting...");
+        (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
+        (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
+      ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", self->restart_timeout_ms_ / 1000);
       self->restart_sensor();
-      self->last_sensor_restart_ts_ = now;
     }
     unsigned long start = micros();
     VL53L1_Error status = self->current_zone->readDistance(self->distanceSensor);
     if (status == VL53L1_ERROR_NONE)
       self->last_loop_update_ts_ = millis();
+    uint16_t dist = self->current_zone->getDistance();
+    if (status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
+      self->invalid_read_count_++;
+    } else {
+      self->invalid_read_count_ = 0;
+    }
+    if (self->invalid_read_count_ > self->invalid_distance_limit_ &&
+        (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
+      ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
+      self->restart_sensor();
+    }
     bool zone_trig = self->current_zone->getMinDistance() < self->current_zone->threshold->max &&
                      self->current_zone->getMinDistance() > self->current_zone->threshold->min;
     if (!self->cpu_optimizations_active_ || zone_trig)

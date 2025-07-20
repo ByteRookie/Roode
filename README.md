@@ -470,6 +470,10 @@ calibration:6:01PM
 | `sensor_status` (text) | text_sensor | "ok", "timeout", "reinitializing", "error" or "offline" |
 | `enabled_features` | text_sensor | List of active runtime features |
 
+Threshold and ROI sensors as well as the `people_counter` number use the
+`config` entity category so they appear under the **Settings** tab of the device
+in Home Assistant.
+
 
 ### Threshold distance
 

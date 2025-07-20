@@ -6,13 +6,16 @@ from esphome.components import number
 from esphome.const import (
     CONF_ID,
     CONF_RESTORE_VALUE,
+    ENTITY_CATEGORY_CONFIG,
 )
 
 PersistedNumber = number.number_ns.class_(
     "PersistedNumber", number.Number, cg.Component
 )
 
-PERSISTED_NUMBER_SCHEMA = number.number_schema(PersistedNumber).extend(
+PERSISTED_NUMBER_SCHEMA = number.number_schema(
+    PersistedNumber, entity_category=ENTITY_CATEGORY_CONFIG
+).extend(
     {
         cv.GenerateID(): cv.declare_id(PersistedNumber),
         cv.Optional(CONF_RESTORE_VALUE, default=True): cv.boolean,

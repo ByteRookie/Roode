@@ -7,6 +7,15 @@ from esphome.const import (
     CONF_ENTITY_CATEGORY,
     ENTITY_CATEGORY_DIAGNOSTIC,
 )
+
+try:
+    from esphome.const import ENTITY_CATEGORY_CONFIG
+    try:
+        cv.entity_category("config")
+    except Exception:
+        ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
+except ImportError:
+    ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
 from . import Roode, CONF_ROODE_ID
 
 DEPENDENCIES = ["roode"]
@@ -53,7 +62,7 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional(CONF_ICON, default="mdi:cog"): cv.icon,
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
                 cv.Optional(
-                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
                 ): cv.entity_category,
             }
         ),

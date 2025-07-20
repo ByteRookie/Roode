@@ -471,8 +471,10 @@ calibration:6:01PM
 | `enabled_features` | text_sensor | List of active runtime features |
 
 Threshold and ROI sensors as well as the `people_counter` number use the
-`config` entity category so they appear under the **Settings** tab of the device
-in Home Assistant.
+`config` entity category (if supported) so they appear under the **Settings**
+tab of the device in Home Assistant. On older ESPHome versions that do not
+support this category they will fall back to the standard `diagnostic`
+category.
 
 
 ### Threshold distance

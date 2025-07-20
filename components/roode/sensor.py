@@ -8,8 +8,12 @@ from esphome.const import (
     STATE_CLASS_MEASUREMENT,
     UNIT_EMPTY,
     ENTITY_CATEGORY_DIAGNOSTIC,
-    ENTITY_CATEGORY_CONFIG,
 )
+
+try:
+    from esphome.const import ENTITY_CATEGORY_CONFIG
+except ImportError:  # Fallback for older ESPHome releases
+    ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
 from . import Roode, CONF_ROODE_ID
 
 DEPENDENCIES = ["roode"]

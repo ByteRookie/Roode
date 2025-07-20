@@ -6,8 +6,13 @@ from esphome.components import number
 from esphome.const import (
     CONF_ID,
     CONF_RESTORE_VALUE,
-    ENTITY_CATEGORY_CONFIG,
+    ENTITY_CATEGORY_DIAGNOSTIC,
 )
+
+try:
+    from esphome.const import ENTITY_CATEGORY_CONFIG
+except ImportError:  # Older ESPHome versions
+    ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
 
 PersistedNumber = number.number_ns.class_(
     "PersistedNumber", number.Number, cg.Component

@@ -12,7 +12,14 @@ from esphome.const import (
 
 try:
     from esphome.const import ENTITY_CATEGORY_CONFIG
-except ImportError:  # Fallback for older ESPHome releases
+    # Some old ESPHome versions provide the constant but do not allow the value
+    # during configuration validation. Attempt to validate a dummy value and
+    # fall back if it fails.
+    try:
+        cv.entity_category("config")
+    except Exception:
+        ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
+except ImportError:  # Fallback for very old ESPHome releases
     ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
 from . import Roode, CONF_ROODE_ID
 

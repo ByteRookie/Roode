@@ -11,7 +11,14 @@ from esphome.const import (
 
 try:
     from esphome.const import ENTITY_CATEGORY_CONFIG
-except ImportError:  # Older ESPHome versions
+    # Older ESPHome versions may define the constant but still reject the value
+    # during validation. Check that it is actually accepted by the schema and
+    # fall back to the diagnostic category otherwise.
+    try:
+        cv.entity_category("config")
+    except Exception:
+        ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
+except ImportError:  # Pre-config ESPHome
     ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
 
 PersistedNumber = number.number_ns.class_(

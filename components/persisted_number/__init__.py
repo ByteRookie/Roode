@@ -11,11 +11,11 @@ from esphome.const import (
 
 try:
     from esphome.const import ENTITY_CATEGORY_CONFIG
-    # Older ESPHome versions may define the constant but still reject the value
-    # during validation. Check that it is actually accepted by the schema and
-    # fall back to the diagnostic category otherwise.
+    # Some ESPHome versions declare the constant but individual components may
+    # not accept it. Attempt to build a schema with this category and fall back
+    # to the diagnostic group on failure.
     try:
-        cv.entity_category("config")
+        number.number_schema(number.Number, entity_category="config")
     except Exception:
         ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
 except ImportError:  # Pre-config ESPHome

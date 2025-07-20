@@ -10,8 +10,10 @@ from esphome.const import (
 
 try:
     from esphome.const import ENTITY_CATEGORY_CONFIG
+    # Ensure the text sensor schema accepts this category. Some ESPHome
+    # versions expose the constant but reject it during validation.
     try:
-        cv.entity_category("config")
+        text_sensor.text_sensor_schema(entity_category="config")
     except Exception:
         ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
 except ImportError:

@@ -12,8 +12,11 @@ from esphome.const import (
 
 try:
     from esphome.const import ENTITY_CATEGORY_CONFIG
+    # Validate that sensors actually accept this category. Older ESPHome
+    # releases defined the constant but rejected the value during schema
+    # validation.
     try:
-        cv.entity_category("config")
+        sensor.sensor_schema(entity_category="config")
     except Exception:
         ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
 except ImportError:

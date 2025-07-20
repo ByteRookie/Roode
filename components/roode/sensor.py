@@ -9,18 +9,6 @@ from esphome.const import (
     UNIT_EMPTY,
     ENTITY_CATEGORY_DIAGNOSTIC,
 )
-
-try:
-    from esphome.const import ENTITY_CATEGORY_CONFIG
-    # Some old ESPHome versions provide the constant but do not allow the value
-    # during configuration validation. Attempt to validate a dummy value and
-    # fall back if it fails.
-    try:
-        cv.entity_category("config")
-    except Exception:
-        ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
-except ImportError:  # Fallback for very old ESPHome releases
-    ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
 from . import Roode, CONF_ROODE_ID
 
 DEPENDENCIES = ["roode"]
@@ -64,56 +52,56 @@ CONFIG_SCHEMA = sensor.sensor_schema().extend(
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_CONFIG,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_MAX_THRESHOLD_EXIT): sensor.sensor_schema(
             icon="mdi:map-marker-distance",
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_CONFIG,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_MIN_THRESHOLD_ENTRY): sensor.sensor_schema(
             icon="mdi:map-marker-distance",
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_CONFIG,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_MIN_THRESHOLD_EXIT): sensor.sensor_schema(
             icon="mdi:map-marker-distance",
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_CONFIG,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_ROI_HEIGHT_ENTRY): sensor.sensor_schema(
             icon="mdi:table-row-height",
             unit_of_measurement="px",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_CONFIG,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_ROI_WIDTH_ENTRY): sensor.sensor_schema(
             icon="mdi:table-column-width",
             unit_of_measurement="px",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_CONFIG,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_ROI_HEIGHT_EXIT): sensor.sensor_schema(
             icon="mdi:table-row-height",
             unit_of_measurement="px",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_CONFIG,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_ROI_WIDTH_EXIT): sensor.sensor_schema(
             icon="mdi:table-column-width",
             unit_of_measurement="px",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_CONFIG,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(SENSOR_STATUS): sensor.sensor_schema(
             icon="mdi:check-circle",

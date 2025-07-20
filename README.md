@@ -336,6 +336,7 @@ reflections cause false triggers.
 | [peopleCounter8266.yaml](peopleCounter8266.yaml) | Minimal setup for ESP8266 |
 | [peopleCounter8266Dev.yaml](peopleCounter8266Dev.yaml) | Most advanced ESP8266 configuration |
 | [extra_sensors_example.yaml](extra_sensors_example.yaml) | Additional diagnostic sensors |
+| [sensor_multiselect_input.yaml](sensor_multiselect_input.yaml) | Home Assistant helper to pick multiple sensors |
 
 ### Sensors
 

@@ -1,8 +1,16 @@
 # RooDe
 
-[![GitHub release](https://img.shields.io/badge/release-1.6.0-blue?style=flat-square)](https://github.com/Lyr3x/Roode/releases/tag/1.6.0)
-
-[![Roode community](https://img.shields.io/discord/879407995837087804.svg?label=Discord&logo=Discord&colorB=7289da&style=for-the-badge)](https://discord.gg/hU9SvSXMHs)
+<div style="display:flex; overflow-x:auto; white-space:nowrap; align-items:center; height:40px;">
+  <a href="https://github.com/Lyr3x/Roode/releases/tag/1.6.0">
+    <img alt="GitHub release" src="https://img.shields.io/badge/release-1.6.0-blue?style=flat-square">
+  </a>
+  <a href="https://discord.gg/hU9SvSXMHs">
+    <img alt="Roode community" src="https://img.shields.io/discord/879407995837087804.svg?label=Discord&logo=Discord&colorB=7289da&style=for-the-badge">
+  </a>
+  <a href="https://github.com/Lyr3x/Roode/blob/master/LICENSE">
+    <img alt="License" src="https://img.shields.io/github/license/Lyr3x/Roode.svg?style=flat-square">
+  </a>
+</div>
 
 A people counter that works with any smart home system that supports ESPHome/MQTT (e.g., Home Assistant). All necessary entities are created automatically.
 

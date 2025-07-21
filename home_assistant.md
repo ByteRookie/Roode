@@ -23,3 +23,6 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
     data:
       newCount: "{{ states('input_number.set_people32') | int }}"
 ```
+
+## Dashboard Demo
+Add the demo view to your dashboard by including `dashboard/demo_view.yaml` in your Lovelace configuration. Ensure `smartview-dashboard-scripts.js` is served from `/local/smartview-dashboard-scripts.js` and referenced in your resources.

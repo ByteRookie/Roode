@@ -1,0 +1,14 @@
+# Demo view using SmartViewCard
+views:
+  - title: Demo
+    path: demo
+    cards:
+      - type: custom:smart-view-card
+        content: |
+          <h2>Demo Content</h2>
+          <p>This custom card scrolls vertically inside the card area.</p>
+          <p>Add more paragraphs to test scrolling.</p>
+          <p>Line 4</p>
+          <p>Line 5</p>
+          <p>Line 6</p>
+

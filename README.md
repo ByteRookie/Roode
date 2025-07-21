@@ -470,12 +470,6 @@ calibration:6:01PM
 | `sensor_status` (text) | text_sensor | "ok", "timeout", "reinitializing", "error" or "offline" |
 | `enabled_features` | text_sensor | List of active runtime features |
 
-The `people_counter` number and the ROI/threshold sensors use the `config`
-entity category when supported so they show up under the **Settings** tab for
-the device in Home Assistant. The `enabled_features` text sensor is also grouped
-there. On older ESPHome versions that do not recognize this category all of
-these entities appear as regular diagnostic sensors instead.
-
 
 ### Threshold distance
 
@@ -624,12 +618,7 @@ interrupt and polling mode, and manual adjustments to the people count.
 ### Feature text sensor
 
 The `enabled_features` text sensor summarizes which runtime features are active.
-Typical values include `dual_core` or `single_core`, `xshut` or `no_xshut`, and
-`interrupt` or `polling`. When the `config` entity category is supported, this
-sensor appears in Home Assistant's **Settings** tab along with the ROI and
-threshold sensors. This helps verify that the hardware pins and options are
-detected correctly.
-
+Typical values include `dual_core` or `single_core`, `xshut` or `no_xshut`, and `interrupt` or `polling`. When the `config` entity category is supported, this sensor appears in Home Assistant's **Settings** tab. This helps verify that the hardware pins and options are detected correctly.
 ### Diagnostic sensors
 
 Optional sensors provide insight into Roode's operation:

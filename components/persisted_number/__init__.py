@@ -6,28 +6,13 @@ from esphome.components import number
 from esphome.const import (
     CONF_ID,
     CONF_RESTORE_VALUE,
-    ENTITY_CATEGORY_DIAGNOSTIC,
 )
-
-try:
-    from esphome.const import ENTITY_CATEGORY_CONFIG
-    # Some ESPHome versions declare the constant but individual components may
-    # not accept it. Attempt to build a schema with this category and fall back
-    # to the diagnostic group on failure.
-    try:
-        number.number_schema(number.Number, entity_category="config")
-    except Exception:
-        ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
-except ImportError:  # Pre-config ESPHome
-    ENTITY_CATEGORY_CONFIG = ENTITY_CATEGORY_DIAGNOSTIC
 
 PersistedNumber = number.number_ns.class_(
     "PersistedNumber", number.Number, cg.Component
 )
 
-PERSISTED_NUMBER_SCHEMA = number.number_schema(
-    PersistedNumber, entity_category=ENTITY_CATEGORY_CONFIG
-).extend(
+PERSISTED_NUMBER_SCHEMA = number.number_schema(PersistedNumber).extend(
     {
         cv.GenerateID(): cv.declare_id(PersistedNumber),
         cv.Optional(CONF_RESTORE_VALUE, default=True): cv.boolean,

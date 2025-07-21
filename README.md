@@ -1,6 +1,6 @@
 # RooDe
 
-[![GitHub release](https://img.shields.io/badge/release-1.6.0-blue?style=flat-square)](https://github.com/Lyr3x/Roode/releases/tag/1.6.0)
+[![GitHub release](https://img.shields.io/badge/release-1.7.0-blue?style=flat-square)](https://github.com/Lyr3x/Roode/releases/tag/1.7.0)
 
 [![Roode community](https://img.shields.io/discord/879407995837087804.svg?label=Discord&logo=Discord&colorB=7289da&style=for-the-badge)](https://discord.gg/hU9SvSXMHs)
 

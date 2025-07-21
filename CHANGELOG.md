@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.0
+- Restart sensor after consecutive invalid distance readings
+- Configurable `invalid_distance_limit` and `restart_timeout`
+
 ## 1.6.0
 - Auto restart sensors via XSHUT with multiplexing support
 - Startup pin validation with built‑in pull-ups

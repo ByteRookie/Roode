@@ -421,8 +421,9 @@ text_sensor:
       name: $friendly_name sensor status text
   # The sensor_name, enabled_features and optional_sensors text sensors
   # are created automatically by the Roode component with entity_category: config.
-  # To avoid duplicate entities, list all Roode text sensors under one
-  # `platform: roode` entry.
+  # Only one `platform: roode` block is allowed for text sensors using the same
+  # Roode id. If you split them into multiple blocks, ESPHome will report
+  # duplicate entity names.
   # To override the default names you can specify them here:
   #   sensor_name:
   #     name: My Sensor Name

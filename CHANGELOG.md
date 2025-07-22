@@ -15,6 +15,8 @@
 - Automatically create `sensor_name`, `enabled_features` and
   `optional_sensors` text sensors with `entity_category: config`
   to simplify configuration
+- Validation now errors if multiple `platform: roode` text sensor blocks use
+  the same id, preventing duplicate entity names
 
 ## 1.5.1
 - Add diagnostic sensors reporting loop time, CPU usage, and RAM and flash usage percentages

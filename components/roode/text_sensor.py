@@ -21,9 +21,21 @@ OPTIONAL_SENSORS = "optional_sensors"
 
 TYPES = [VERSION, ENTRY_EXIT_EVENT, STATUS, FEATURES, SENSOR_NAME, OPTIONAL_SENSORS]
 
-CONFIG_SCHEMA = cv.Schema(
-    {
-        cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
+_defined_roode_ids = set()
+
+def _validate_single_block(config):
+    rid = str(config[CONF_ROODE_ID].id)
+    if rid in _defined_roode_ids:
+        raise cv.Invalid(
+            "Only one 'platform: roode' text_sensor block is allowed per Roode id"
+        )
+    _defined_roode_ids.add(rid)
+    return config
+
+CONFIG_SCHEMA = cv.All(
+    cv.Schema(
+        {
+            cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
         cv.Optional(VERSION): text_sensor.text_sensor_schema().extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:git"): cv.icon,
@@ -88,6 +100,8 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
     }
+    ),
+    _validate_single_block,
 )
 
 

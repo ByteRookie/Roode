@@ -421,10 +421,8 @@ text_sensor:
   - platform: roode
     sensor_status:
       name: $friendly_name sensor status text
-  - platform: roode
-    enabled_features:
-      name: $friendly_name enabled features
-      ## This sensor is a text_sensor that lists all enabled features
+  # The sensor_name, enabled_features and optional_sensors text sensors
+  # are created automatically by the Roode component with entity_category: config
 ```
 The features string lists items as `name:value` pairs separated by new lines.
 The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
@@ -475,6 +473,8 @@ calibration:6:01PM
 | `entry_exit_event` | text_sensor | Last entry or exit direction |
 | `sensor_status` (text) | text_sensor | "ok", "timeout", "reinitializing", "error" or "offline" |
 | `enabled_features` | text_sensor | List of active runtime features |
+| `sensor_name` | text_sensor | Name of the device reported by ESPHome |
+| `optional_sensors` | text_sensor | Runtime list of optional sensors |
 
 
 ### Threshold distance
@@ -622,12 +622,16 @@ in the `roode:` section to include interrupt fallbacks and XSHUT recovery
 details. Event logs cover power cycles of the sensor, automatic changes between
 interrupt and polling mode, and manual adjustments to the people count.
 
-### Feature text sensor
+### Configuration text sensors
 
-The `enabled_features` text sensor summarizes which runtime features are active.
-Typical values include `dual_core` or `single_core`, `xshut` or `no_xshut`, and
-`interrupt` or `polling`. This helps verify that the hardware pins and options
-are detected correctly.
+The plugin automatically exposes three text sensors with `entity_category: config`:
+
+- `sensor_name` publishes the device's name.
+- `enabled_features` lists runtime options like `dual_core` vs `single_core`,
+  `xshut` vs `no_xshut` and `interrupt` vs `polling`.
+- `optional_sensors` shows which extra sensors are enabled at runtime.
+
+These help verify that the hardware pins and options are detected correctly.
 
 ### Diagnostic sensors
 
@@ -637,8 +641,9 @@ Optional sensors provide insight into Roode's operation:
 - `sensor_status` and `interrupt_status` show the current hardware state. The
   status sensor reports `ok`, `timeout`, `reinitializing`, `error` or `offline`
   so automations can react to issues.
-- `version`, `entry_exit_event` and `enabled_features` provide diagnostic text,
-  and a text-sensor `sensor_status` exposes the same status string.
+- `version`, `entry_exit_event`, `sensor_name`, `enabled_features` and
+  `optional_sensors` provide diagnostic text, and a text-sensor `sensor_status`
+  exposes the same status string.
 - ROI size and threshold sensors allow live tuning of each zone.
 - `manual_adjustment_count` records people-count corrections.
 - The sensor automatically restarts if polling stops for the configured `restart_timeout`

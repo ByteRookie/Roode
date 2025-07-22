@@ -180,18 +180,6 @@ text_sensor:
   - platform: roode
     entry_exit_event:
       name: $friendly_name last direction
-  - platform: roode
-    enabled_features:
-      name: $friendly_name enabled features
-      entity_category: config
-  - platform: roode
-    sensor_name:
-      name: $friendly_name sensor name
-      entity_category: config
-  - platform: roode
-    optional_sensors:
-      name: $friendly_name optional sensors
-      entity_category: config
   - platform: template
     name: $friendly_name Uptime Human Readable
     id: uptime_human

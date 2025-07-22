@@ -51,7 +51,10 @@ CONFIG_SCHEMA = cv.Schema(
                 ): cv.entity_category,
             }
         ),
-        cv.Optional(FEATURES): text_sensor.text_sensor_schema().extend(
+        cv.Optional(
+            FEATURES,
+            default={"name": "Roode Enabled Features"},
+        ): text_sensor.text_sensor_schema().extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:cog"): cv.icon,
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
@@ -60,7 +63,10 @@ CONFIG_SCHEMA = cv.Schema(
                 ): cv.entity_category,
             }
         ),
-        cv.Optional(SENSOR_NAME): text_sensor.text_sensor_schema().extend(
+        cv.Optional(
+            SENSOR_NAME,
+            default={"name": "Roode Sensor Name"},
+        ): text_sensor.text_sensor_schema().extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:identifier"): cv.icon,
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
@@ -69,7 +75,10 @@ CONFIG_SCHEMA = cv.Schema(
                 ): cv.entity_category,
             }
         ),
-        cv.Optional(OPTIONAL_SENSORS): text_sensor.text_sensor_schema().extend(
+        cv.Optional(
+            OPTIONAL_SENSORS,
+            default={"name": "Roode Optional Sensors"},
+        ): text_sensor.text_sensor_schema().extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:format-list-checks"): cv.icon,
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),

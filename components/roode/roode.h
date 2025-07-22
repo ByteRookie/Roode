@@ -111,6 +111,8 @@ class Roode : public PollingComponent {
   void set_interrupt_status_sensor(sensor::Sensor *sens) { interrupt_status_sensor = sens; }
   void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
   void set_sensor_status_text_sensor(text_sensor::TextSensor *sensor_) { status_text_sensor = sensor_; }
+  void set_sensor_name_text_sensor(text_sensor::TextSensor *sensor_) { sensor_name_sensor = sensor_; }
+  void set_optional_sensors_text_sensor(text_sensor::TextSensor *sensor_) { optional_sensors_sensor = sensor_; }
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
@@ -165,6 +167,8 @@ class Roode : public PollingComponent {
   text_sensor::TextSensor *entry_exit_event_sensor{nullptr};
   text_sensor::TextSensor *enabled_features_sensor{nullptr};
   text_sensor::TextSensor *status_text_sensor{nullptr};
+  text_sensor::TextSensor *sensor_name_sensor{nullptr};
+  text_sensor::TextSensor *optional_sensors_sensor{nullptr};
   sensor::Sensor *manual_adjustment_sensor{nullptr};
   sensor::Sensor *interrupt_status_sensor{nullptr};
 
@@ -212,6 +216,7 @@ class Roode : public PollingComponent {
   void calibrateDistance();
   void calibrate_zones();
   void publish_feature_list();
+  void publish_optional_sensors();
   const RangingMode *determine_ranging_mode(uint16_t average_entry_zone_distance, uint16_t average_exit_zone_distance);
   void publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax);
   void updateCounter(int delta);

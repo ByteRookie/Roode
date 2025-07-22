@@ -108,6 +108,7 @@ void Roode::log_event(const std::string &msg) {
     if (msg == "dual_core_success" || msg == "fallback_single_core" || msg == "force_single_core" ||
         msg == "interrupt_fallback_polling" || msg == "interrupt_recovered") {
       instance_->publish_feature_list();
+      instance_->publish_optional_sensors();
     }
   }
 }
@@ -128,6 +129,9 @@ void Roode::setup() {
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
+  }
+  if (sensor_name_sensor != nullptr) {
+    sensor_name_sensor->publish_state(App.get_name());
   }
   ESP_LOGI(SETUP, "Using sampling with sampling size: %d", samples);
 
@@ -243,6 +247,7 @@ void Roode::setup() {
     expected_counter_ = people_counter->state;
 
   publish_feature_list();
+  publish_optional_sensors();
   update_status_text("ok");
 }
 
@@ -526,6 +531,7 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
   publish_feature_list();
+  publish_optional_sensors();
 }
 
 void Roode::apply_cpu_optimizations(float cpu) {
@@ -643,6 +649,7 @@ void Roode::calibrate_zones() {
   }
   ESP_LOGI(SETUP, "Finished calibrating sensor zones");
   publish_feature_list();
+  publish_optional_sensors();
 }
 
 void Roode::calibrateDistance() {
@@ -748,6 +755,31 @@ void Roode::publish_feature_list() {
   if (enabled_features_sensor != nullptr)
     enabled_features_sensor->publish_state(feature_list);
   log_event(std::string("features_enabled: ") + feature_list);
+}
+
+void Roode::publish_optional_sensors() {
+  std::vector<std::string> sensors;
+  if (loop_time_sensor != nullptr)
+    sensors.push_back("loop_time");
+  if (cpu_usage_sensor != nullptr)
+    sensors.push_back("cpu_usage");
+  if (ram_free_sensor != nullptr)
+    sensors.push_back("ram_free");
+  if (flash_free_sensor != nullptr)
+    sensors.push_back("flash_free");
+  if (interrupt_status_sensor != nullptr)
+    sensors.push_back("interrupt_status");
+  if (manual_adjustment_sensor != nullptr)
+    sensors.push_back("manual_adjustment_count");
+
+  std::string sensor_list;
+  for (size_t i = 0; i < sensors.size(); ++i) {
+    sensor_list += sensors[i];
+    if (i + 1 < sensors.size())
+      sensor_list += "\n";
+  }
+  if (optional_sensors_sensor != nullptr)
+    optional_sensors_sensor->publish_state(sensor_list);
 }
 
 

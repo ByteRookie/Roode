@@ -6,6 +6,7 @@ from esphome.const import (
     CONF_ICON,
     CONF_ENTITY_CATEGORY,
     ENTITY_CATEGORY_DIAGNOSTIC,
+    ENTITY_CATEGORY_CONFIG,
 )
 from . import Roode, CONF_ROODE_ID
 
@@ -15,8 +16,10 @@ VERSION = "version"
 ENTRY_EXIT_EVENT = "entry_exit_event"
 STATUS = "sensor_status"
 FEATURES = "enabled_features"
+SENSOR_NAME = "sensor_name"
+OPTIONAL_SENSORS = "optional_sensors"
 
-TYPES = [VERSION, ENTRY_EXIT_EVENT, STATUS, FEATURES]
+TYPES = [VERSION, ENTRY_EXIT_EVENT, STATUS, FEATURES, SENSOR_NAME, OPTIONAL_SENSORS]
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -53,7 +56,25 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional(CONF_ICON, default="mdi:cog"): cv.icon,
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
                 cv.Optional(
-                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
+                ): cv.entity_category,
+            }
+        ),
+        cv.Optional(SENSOR_NAME): text_sensor.text_sensor_schema().extend(
+            {
+                cv.Optional(CONF_ICON, default="mdi:identifier"): cv.icon,
+                cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
+                ): cv.entity_category,
+            }
+        ),
+        cv.Optional(OPTIONAL_SENSORS): text_sensor.text_sensor_schema().extend(
+            {
+                cv.Optional(CONF_ICON, default="mdi:format-list-checks"): cv.icon,
+                cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
                 ): cv.entity_category,
             }
         ),

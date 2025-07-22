@@ -415,14 +415,14 @@ text_sensor:
   - platform: roode
     version:
       name: $friendly_name version
-  - platform: roode
     entry_exit_event:
       name: $friendly_name last direction
-  - platform: roode
     sensor_status:
       name: $friendly_name sensor status text
   # The sensor_name, enabled_features and optional_sensors text sensors
-  # are created automatically by the Roode component with entity_category: config
+  # are created automatically by the Roode component with entity_category: config.
+  # To avoid duplicate entities, list all Roode text sensors under one
+  # `platform: roode` entry.
 ```
 The features string lists items as `name:value` pairs separated by new lines.
 The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
@@ -631,7 +631,9 @@ The plugin automatically exposes three text sensors with `entity_category: confi
   `xshut` vs `no_xshut` and `interrupt` vs `polling`.
 - `optional_sensors` shows which extra sensors are enabled at runtime.
 
-These help verify that the hardware pins and options are detected correctly.
+These help verify that the hardware pins and options are detected correctly. When
+adding text sensors in YAML, use a single `platform: roode` entry so these
+auto-generated sensors only appear once.
 
 ### Diagnostic sensors
 

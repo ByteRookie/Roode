@@ -423,6 +423,13 @@ text_sensor:
   # are created automatically by the Roode component with entity_category: config.
   # To avoid duplicate entities, list all Roode text sensors under one
   # `platform: roode` entry.
+  # To override the default names you can specify them here:
+  #   sensor_name:
+  #     name: My Sensor Name
+  #   enabled_features:
+  #     name: My Enabled Features
+  #   optional_sensors:
+  #     name: My Optional Sensors
 ```
 The features string lists items as `name:value` pairs separated by new lines.
 The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,

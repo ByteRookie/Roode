@@ -11,6 +11,11 @@
 - Interrupt mode gracefully falls back to polling and logs the reason
 - Colored logs for easier troubleshooting
 
+## 1.6.1
+- Automatically create `sensor_name`, `enabled_features` and
+  `optional_sensors` text sensors with `entity_category: config`
+  to simplify configuration
+
 ## 1.5.1
 - Add diagnostic sensors reporting loop time, CPU usage, and RAM and flash usage percentages
 

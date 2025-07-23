@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Roode Config Tool</title>
+  <title>Roode Selector</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
   <style>
@@ -11,8 +11,7 @@
     header h1 { margin:0; font-size:2.5rem; animation: slide 1s ease-out forwards; transform:translateY(-100%); }
     @keyframes slide { to { transform:translateY(0); } }
     main { padding:1rem; max-width:800px; margin:auto; }
-    label { display:block; margin-top:1rem; }
-    input, select { padding:.25rem; font-size:1rem; min-width:250px; }
+    label { display:block; margin-top:1rem; font-weight:bold; }
     pre { background:#eee; padding:.5rem; white-space:pre-wrap; }
     .copy-btn { border:none; background:none; cursor:pointer; font-size:1rem; }
     .button-group button { margin-right:.5rem; }
@@ -32,21 +31,9 @@
     refresh: always</pre>
     </section>
 
-    <section id="config">
+    <section id="selector">
       <h2>Configuration Helper</h2>
-      <p>Fill in the required information, choose sensors and optional features, then copy the YAML.</p>
-
-      <label>Device Name <input id="device" placeholder="roode32"></label>
-      <label>Board
-        <select id="board">
-          <option value="wemos_d1_mini32">ESP32 D1 Mini</option>
-          <option value="d1_mini">ESP8266 D1 Mini</option>
-        </select>
-      </label>
-      <label>WiFi SSID <input id="ssid"></label>
-      <label>WiFi Password <input id="wpass" type="password"></label>
-      <label>API Password <input id="apass" type="password"></label>
-      <label>OTA Password <input id="otapass" type="password"></label>
+      <p>Select your desired sensors and features below. The comma-separated lists can be copied for your ESPHome config.</p>
 
       <label>Sensors
         <select id="sensors" multiple></select>
@@ -55,6 +42,8 @@
           <button id="clearSensors">Remove All</button>
         </div>
       </label>
+      <h3>Selected Sensors <button class="copy-btn" id="copySensors" title="Copy to clipboard">📋</button></h3>
+      <pre id="sensorOutput"></pre>
 
       <label>Features
         <select id="features" multiple></select>
@@ -63,61 +52,58 @@
           <button id="clearFeatures">Remove All</button>
         </div>
       </label>
-
-      <div id="featureOptions"></div>
-
-      <h3>Generated Config <button class="copy-btn" id="copyConfig" title="Copy to clipboard">📋</button></h3>
-      <pre id="configOutput"></pre>
+      <h3>Selected Features <button class="copy-btn" id="copyFeatures" title="Copy to clipboard">📋</button></h3>
+      <pre id="featureOutput"></pre>
     </section>
   </main>
 
 <script>
 const sensors = [
-  { value: 'people_counter', label: 'People Count', section: 'number', snippet: `- platform: roode\n    people_counter:\n      name: $friendly_name people counter` },
-  { value: 'presence_sensor', label: 'Presence', section: 'binary_sensor', snippet: `- platform: roode\n    presence_sensor:\n      name: $friendly_name presence` },
-  { value: 'sensor_xshut_state', label: 'XSHUT State', section: 'binary_sensor', snippet: `- platform: roode\n    sensor_xshut_state:\n      name: $friendly_name xshut state` },
-  { value: 'distance_entry', label: 'Distance Zone 0', section: 'sensor', snippet: `distance_entry:\n      name: $friendly_name distance zone 0` },
-  { value: 'distance_exit', label: 'Distance Zone 1', section: 'sensor', snippet: `distance_exit:\n      name: $friendly_name distance zone 1` },
-  { value: 'max_threshold_entry', label: 'Max Zone 0', section: 'sensor', snippet: `max_threshold_entry:\n      name: $friendly_name max zone 0` },
-  { value: 'max_threshold_exit', label: 'Max Zone 1', section: 'sensor', snippet: `max_threshold_exit:\n      name: $friendly_name max zone 1` },
-  { value: 'min_threshold_entry', label: 'Min Zone 0', section: 'sensor', snippet: `min_threshold_entry:\n      name: $friendly_name min zone 0` },
-  { value: 'min_threshold_exit', label: 'Min Zone 1', section: 'sensor', snippet: `min_threshold_exit:\n      name: $friendly_name min zone 1` },
-  { value: 'roi_height_entry', label: 'ROI Height Zone 0', section: 'sensor', snippet: `roi_height_entry:\n      name: $friendly_name ROI height zone 0` },
-  { value: 'roi_width_entry', label: 'ROI Width Zone 0', section: 'sensor', snippet: `roi_width_entry:\n      name: $friendly_name ROI width zone 0` },
-  { value: 'roi_height_exit', label: 'ROI Height Zone 1', section: 'sensor', snippet: `roi_height_exit:\n      name: $friendly_name ROI height zone 1` },
-  { value: 'roi_width_exit', label: 'ROI Width Zone 1', section: 'sensor', snippet: `roi_width_exit:\n      name: $friendly_name ROI width zone 1` },
-  { value: 'loop_time', label: 'Loop Time', section: 'sensor', snippet: `loop_time:\n      name: $friendly_name loop time` },
-  { value: 'cpu_usage', label: 'CPU Usage', section: 'sensor', snippet: `cpu_usage:\n      name: $friendly_name CPU usage` },
-  { value: 'ram_free', label: 'RAM Usage', section: 'sensor', snippet: `ram_free:\n      name: $friendly_name RAM usage` },
-  { value: 'flash_free', label: 'Flash Usage', section: 'sensor', snippet: `flash_free:\n      name: $friendly_name flash usage` },
-  { value: 'sensor_status', label: 'Sensor Status', section: 'sensor', snippet: `sensor_status:\n      name: $friendly_name sensor status` },
-  { value: 'interrupt_status', label: 'Interrupt Status', section: 'sensor', snippet: `interrupt_status:\n      name: $friendly_name interrupt status` },
-  { value: 'manual_adjustment_count', label: 'Manual Adjusts', section: 'sensor', snippet: `manual_adjustment_count:\n      name: $friendly_name manual adjusts` },
-  { value: 'version', label: 'Version', section: 'text_sensor', snippet: `- platform: roode\n    version:\n      name: $friendly_name version` },
-  { value: 'entry_exit_event', label: 'Last Direction', section: 'text_sensor', snippet: `- platform: roode\n    entry_exit_event:\n      name: $friendly_name last direction` },
-  { value: 'sensor_status_text', label: 'Sensor Status Text', section: 'text_sensor', snippet: `- platform: roode\n    sensor_status:\n      name: $friendly_name sensor status text` },
-  { value: 'enabled_features', label: 'Enabled Features', section: 'text_sensor', snippet: `- platform: roode\n    enabled_features:\n      name: $friendly_name enabled features` }
+  { value: 'people_counter', label: 'People Counter', desc: 'Counts people entering and exiting' },
+  { value: 'presence_sensor', label: 'Presence', desc: 'Binary sensor for presence detection' },
+  { value: 'sensor_xshut_state', label: 'XSHUT State', desc: 'Reports XSHUT pin state' },
+  { value: 'distance_entry', label: 'Distance Zone 0', desc: 'Distance reading for entry zone' },
+  { value: 'distance_exit', label: 'Distance Zone 1', desc: 'Distance reading for exit zone' },
+  { value: 'max_threshold_entry', label: 'Max Zone 0', desc: 'Maximum threshold for zone 0' },
+  { value: 'max_threshold_exit', label: 'Max Zone 1', desc: 'Maximum threshold for zone 1' },
+  { value: 'min_threshold_entry', label: 'Min Zone 0', desc: 'Minimum threshold for zone 0' },
+  { value: 'min_threshold_exit', label: 'Min Zone 1', desc: 'Minimum threshold for zone 1' },
+  { value: 'roi_height_entry', label: 'ROI Height Zone 0', desc: 'Region height for zone 0' },
+  { value: 'roi_width_entry', label: 'ROI Width Zone 0', desc: 'Region width for zone 0' },
+  { value: 'roi_height_exit', label: 'ROI Height Zone 1', desc: 'Region height for zone 1' },
+  { value: 'roi_width_exit', label: 'ROI Width Zone 1', desc: 'Region width for zone 1' },
+  { value: 'loop_time', label: 'Loop Time', desc: 'Main loop execution time' },
+  { value: 'cpu_usage', label: 'CPU Usage', desc: 'CPU usage percentage' },
+  { value: 'ram_free', label: 'RAM Usage', desc: 'Free RAM in bytes' },
+  { value: 'flash_free', label: 'Flash Usage', desc: 'Free flash memory' },
+  { value: 'sensor_status', label: 'Sensor Status', desc: 'Numeric sensor status code' },
+  { value: 'interrupt_status', label: 'Interrupt Status', desc: 'VL53L1X interrupt status' },
+  { value: 'manual_adjustment_count', label: 'Manual Adjusts', desc: 'Number of manual count adjustments' },
+  { value: 'version', label: 'Version', desc: 'Firmware version text sensor' },
+  { value: 'entry_exit_event', label: 'Last Direction', desc: 'Text sensor for last entry/exit event' },
+  { value: 'sensor_status_text', label: 'Sensor Status Text', desc: 'Human-readable sensor status' },
+  { value: 'enabled_features', label: 'Enabled Features', desc: 'List of enabled features' }
 ];
 
 const features = [
-  { value: 'vl53l1x.timeout', label: 'Timeout', section:'vl53l1x', template:'timeout: VALUE', placeholder:'2s' },
-  { value: 'vl53l1x.pins.interrupt', label: 'Interrupt Pin', section:'vl53l1x', template:'pins:\n  interrupt: VALUE', placeholder:'GPIO32' },
-  { value: 'vl53l1x.calibration.ranging', label: 'Ranging Mode', section:'vl53l1x', template:'calibration:\n  ranging: VALUE', placeholder:'long' },
-  { value: 'vl53l1x.calibration.offset', label: 'Distance Offset', section:'vl53l1x', template:'calibration:\n  offset: VALUE', placeholder:'20mm' },
-  { value: 'vl53l1x.calibration.crosstalk', label: 'Crosstalk', section:'vl53l1x', template:'calibration:\n  crosstalk: VALUE', placeholder:'100000cps' },
-  { value: 'roode.sampling', label: 'Sample Count', section:'roode', template:'sampling: VALUE', placeholder:'2' },
-  { value: 'roode.orientation', label: 'Orientation', section:'roode', template:'orientation: VALUE', placeholder:'parallel' },
-  { value: 'roode.roi', label: 'ROI Size', section:'roode', template:'roi: VALUE', placeholder:'{ height: 16, width: 6 }' },
-  { value: 'roode.detection_thresholds', label: 'Detection Thresholds', section:'roode', template:'detection_thresholds: VALUE', placeholder:'{ min: 0%, max: 85% }' },
-  { value: 'roode.calibration_persistence', label: 'Save Thresholds', section:'roode', template:'calibration_persistence: VALUE', placeholder:'true' },
-  { value: 'roode.filter_mode', label: 'Filter Mode', section:'roode', template:'filter_mode: VALUE', placeholder:'min' },
-  { value: 'roode.filter_window', label: 'Filter Window', section:'roode', template:'filter_window: VALUE', placeholder:'5' },
-  { value: 'roode.log_fallback_events', label: 'Log Fallback Events', section:'roode', template:'log_fallback_events: VALUE', placeholder:'true' },
-  { value: 'roode.force_single_core', label: 'Force Single Core', section:'roode', template:'force_single_core: VALUE', placeholder:'false' },
-  { value: 'roode.invalid_distance_limit', label: 'Invalid Distance Limit', section:'roode', template:'invalid_distance_limit: VALUE', placeholder:'10' },
-  { value: 'roode.restart_timeout', label: 'Restart Timeout', section:'roode', template:'restart_timeout: VALUE', placeholder:'30s' },
-  { value: 'roode.zones.invert', label: 'Invert Zones', section:'roode', template:'zones:\n  invert: VALUE', placeholder:'false' },
-  { value: 'roode.zones.entry_exit', label: 'Per-zone Config', section:'roode', template:'zones:\n  entry:\n    roi: auto\n  exit:\n    roi:\n      height: 8\n      center: 124', placeholder:'' }
+  { value: 'vl53l1x.timeout', label: 'Timeout', desc: 'Sensor timeout duration' },
+  { value: 'vl53l1x.pins.interrupt', label: 'Interrupt Pin', desc: 'GPIO pin for VL53L1X interrupt' },
+  { value: 'vl53l1x.calibration.ranging', label: 'Ranging Mode', desc: 'Short/long distance mode' },
+  { value: 'vl53l1x.calibration.offset', label: 'Distance Offset', desc: 'Calibration distance offset' },
+  { value: 'vl53l1x.calibration.crosstalk', label: 'Crosstalk', desc: 'Sensor crosstalk value' },
+  { value: 'roode.sampling', label: 'Sample Count', desc: 'Number of samples per reading' },
+  { value: 'roode.orientation', label: 'Orientation', desc: 'Sensor orientation relative to doorway' },
+  { value: 'roode.roi', label: 'ROI Size', desc: 'Region of interest dimensions' },
+  { value: 'roode.detection_thresholds', label: 'Detection Thresholds', desc: 'Min and max detection thresholds' },
+  { value: 'roode.calibration_persistence', label: 'Save Thresholds', desc: 'Store calibration in flash' },
+  { value: 'roode.filter_mode', label: 'Filter Mode', desc: 'Type of filter to apply' },
+  { value: 'roode.filter_window', label: 'Filter Window', desc: 'Size of filter window' },
+  { value: 'roode.log_fallback_events', label: 'Log Fallback Events', desc: 'Log when falling back from interrupt mode' },
+  { value: 'roode.force_single_core', label: 'Force Single Core', desc: 'Run on a single core only' },
+  { value: 'roode.invalid_distance_limit', label: 'Invalid Distance Limit', desc: 'Threshold for invalid distance' },
+  { value: 'roode.restart_timeout', label: 'Restart Timeout', desc: 'Restart sensor after this timeout' },
+  { value: 'roode.zones.invert', label: 'Invert Zones', desc: 'Swap entry and exit zones' },
+  { value: 'roode.zones.entry_exit', label: 'Per-zone Config', desc: 'Advanced per-zone configuration' }
 ];
 
 function populateSelect(el, items) {
@@ -125,6 +111,7 @@ function populateSelect(el, items) {
     const opt = document.createElement('option');
     opt.value = item.value;
     opt.textContent = item.label;
+    opt.title = item.desc;
     el.appendChild(opt);
   });
 }
@@ -138,101 +125,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const sensorChoices = new Choices(sensorSelect, { removeItemButton:true, searchEnabled:true, shouldSort:false });
   const featureChoices = new Choices(featureSelect, { removeItemButton:true, searchEnabled:true, shouldSort:false });
 
-  function indent(str, n) {
-    return str.split('\n').map(l => ' '.repeat(n) + l).join('\n');
-  }
-
-  function renderFeatureInputs() {
-    const container = document.getElementById('featureOptions');
-    container.innerHTML = '';
-    featureChoices.getValue(true).forEach(val => {
-      const feat = features.find(f => f.value === val);
-      if (!feat) return;
-      const id = 'feat_' + val.replace(/[^\w]/g,'_');
-      const label = document.createElement('label');
-      label.textContent = feat.label + ' ';
-      const input = document.createElement('input');
-      input.id = id;
-      input.placeholder = feat.placeholder || '';
-      input.addEventListener('input', update);
-      label.appendChild(input);
-      container.appendChild(label);
-    });
-  }
-
-  function buildYaml() {
-    const device = document.getElementById('device').value || 'roode';
-    const board = document.getElementById('board').value;
-    const ssid = document.getElementById('ssid').value || 'your_ssid';
-    const wpass = document.getElementById('wpass').value || 'wifi_password';
-    const apass = document.getElementById('apass').value || 'api_password';
-    const otapass = document.getElementById('otapass').value || 'ota_password';
-
-    const yamlParts = [];
-    yamlParts.push(`substitutions:\n  devicename: ${device}\n  friendly_name: ${device}`);
-    yamlParts.push(`external_components:\n  - source: github://Lyr3x/Roode\n    refresh: always`);
-    yamlParts.push(`esphome:\n  name: ${device}`);
-    if (board.startsWith('wemos') || board.includes('esp32')) {
-      yamlParts.push(`esp32:\n  board: ${board}\n  framework:\n    type: arduino`);
-    } else {
-      yamlParts.push(`esp8266:\n  board: ${board}`);
-    }
-    yamlParts.push(`wifi:\n  ssid: "${ssid}"\n  password: "${wpass}"`);
-    yamlParts.push(`api:\n  password: "${apass}"`);
-    yamlParts.push(`ota:\n  password: "${otapass}"`);
-    yamlParts.push(`logger:`);
-    yamlParts.push(`i2c:\n  sda: 21\n  scl: 22`);
-
-    const featGroups = { vl53l1x: [], roode: [] };
-    featureChoices.getValue(true).forEach(val => {
-      const feat = features.find(f => f.value === val);
-      if (!feat) return;
-      const id = 'feat_' + val.replace(/[^\w]/g,'_');
-      const value = (document.getElementById(id) || {}).value || feat.placeholder || '';
-      featGroups[feat.section].push(feat.template.replace(/VALUE/g, value));
-    });
-
-    if (featGroups['vl53l1x'].length) {
-      yamlParts.push('vl53l1x:\n' + indent(featGroups['vl53l1x'].join('\n'),2));
-    }
-
-    yamlParts.push('roode:\n  id: roode_platform');
-    if (featGroups['roode'].length) {
-      yamlParts.push(indent(featGroups['roode'].join('\n'),2));
-    }
-
-    const sections = { number: [], binary_sensor: [], sensor: [], text_sensor: [] };
-    sensorChoices.getValue(true).forEach(val => {
-      const sn = sensors.find(s => s.value === val);
-      if (!sn) return;
-      sections[sn.section].push(sn.snippet);
-    });
-
-    if (sections['number'].length) {
-      yamlParts.push('number:\n' + indent(sections['number'].join('\n'),2));
-    }
-    if (sections['binary_sensor'].length) {
-      yamlParts.push('binary_sensor:\n' + indent(sections['binary_sensor'].join('\n'),2));
-    }
-    if (sections['sensor'].length) {
-      yamlParts.push('sensor:\n  - platform: roode\n    id: roode_sensors');
-      yamlParts.push(indent(sections['sensor'].join('\n'),4));
-    }
-    if (sections['text_sensor'].length) {
-      yamlParts.push('text_sensor:\n' + indent(sections['text_sensor'].join('\n'),2));
-    }
-
-    return yamlParts.join('\n\n') + '\n';
-  }
-
   function update() {
-    renderFeatureInputs();
-    document.getElementById('configOutput').textContent = buildYaml();
+    document.getElementById('sensorOutput').textContent = sensorChoices.getValue(true).join(', ');
+    document.getElementById('featureOutput').textContent = featureChoices.getValue(true).join(', ');
   }
 
-  ['device','ssid','wpass','apass','otapass','board'].forEach(id => {
-    document.getElementById(id).addEventListener('input', update);
-  });
   sensorSelect.addEventListener('change', update);
   featureSelect.addEventListener('change', update);
 
@@ -253,8 +150,11 @@ document.addEventListener('DOMContentLoaded', () => {
     update();
   });
 
-  document.getElementById('copyConfig').addEventListener('click', () => {
-    navigator.clipboard.writeText(document.getElementById('configOutput').textContent);
+  document.getElementById('copySensors').addEventListener('click', () => {
+    navigator.clipboard.writeText(document.getElementById('sensorOutput').textContent);
+  });
+  document.getElementById('copyFeatures').addEventListener('click', () => {
+    navigator.clipboard.writeText(document.getElementById('featureOutput').textContent);
   });
 
   update();

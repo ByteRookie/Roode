@@ -347,7 +347,7 @@ reflections cause false triggers.
 
 ### Interactive Selector Tool
 
-Use the [interactive selector tool](https://byterookie.github.io/Roode/) to choose sensors and features. Each dropdown lists a short description next to the friendly name, and the results are comma-separated lists ready for your YAML.
+Use the [interactive selector tool](https://byterookie.github.io/Roode/) to choose sensors and features. Each dropdown lists a short description next to the friendly name, and the results are comma-separated lists ready for your YAML. You can also paste an existing list into either output box to reselect those items automatically.
 
 ### Sensors
 

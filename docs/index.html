@@ -12,7 +12,8 @@
     @keyframes slide { to { transform:translateY(0); } }
     main { padding:1rem; max-width:800px; margin:auto; }
     label { display:block; margin-top:1rem; font-weight:bold; }
-    pre { background:#eee; padding:.5rem; white-space:pre-wrap; }
+    textarea { width:100%; min-height:3rem; }
+    pre, textarea { background:#eee; padding:.5rem; white-space:pre-wrap; }
     .copy-btn { border:none; background:none; cursor:pointer; font-size:1rem; }
     .button-group button { margin-right:.5rem; }
   </style>
@@ -43,7 +44,7 @@
         </div>
       </label>
       <h3>Selected Sensors <button class="copy-btn" id="copySensors" title="Copy to clipboard">📋</button></h3>
-      <pre id="sensorOutput"></pre>
+      <textarea id="sensorOutput"></textarea>
 
       <label>Features
         <select id="features" multiple></select>
@@ -53,7 +54,7 @@
         </div>
       </label>
       <h3>Selected Features <button class="copy-btn" id="copyFeatures" title="Copy to clipboard">📋</button></h3>
-      <pre id="featureOutput"></pre>
+      <textarea id="featureOutput"></textarea>
     </section>
   </main>
 
@@ -110,8 +111,8 @@ function populateSelect(el, items) {
   items.forEach(item => {
     const opt = document.createElement('option');
     opt.value = item.value;
-    opt.textContent = `${item.label} - ${item.desc}`;
-    opt.title = item.desc;
+    opt.textContent = item.label;
+    opt.setAttribute('data-custom-properties', item.desc);
     el.appendChild(opt);
   });
 }
@@ -122,16 +123,42 @@ document.addEventListener('DOMContentLoaded', () => {
   populateSelect(sensorSelect, sensors);
   populateSelect(featureSelect, features);
 
-  const sensorChoices = new Choices(sensorSelect, { removeItemButton:true, searchEnabled:true, shouldSort:false });
-  const featureChoices = new Choices(featureSelect, { removeItemButton:true, searchEnabled:true, shouldSort:false });
+  const options = {
+    removeItemButton: true,
+    searchEnabled: true,
+    shouldSort: false,
+    callbackOnCreateTemplates: function(template) {
+      return {
+        choice: (classNames, data) => {
+          return template(`\n            <div class="${classNames.item} ${classNames.itemChoice}" data-select-text="" data-choice data-id="${data.id}" data-value="${data.value}" ${data.disabled ? 'data-choice-disabled aria-disabled="true"' : 'data-choice-selectable'}>\n              ${data.label}<br><small>${data.customProperties}</small>\n            </div>\n          `);
+        }
+      };
+    }
+  };
+
+  const sensorChoices = new Choices(sensorSelect, options);
+  const featureChoices = new Choices(featureSelect, options);
 
   function update() {
-    document.getElementById('sensorOutput').textContent = sensorChoices.getValue(true).join(', ');
-    document.getElementById('featureOutput').textContent = featureChoices.getValue(true).join(', ');
+    document.getElementById('sensorOutput').value = sensorChoices.getValue(true).join(', ');
+    document.getElementById('featureOutput').value = featureChoices.getValue(true).join(', ');
   }
 
   sensorSelect.addEventListener('change', update);
   featureSelect.addEventListener('change', update);
+
+  document.getElementById('sensorOutput').addEventListener('input', () => {
+    const vals = document.getElementById('sensorOutput').value.split(',').map(v => v.trim()).filter(Boolean);
+    sensorChoices.removeActiveItems();
+    vals.forEach(v => sensorChoices.setChoiceByValue(v));
+    update();
+  });
+  document.getElementById('featureOutput').addEventListener('input', () => {
+    const vals = document.getElementById('featureOutput').value.split(',').map(v => v.trim()).filter(Boolean);
+    featureChoices.removeActiveItems();
+    vals.forEach(v => featureChoices.setChoiceByValue(v));
+    update();
+  });
 
   document.getElementById('selectSensors').addEventListener('click', () => {
     sensors.forEach(s => sensorChoices.setChoiceByValue(s.value));
@@ -151,10 +178,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('copySensors').addEventListener('click', () => {
-    navigator.clipboard.writeText(document.getElementById('sensorOutput').textContent);
+    navigator.clipboard.writeText(document.getElementById('sensorOutput').value);
   });
   document.getElementById('copyFeatures').addEventListener('click', () => {
-    navigator.clipboard.writeText(document.getElementById('featureOutput').textContent);
+    navigator.clipboard.writeText(document.getElementById('featureOutput').value);
   });
 
   update();

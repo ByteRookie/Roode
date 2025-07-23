@@ -21,6 +21,7 @@ OPTIONAL_SENSORS = "optional_sensors"
 
 TYPES = [VERSION, ENTRY_EXIT_EVENT, STATUS, FEATURES, SENSOR_NAME, OPTIONAL_SENSORS]
 
+
 _defined_roode_ids = set()
 
 
@@ -35,18 +36,18 @@ def _validate_single_block(config):
 
 
 def _set_default_names(config):
-    rid = str(config.get(CONF_ROODE_ID, ""))
+    rid = str(config[CONF_ROODE_ID].id)
+    suffix = f" {rid}" if rid else ""
     if FEATURES not in config:
-        config[FEATURES] = {"name": f"Roode Enabled Features {rid}"}
+        config[FEATURES] = {"name": f"Roode Enabled Features{suffix}"}
     if SENSOR_NAME not in config:
-        config[SENSOR_NAME] = {"name": f"Roode Sensor Name {rid}"}
+        config[SENSOR_NAME] = {"name": f"Roode Sensor Name{suffix}"}
     if OPTIONAL_SENSORS not in config:
-        config[OPTIONAL_SENSORS] = {"name": f"Roode Optional Sensors {rid}"}
+        config[OPTIONAL_SENSORS] = {"name": f"Roode Optional Sensors{suffix}"}
     return config
 
 
 CONFIG_SCHEMA = cv.All(
-    _set_default_names,
     cv.Schema(
         {
             cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
@@ -106,6 +107,7 @@ CONFIG_SCHEMA = cv.All(
             ),
         }
     ),
+    _set_default_names,
     _validate_single_block,
 )
 

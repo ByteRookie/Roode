@@ -18,6 +18,7 @@
   duplicates when several sensors are present
 - Validation now errors if multiple `platform: roode` text sensor blocks use
   the same id, preventing duplicate entity names
+- Fix default text sensor names when the Roode id is omitted
 
 ## 1.5.1
 - Add diagnostic sensors reporting loop time, CPU usage, and RAM and flash usage percentages

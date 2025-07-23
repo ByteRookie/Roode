@@ -14,6 +14,7 @@ from esphome.const import (
 )
 from esphome import core
 from esphome.components import text_sensor
+import roode.text_sensor as roode_ts
 from ..vl53l1x import distance_as_mm, NullableSchema, VL53L1X
 
 DEPENDENCIES = ["vl53l1x"]
@@ -135,14 +136,13 @@ async def to_code(config: Dict):
     # Auto-create configuration text sensors if they weren't explicitly added via
     # a text_sensor block. When multiple Roode components are present each name
     # includes the component ID to avoid duplicates.
-    from . import text_sensor as ts
     rid = str(config[CONF_ID])
     suffix = f" {rid}" if rid else ""
-    defined = ts.configured_sensors.get(rid, set())
+    defined = roode_ts.configured_sensors.get(rid, set())
     defaults = {
-        ts.SENSOR_NAME: ("mdi:identifier", f"Roode Sensor Name{suffix}"),
-        ts.FEATURES: ("mdi:cog", f"Roode Enabled Features{suffix}"),
-        ts.OPTIONAL_SENSORS: ("mdi:format-list-checks", f"Roode Optional Sensors{suffix}"),
+        roode_ts.SENSOR_NAME: ("mdi:identifier", f"Roode Sensor Name{suffix}"),
+        roode_ts.FEATURES: ("mdi:cog", f"Roode Enabled Features{suffix}"),
+        roode_ts.OPTIONAL_SENSORS: ("mdi:format-list-checks", f"Roode Optional Sensors{suffix}"),
     }
     for key, (icon, name) in defaults.items():
         if key in defined:

@@ -647,6 +647,11 @@ Optional sensors provide insight into Roode's operation:
 See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
 these sensors.
 
+When using the plugin wizard, a new **Optional Sensors** dropdown lets you
+choose whether these diagnostics should be created automatically. Select **All**
+to create every sensor, **None** to disable them, or **Custom** to specify only
+the sensors you need.
+
 
 ## FAQ/Troubleshoot
 

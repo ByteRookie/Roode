@@ -8,6 +8,7 @@ from esphome.const import (
     STATE_CLASS_MEASUREMENT,
     UNIT_EMPTY,
     ENTITY_CATEGORY_DIAGNOSTIC,
+    CONF_ENTITY_CATEGORY,
 )
 from . import Roode, CONF_ROODE_ID
 
@@ -30,121 +31,211 @@ CONF_RAM_FREE = "ram_free"
 CONF_FLASH_FREE = "flash_free"
 CONF_MANUAL_ADJUST = "manual_adjustment_count"
 CONF_INTERRUPT_STATUS = "interrupt_status"
+CONF_OPTIONAL_SENSORS = "optional_sensors"
+OPTIONAL_SENSOR_OPTIONS = ["all", "none", "custom"]
 
 CONFIG_SCHEMA = sensor.sensor_schema().extend(
     {
+        cv.Optional(CONF_OPTIONAL_SENSORS, default="custom"): cv.enum(
+            OPTIONAL_SENSOR_OPTIONS, upper=False
+        ),
         cv.Optional(CONF_DISTANCE_ENTRY): sensor.sensor_schema(
             icon=ICON_RULER,
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_DISTANCE_EXIT): sensor.sensor_schema(
             icon=ICON_RULER,
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_MAX_THRESHOLD_ENTRY): sensor.sensor_schema(
             icon="mdi:map-marker-distance",
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_MAX_THRESHOLD_EXIT): sensor.sensor_schema(
             icon="mdi:map-marker-distance",
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_MIN_THRESHOLD_ENTRY): sensor.sensor_schema(
             icon="mdi:map-marker-distance",
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_MIN_THRESHOLD_EXIT): sensor.sensor_schema(
             icon="mdi:map-marker-distance",
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_ROI_HEIGHT_ENTRY): sensor.sensor_schema(
             icon="mdi:table-row-height",
             unit_of_measurement="px",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_ROI_WIDTH_ENTRY): sensor.sensor_schema(
             icon="mdi:table-column-width",
             unit_of_measurement="px",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_ROI_HEIGHT_EXIT): sensor.sensor_schema(
             icon="mdi:table-row-height",
             unit_of_measurement="px",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_ROI_WIDTH_EXIT): sensor.sensor_schema(
             icon="mdi:table-column-width",
             unit_of_measurement="px",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(SENSOR_STATUS): sensor.sensor_schema(
             icon="mdi:check-circle",
             accuracy_decimals=0,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_LOOP_TIME): sensor.sensor_schema(
             icon="mdi:progress-clock",
             unit_of_measurement="ms",
             accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_CPU_USAGE): sensor.sensor_schema(
             icon="mdi:cpu-64-bit",
             unit_of_measurement="%",
             accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_RAM_FREE): sensor.sensor_schema(
             icon="mdi:memory",
             unit_of_measurement="%",
             accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_FLASH_FREE): sensor.sensor_schema(
             icon=ICON_NEW_BOX,
             unit_of_measurement="%",
             accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_INTERRUPT_STATUS): sensor.sensor_schema(
             icon="mdi:lightning-bolt",
             accuracy_decimals=0,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.Optional(CONF_MANUAL_ADJUST): sensor.sensor_schema(
             icon="mdi:counter",
             accuracy_decimals=0,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ).extend(
+            {
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category
+            }
         ),
         cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
     }
@@ -153,54 +244,55 @@ CONFIG_SCHEMA = sensor.sensor_schema().extend(
 
 async def to_code(config):
     var = await cg.get_variable(config[CONF_ROODE_ID])
-    if CONF_DISTANCE_ENTRY in config:
-        distance = await sensor.new_sensor(config[CONF_DISTANCE_ENTRY])
+    optional = config.get(CONF_OPTIONAL_SENSORS, "custom")
+    if optional == "all" or CONF_DISTANCE_ENTRY in config:
+        distance = await sensor.new_sensor(config.get(CONF_DISTANCE_ENTRY, {}))
         cg.add(var.set_distance_entry(distance))
-    if CONF_DISTANCE_EXIT in config:
-        distance = await sensor.new_sensor(config[CONF_DISTANCE_EXIT])
+    if optional == "all" or CONF_DISTANCE_EXIT in config:
+        distance = await sensor.new_sensor(config.get(CONF_DISTANCE_EXIT, {}))
         cg.add(var.set_distance_exit(distance))
-    if CONF_MAX_THRESHOLD_ENTRY in config:
-        count = await sensor.new_sensor(config[CONF_MAX_THRESHOLD_ENTRY])
+    if optional == "all" or CONF_MAX_THRESHOLD_ENTRY in config:
+        count = await sensor.new_sensor(config.get(CONF_MAX_THRESHOLD_ENTRY, {}))
         cg.add(var.set_max_threshold_entry_sensor(count))
-    if CONF_MAX_THRESHOLD_EXIT in config:
-        count = await sensor.new_sensor(config[CONF_MAX_THRESHOLD_EXIT])
+    if optional == "all" or CONF_MAX_THRESHOLD_EXIT in config:
+        count = await sensor.new_sensor(config.get(CONF_MAX_THRESHOLD_EXIT, {}))
         cg.add(var.set_max_threshold_exit_sensor(count))
-    if CONF_MIN_THRESHOLD_ENTRY in config:
-        count = await sensor.new_sensor(config[CONF_MIN_THRESHOLD_ENTRY])
+    if optional == "all" or CONF_MIN_THRESHOLD_ENTRY in config:
+        count = await sensor.new_sensor(config.get(CONF_MIN_THRESHOLD_ENTRY, {}))
         cg.add(var.set_min_threshold_entry_sensor(count))
-    if CONF_MIN_THRESHOLD_EXIT in config:
-        count = await sensor.new_sensor(config[CONF_MIN_THRESHOLD_EXIT])
+    if optional == "all" or CONF_MIN_THRESHOLD_EXIT in config:
+        count = await sensor.new_sensor(config.get(CONF_MIN_THRESHOLD_EXIT, {}))
         cg.add(var.set_min_threshold_exit_sensor(count))
-    if CONF_ROI_HEIGHT_ENTRY in config:
-        count = await sensor.new_sensor(config[CONF_ROI_HEIGHT_ENTRY])
+    if optional == "all" or CONF_ROI_HEIGHT_ENTRY in config:
+        count = await sensor.new_sensor(config.get(CONF_ROI_HEIGHT_ENTRY, {}))
         cg.add(var.set_entry_roi_height_sensor(count))
-    if CONF_ROI_WIDTH_ENTRY in config:
-        count = await sensor.new_sensor(config[CONF_ROI_WIDTH_ENTRY])
+    if optional == "all" or CONF_ROI_WIDTH_ENTRY in config:
+        count = await sensor.new_sensor(config.get(CONF_ROI_WIDTH_ENTRY, {}))
         cg.add(var.set_entry_roi_width_sensor(count))
-    if CONF_ROI_HEIGHT_EXIT in config:
-        count = await sensor.new_sensor(config[CONF_ROI_HEIGHT_EXIT])
+    if optional == "all" or CONF_ROI_HEIGHT_EXIT in config:
+        count = await sensor.new_sensor(config.get(CONF_ROI_HEIGHT_EXIT, {}))
         cg.add(var.set_exit_roi_height_sensor(count))
-    if CONF_ROI_WIDTH_EXIT in config:
-        count = await sensor.new_sensor(config[CONF_ROI_WIDTH_EXIT])
+    if optional == "all" or CONF_ROI_WIDTH_EXIT in config:
+        count = await sensor.new_sensor(config.get(CONF_ROI_WIDTH_EXIT, {}))
         cg.add(var.set_exit_roi_width_sensor(count))
-    if SENSOR_STATUS in config:
-        count = await sensor.new_sensor(config[SENSOR_STATUS])
+    if optional == "all" or SENSOR_STATUS in config:
+        count = await sensor.new_sensor(config.get(SENSOR_STATUS, {}))
         cg.add(var.set_sensor_status_sensor(count))
-    if CONF_LOOP_TIME in config:
-        count = await sensor.new_sensor(config[CONF_LOOP_TIME])
+    if optional == "all" or CONF_LOOP_TIME in config:
+        count = await sensor.new_sensor(config.get(CONF_LOOP_TIME, {}))
         cg.add(var.set_loop_time_sensor(count))
-    if CONF_CPU_USAGE in config:
-        count = await sensor.new_sensor(config[CONF_CPU_USAGE])
+    if optional == "all" or CONF_CPU_USAGE in config:
+        count = await sensor.new_sensor(config.get(CONF_CPU_USAGE, {}))
         cg.add(var.set_cpu_usage_sensor(count))
-    if CONF_RAM_FREE in config:
-        count = await sensor.new_sensor(config[CONF_RAM_FREE])
+    if optional == "all" or CONF_RAM_FREE in config:
+        count = await sensor.new_sensor(config.get(CONF_RAM_FREE, {}))
         cg.add(var.set_ram_free_sensor(count))
-    if CONF_FLASH_FREE in config:
-        count = await sensor.new_sensor(config[CONF_FLASH_FREE])
+    if optional == "all" or CONF_FLASH_FREE in config:
+        count = await sensor.new_sensor(config.get(CONF_FLASH_FREE, {}))
         cg.add(var.set_flash_free_sensor(count))
-    if CONF_INTERRUPT_STATUS in config:
-        count = await sensor.new_sensor(config[CONF_INTERRUPT_STATUS])
+    if optional == "all" or CONF_INTERRUPT_STATUS in config:
+        count = await sensor.new_sensor(config.get(CONF_INTERRUPT_STATUS, {}))
         cg.add(var.set_interrupt_status_sensor(count))
-    if CONF_MANUAL_ADJUST in config:
-        count = await sensor.new_sensor(config[CONF_MANUAL_ADJUST])
+    if optional == "all" or CONF_MANUAL_ADJUST in config:
+        count = await sensor.new_sensor(config.get(CONF_MANUAL_ADJUST, {}))
         cg.add(var.set_manual_adjustment_sensor(count))

@@ -13,6 +13,7 @@ from esphome.const import (
     CONF_ENTITY_CATEGORY,
     ENTITY_CATEGORY_CONFIG,
 )
+from esphome.core import ID
 from ..vl53l1x import distance_as_mm, NullableSchema, VL53L1X
 
 DEPENDENCIES = ["vl53l1x"]
@@ -134,17 +135,23 @@ async def to_code(config: Dict):
     sensor_mode_class = roode_ns.class_(
         "SensorModeSelect", select.Select, cg.Component
     )
-    sensor_mode_select_conf = {
-        CONF_ID: cg.ID(f"{config[CONF_ID].id}_sensor_mode", type=sensor_mode_class),
-        CONF_NAME: "sensor mode",
-        CONF_ICON: "mdi:menu-down",
-        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_CONFIG,
-    }
+    sensor_mode_select_schema = select.select_schema(
+        sensor_mode_class,
+        icon="mdi:menu-down",
+        entity_category=ENTITY_CATEGORY_CONFIG,
+    )
+    sensor_mode_select_conf = sensor_mode_select_schema(
+        {
+            CONF_ID: ID(
+                f"{config[CONF_ID].id}_sensor_mode", type=sensor_mode_class
+            ),
+            CONF_NAME: "sensor mode",
+        }
+    )
     sensor_mode_select = await select.new_select(
         sensor_mode_select_conf, options=["no_sensors", "all_sensors"]
     )
-    await cg.register_component(sensor_mode_select, sensor_mode_select_conf)
-    cg.add(sensor_mode_select.set_parent(roode))
+    await cg.register_parented(sensor_mode_select, roode)
     cg.add(roode.set_sensor_mode_select(sensor_mode_select))
 
 

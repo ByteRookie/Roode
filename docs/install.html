@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Roode Install Guide</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin:0; background:#f6f6f6; }
+    header { background:#333; color:#fff; padding:1rem; }
+    nav a { color:#fff; margin-right:1rem; text-decoration:none; }
+    nav a.active { font-weight:bold; text-decoration:underline; }
+    main { padding:1rem; }
+    pre { background:#eee; padding:.5rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="install.html" class="active">Install</a>
+      <a href="index.html">Config</a>
+    </nav>
+  </header>
+  <main>
+    <h2>Installation</h2>
+    <ol>
+      <li>Install <a href="https://esphome.io/">ESPHome</a> on your computer or Home Assistant.</li>
+      <li>Add Roode as an external component in your YAML:
+        <pre>external_components:
+  - source: github://Lyr3x/Roode
+</pre>
+      </li>
+      <li>Copy one of the example configs from the <a href="../">GitHub repository</a> and adjust as needed.</li>
+      <li>Flash your device with <code>esphome run yourfile.yaml</code>.</li>
+    </ol>
+    <p><a href="../README.md">Back to GitHub README</a></p>
+  </main>
+</body>
+</html>

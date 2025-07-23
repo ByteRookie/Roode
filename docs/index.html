@@ -1,24 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Roode Configuration Helper</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
-<style>
-body { font-family: sans-serif; padding: 1rem; }
-label { display: block; margin-top: 1rem; }
-.copy-btn {
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 1rem;
-}
-</style>
-<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+  <meta charset="UTF-8">
+  <title>Roode Configuration Helper</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+  <style>
+    body { font-family: system-ui, sans-serif; margin:0; background:#f6f6f6; }
+    header { background:#333; color:#fff; padding:1rem; }
+    nav a { color:#fff; margin-right:1rem; text-decoration:none; }
+    nav a.active { font-weight:bold; text-decoration:underline; }
+    main { padding:1rem; }
+    label { display:block; margin-top:1rem; }
+    select { min-width:250px; }
+    pre { background:#eee; padding:.5rem; }
+    .copy-btn { border:none; background:none; cursor:pointer; font-size:1rem; }
+    .button-group button { margin-right:.5rem; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 </head>
 <body>
-<h2>Roode Configuration Helper</h2>
-<p>Select sensors and configuration options to copy into your YAML.</p>
+  <header>
+    <nav>
+      <a href="install.html">Install</a>
+      <a href="index.html" class="active">Config</a>
+    </nav>
+  </header>
+  <main>
+  <h2>Roode Configuration Helper</h2>
+  <p>Select sensors and optional configuration features then copy the lists.</p>
 
 <label>Sensors
   <select id="sensors" multiple></select>
@@ -67,8 +76,6 @@ const sensors = [
 ];
 
 const features = [
-  { value: 'vl53l1x.sensor_id', label: 'Sensor ID' },
-  { value: 'vl53l1x.address & vl53l1x.pins.xshut', label: 'I2C Address & XSHUT' },
   { value: 'vl53l1x.timeout', label: 'Timeout' },
   { value: 'vl53l1x.pins.interrupt', label: 'Interrupt Pin' },
   { value: 'vl53l1x.calibration.ranging', label: 'Ranging Mode' },
@@ -142,6 +149,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
+
+  </main>
 
 </body>
 </html>

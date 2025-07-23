@@ -347,7 +347,7 @@ reflections cause false triggers.
 
 ### Interactive Selector Tool
 
-Use the [interactive configuration tool](https://byterookie.github.io/Roode/interactive-selector.html) to select sensors and features. The page uses polished dropdowns with search boxes, "Select All" and "Remove All" shortcuts, and copy buttons for the generated lists. The HTML file also lives in the repository's `docs/` folder so you can open it locally if desired.
+Use the [interactive configuration tool](https://byterookie.github.io/Roode/) to choose sensors and optional features. The site features modern dropdowns with search, "Select All" and "Remove All" shortcuts plus copy buttons for the resulting lists. A built‑in install guide is available from the navigation bar, and the HTML lives in the `docs/` folder so you can open it locally as well.
 
 ### Sensors
 

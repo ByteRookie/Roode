@@ -21,11 +21,15 @@ label { display: block; margin-top: 1rem; }
 <p>Select sensors and configuration options to copy into your YAML.</p>
 
 <label>Sensors
-<select id="sensors" multiple></select>
+  <select id="sensors" multiple></select>
+  <button id="selectSensors">Select All</button>
+  <button id="clearSensors">Remove All</button>
 </label>
 
 <label>Features
-<select id="features" multiple></select>
+  <select id="features" multiple></select>
+  <button id="selectFeatures">Select All</button>
+  <button id="clearFeatures">Remove All</button>
 </label>
 
 <h3>Selected Sensors <button class="copy-btn" id="copySensors" title="Copy to clipboard">📋</button></h3>
@@ -36,59 +40,59 @@ label { display: block; margin-top: 1rem; }
 
 <script>
 const sensors = [
- 'people_counter',
- 'presence_sensor',
- 'sensor_xshut_state',
- 'distance_entry',
- 'distance_exit',
- 'max_threshold_entry',
- 'max_threshold_exit',
- 'min_threshold_entry',
- 'min_threshold_exit',
- 'roi_height_entry',
- 'roi_width_entry',
- 'roi_height_exit',
- 'roi_width_exit',
- 'loop_time',
- 'cpu_usage',
- 'ram_free',
- 'flash_free',
- 'sensor_status',
- 'interrupt_status',
- 'manual_adjustment_count',
- 'version',
- 'entry_exit_event',
- 'sensor_status (text)',
- 'enabled_features'
+  { value: 'people_counter', label: 'People Count' },
+  { value: 'presence_sensor', label: 'Presence' },
+  { value: 'sensor_xshut_state', label: 'XSHUT State' },
+  { value: 'distance_entry', label: 'Distance Zone 0' },
+  { value: 'distance_exit', label: 'Distance Zone 1' },
+  { value: 'max_threshold_entry', label: 'Max Zone 0' },
+  { value: 'max_threshold_exit', label: 'Max Zone 1' },
+  { value: 'min_threshold_entry', label: 'Min Zone 0' },
+  { value: 'min_threshold_exit', label: 'Min Zone 1' },
+  { value: 'roi_height_entry', label: 'ROI Height Zone 0' },
+  { value: 'roi_width_entry', label: 'ROI Width Zone 0' },
+  { value: 'roi_height_exit', label: 'ROI Height Zone 1' },
+  { value: 'roi_width_exit', label: 'ROI Width Zone 1' },
+  { value: 'loop_time', label: 'Loop Time' },
+  { value: 'cpu_usage', label: 'CPU Usage' },
+  { value: 'ram_free', label: 'RAM Usage' },
+  { value: 'flash_free', label: 'Flash Usage' },
+  { value: 'sensor_status', label: 'Sensor Status' },
+  { value: 'interrupt_status', label: 'Interrupt Status' },
+  { value: 'manual_adjustment_count', label: 'Manual Adjusts' },
+  { value: 'version', label: 'Version' },
+  { value: 'entry_exit_event', label: 'Last Direction' },
+  { value: 'sensor_status (text)', label: 'Sensor Status Text' },
+  { value: 'enabled_features', label: 'Enabled Features' }
 ];
 
 const features = [
- 'vl53l1x.sensor_id',
- 'vl53l1x.address & vl53l1x.pins.xshut',
- 'vl53l1x.timeout',
- 'vl53l1x.pins.interrupt',
- 'vl53l1x.calibration.ranging',
- 'vl53l1x.calibration.offset',
- 'vl53l1x.calibration.crosstalk',
- 'roode.sampling',
- 'roode.orientation',
- 'roode.roi',
- 'roode.detection_thresholds',
- 'roode.calibration_persistence',
- 'roode.filter_mode & roode.filter_window',
- 'roode.log_fallback_events',
- 'roode.force_single_core',
- 'roode.invalid_distance_limit',
- 'roode.restart_timeout',
- 'roode.zones.invert',
- 'roode.zones.entry/exit'
+  { value: 'vl53l1x.sensor_id', label: 'Sensor ID' },
+  { value: 'vl53l1x.address & vl53l1x.pins.xshut', label: 'I2C Address & XSHUT' },
+  { value: 'vl53l1x.timeout', label: 'Timeout' },
+  { value: 'vl53l1x.pins.interrupt', label: 'Interrupt Pin' },
+  { value: 'vl53l1x.calibration.ranging', label: 'Ranging Mode' },
+  { value: 'vl53l1x.calibration.offset', label: 'Distance Offset' },
+  { value: 'vl53l1x.calibration.crosstalk', label: 'Crosstalk' },
+  { value: 'roode.sampling', label: 'Sample Count' },
+  { value: 'roode.orientation', label: 'Orientation' },
+  { value: 'roode.roi', label: 'ROI Size' },
+  { value: 'roode.detection_thresholds', label: 'Detection Thresholds' },
+  { value: 'roode.calibration_persistence', label: 'Save Thresholds' },
+  { value: 'roode.filter_mode & roode.filter_window', label: 'Filter Mode/Window' },
+  { value: 'roode.log_fallback_events', label: 'Log Fallback Events' },
+  { value: 'roode.force_single_core', label: 'Force Single Core' },
+  { value: 'roode.invalid_distance_limit', label: 'Invalid Distance Limit' },
+  { value: 'roode.restart_timeout', label: 'Restart Timeout' },
+  { value: 'roode.zones.invert', label: 'Invert Zones' },
+  { value: 'roode.zones.entry/exit', label: 'Per-zone Config' }
 ];
 
-function populateSelect(selectEl, values) {
-  values.forEach(v => {
+function populateSelect(selectEl, items) {
+  items.forEach(item => {
     const opt = document.createElement('option');
-    opt.value = v;
-    opt.textContent = v;
+    opt.value = item.value;
+    opt.textContent = item.label;
     selectEl.appendChild(opt);
   });
 }
@@ -99,8 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
   populateSelect(sensorSelect, sensors);
   populateSelect(featureSelect, features);
 
-  const sensorChoices = new Choices(sensorSelect, { removeItemButton: true });
-  const featureChoices = new Choices(featureSelect, { removeItemButton: true });
+  const sensorChoices = new Choices(sensorSelect, { removeItemButton: true, searchEnabled: true, shouldSort: false });
+  const featureChoices = new Choices(featureSelect, { removeItemButton: true, searchEnabled: true, shouldSort: false });
 
   function update() {
     const sensorVals = sensorChoices.getValue(true);
@@ -111,6 +115,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   sensorSelect.addEventListener('change', update);
   featureSelect.addEventListener('change', update);
+
+  document.getElementById('selectSensors').addEventListener('click', () => {
+    sensors.forEach(s => sensorChoices.setChoiceByValue(s.value));
+    update();
+  });
+  document.getElementById('clearSensors').addEventListener('click', () => {
+    sensorChoices.removeActiveItems();
+    update();
+  });
+  document.getElementById('selectFeatures').addEventListener('click', () => {
+    features.forEach(f => featureChoices.setChoiceByValue(f.value));
+    update();
+  });
+  document.getElementById('clearFeatures').addEventListener('click', () => {
+    featureChoices.removeActiveItems();
+    update();
+  });
 
   document.getElementById('copySensors').addEventListener('click', () => {
     navigator.clipboard.writeText(document.getElementById('sensorList').textContent);

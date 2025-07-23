@@ -244,6 +244,15 @@ void Roode::setup() {
 
   publish_feature_list();
   update_status_text("ok");
+  if (sensor_mode_select != nullptr) {
+    sensor_mode_select->add_on_state_callback([this](std::string value, size_t) {
+      if (value == "no_sensors")
+        this->set_sensor_mode(SENSOR_MODE_NONE);
+      else
+        this->set_sensor_mode(SENSOR_MODE_ALL);
+    });
+    this->set_sensor_mode(sensor_mode_);
+  }
 }
 
 void Roode::update() {
@@ -802,6 +811,15 @@ void Roode::sensor_task(void *param) {
     self->loop_count_++;
     self->update_metrics();
     vTaskDelay(pdMS_TO_TICKS(self->polling_interval_ms_));
+  }
+}
+
+void Roode::set_sensor_mode(SensorMode mode) {
+  sensor_mode_ = mode;
+  if (sensor_mode_select != nullptr) {
+    auto opt = sensor_mode_select->at(static_cast<size_t>(mode));
+    if (opt.has_value())
+      sensor_mode_select->publish_state(opt.value());
   }
 }
 }  // namespace roode

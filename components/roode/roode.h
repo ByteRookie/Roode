@@ -6,6 +6,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/components/select/select.h"
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
@@ -112,6 +113,9 @@ class Roode : public PollingComponent {
   void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
   void set_sensor_status_text_sensor(text_sensor::TextSensor *sensor_) { status_text_sensor = sensor_; }
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
+  void set_sensor_mode_select(select::Select *select) { sensor_mode_select = select; }
+  void set_sensor_mode(SensorMode mode);
+  SensorMode get_sensor_mode() const { return sensor_mode_; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
@@ -167,6 +171,7 @@ class Roode : public PollingComponent {
   text_sensor::TextSensor *status_text_sensor{nullptr};
   sensor::Sensor *manual_adjustment_sensor{nullptr};
   sensor::Sensor *interrupt_status_sensor{nullptr};
+  select::Select *sensor_mode_select{nullptr};
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;
@@ -194,6 +199,9 @@ class Roode : public PollingComponent {
   bool force_single_core_{false};
   TaskHandle_t sensor_task_handle_{nullptr};
   uint8_t multicore_retry_count_{0};
+
+  enum SensorMode { SENSOR_MODE_NONE, SENSOR_MODE_ALL };
+  SensorMode sensor_mode_{SENSOR_MODE_ALL};
 
   enum FSMState { STATE_IDLE, STATE_ENTRY_ACTIVE, STATE_BOTH_ACTIVE };
   FSMState state_{STATE_IDLE};

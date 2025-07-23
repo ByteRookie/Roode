@@ -110,7 +110,7 @@ function populateSelect(el, items) {
   items.forEach(item => {
     const opt = document.createElement('option');
     opt.value = item.value;
-    opt.textContent = item.label;
+    opt.textContent = `${item.label} - ${item.desc}`;
     opt.title = item.desc;
     el.appendChild(opt);
   });

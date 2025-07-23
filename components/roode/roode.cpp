@@ -108,6 +108,7 @@ void Roode::log_event(const std::string &msg) {
     if (msg == "dual_core_success" || msg == "fallback_single_core" || msg == "force_single_core" ||
         msg == "interrupt_fallback_polling" || msg == "interrupt_recovered") {
       instance_->publish_feature_list();
+      instance_->publish_optional_sensors();
     }
   }
 }
@@ -128,6 +129,9 @@ void Roode::setup() {
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
+  }
+  if (sensor_name_sensor != nullptr) {
+    sensor_name_sensor->publish_state(App.get_name());
   }
   ESP_LOGI(SETUP, "Using sampling with sampling size: %d", samples);
 
@@ -243,6 +247,7 @@ void Roode::setup() {
     expected_counter_ = people_counter->state;
 
   publish_feature_list();
+  publish_optional_sensors();
   update_status_text("ok");
 }
 
@@ -298,8 +303,7 @@ void Roode::loop() {
   } else {
     invalid_read_count_ = 0;
   }
-  if (invalid_read_count_ > invalid_distance_limit_ &&
-      (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
+  if (invalid_read_count_ > invalid_distance_limit_ && (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
     ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
     restart_sensor();
   }
@@ -526,6 +530,7 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
   publish_feature_list();
+  publish_optional_sensors();
 }
 
 void Roode::apply_cpu_optimizations(float cpu) {
@@ -643,6 +648,7 @@ void Roode::calibrate_zones() {
   }
   ESP_LOGI(SETUP, "Finished calibrating sensor zones");
   publish_feature_list();
+  publish_optional_sensors();
 }
 
 void Roode::calibrateDistance() {
@@ -750,6 +756,30 @@ void Roode::publish_feature_list() {
   log_event(std::string("features_enabled: ") + feature_list);
 }
 
+void Roode::publish_optional_sensors() {
+  std::vector<std::string> sensors;
+  if (loop_time_sensor != nullptr)
+    sensors.push_back("loop_time");
+  if (cpu_usage_sensor != nullptr)
+    sensors.push_back("cpu_usage");
+  if (ram_free_sensor != nullptr)
+    sensors.push_back("ram_free");
+  if (flash_free_sensor != nullptr)
+    sensors.push_back("flash_free");
+  if (interrupt_status_sensor != nullptr)
+    sensors.push_back("interrupt_status");
+  if (manual_adjustment_sensor != nullptr)
+    sensors.push_back("manual_adjustment_count");
+
+  std::string sensor_list;
+  for (size_t i = 0; i < sensors.size(); ++i) {
+    sensor_list += sensors[i];
+    if (i + 1 < sensors.size())
+      sensor_list += "\n";
+  }
+  if (optional_sensors_sensor != nullptr)
+    optional_sensors_sensor->publish_state(sensor_list);
+}
 
 void Roode::update_status_text(const std::string &status) {
   if (status_text_sensor != nullptr && status != last_status_text_) {
@@ -769,8 +799,7 @@ void Roode::sensor_task(void *param) {
   for (;;) {
     self->use_sensor_task_ = true;
     uint32_t now = millis();
-    if (self->last_loop_update_ts_ != 0 &&
-        (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
+    if (self->last_loop_update_ts_ != 0 && (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
         (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
       ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", self->restart_timeout_ms_ / 1000);
       self->restart_sensor();

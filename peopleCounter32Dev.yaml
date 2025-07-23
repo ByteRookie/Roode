@@ -183,12 +183,8 @@ text_sensor:
   - platform: roode
     version:
       name: $friendly_name version
-  - platform: roode
     entry_exit_event:
       name: $friendly_name last direction
-  - platform: roode
-    enabled_features:
-      name: $friendly_name enabled features
   - platform: template
     name: $friendly_name Uptime Human Readable
     id: uptime_human

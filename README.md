@@ -421,6 +421,7 @@ text_sensor:
       name: $friendly_name sensor status text
   # The sensor_name, enabled_features and optional_sensors text sensors
   # are created automatically by the Roode component with entity_category: config.
+  # Their default names include the Roode ID so multiple sensors don't clash.
   # Only one `platform: roode` block is allowed for text sensors using the same
   # Roode id. If you split them into multiple blocks, ESPHome will report
   # duplicate entity names.
@@ -632,7 +633,9 @@ interrupt and polling mode, and manual adjustments to the people count.
 
 ### Configuration text sensors
 
-The plugin automatically exposes three text sensors with `entity_category: config`:
+The plugin automatically exposes three text sensors with `entity_category: config`.
+Their default names include the Roode ID so multiple sensors can exist in one
+device without clashes:
 
 - `sensor_name` publishes the device's name.
 - `enabled_features` lists runtime options like `dual_core` vs `single_core`,
@@ -641,7 +644,7 @@ The plugin automatically exposes three text sensors with `entity_category: confi
 
 These help verify that the hardware pins and options are detected correctly. When
 adding text sensors in YAML, use a single `platform: roode` entry so these
-auto-generated sensors only appear once.
+auto-generated sensors only appear once or rename them as needed.
 
 ### Diagnostic sensors
 

@@ -32,6 +32,17 @@ def _validate_single_block(config):
     _defined_roode_ids.add(rid)
     return config
 
+
+def _set_default_names(config):
+    rid = str(config[CONF_ROODE_ID].id)
+    if FEATURES not in config:
+        config[FEATURES] = {"name": f"Roode Enabled Features {rid}"}
+    if SENSOR_NAME not in config:
+        config[SENSOR_NAME] = {"name": f"Roode Sensor Name {rid}"}
+    if OPTIONAL_SENSORS not in config:
+        config[OPTIONAL_SENSORS] = {"name": f"Roode Optional Sensors {rid}"}
+    return config
+
 CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
@@ -63,10 +74,7 @@ CONFIG_SCHEMA = cv.All(
                 ): cv.entity_category,
             }
         ),
-        cv.Optional(
-            FEATURES,
-            default={"name": "Roode Enabled Features"},
-        ): text_sensor.text_sensor_schema().extend(
+        cv.Optional(FEATURES): text_sensor.text_sensor_schema().extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:cog"): cv.icon,
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
@@ -75,10 +83,7 @@ CONFIG_SCHEMA = cv.All(
                 ): cv.entity_category,
             }
         ),
-        cv.Optional(
-            SENSOR_NAME,
-            default={"name": "Roode Sensor Name"},
-        ): text_sensor.text_sensor_schema().extend(
+        cv.Optional(SENSOR_NAME): text_sensor.text_sensor_schema().extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:identifier"): cv.icon,
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
@@ -87,10 +92,7 @@ CONFIG_SCHEMA = cv.All(
                 ): cv.entity_category,
             }
         ),
-        cv.Optional(
-            OPTIONAL_SENSORS,
-            default={"name": "Roode Optional Sensors"},
-        ): text_sensor.text_sensor_schema().extend(
+        cv.Optional(OPTIONAL_SENSORS): text_sensor.text_sensor_schema().extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:format-list-checks"): cv.icon,
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
@@ -101,6 +103,7 @@ CONFIG_SCHEMA = cv.All(
         ),
     }
     ),
+    _set_default_names,
     _validate_single_block,
 )
 

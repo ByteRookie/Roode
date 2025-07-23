@@ -14,7 +14,8 @@
 ## 1.6.1
 - Automatically create `sensor_name`, `enabled_features` and
   `optional_sensors` text sensors with `entity_category: config`
-  to simplify configuration
+  to simplify configuration. Default names include the Roode ID to avoid
+  duplicates when several sensors are present
 - Validation now errors if multiple `platform: roode` text sensor blocks use
   the same id, preventing duplicate entity names
 

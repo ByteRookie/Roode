@@ -23,6 +23,7 @@ TYPES = [VERSION, ENTRY_EXIT_EVENT, STATUS, FEATURES, SENSOR_NAME, OPTIONAL_SENS
 
 _defined_roode_ids = set()
 
+
 def _validate_single_block(config):
     rid = str(config[CONF_ROODE_ID].id)
     if rid in _defined_roode_ids:
@@ -34,7 +35,7 @@ def _validate_single_block(config):
 
 
 def _set_default_names(config):
-    rid = str(config[CONF_ROODE_ID].id)
+    rid = str(config.get(CONF_ROODE_ID, ""))
     if FEATURES not in config:
         config[FEATURES] = {"name": f"Roode Enabled Features {rid}"}
     if SENSOR_NAME not in config:
@@ -43,67 +44,68 @@ def _set_default_names(config):
         config[OPTIONAL_SENSORS] = {"name": f"Roode Optional Sensors {rid}"}
     return config
 
+
 CONFIG_SCHEMA = cv.All(
+    _set_default_names,
     cv.Schema(
         {
             cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
-        cv.Optional(VERSION): text_sensor.text_sensor_schema().extend(
-            {
-                cv.Optional(CONF_ICON, default="mdi:git"): cv.icon,
-                cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
-                cv.Optional(
-                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
-                ): cv.entity_category,
-            }
-        ),
-        cv.Optional(ENTRY_EXIT_EVENT): text_sensor.text_sensor_schema().extend(
-            {
-                cv.Optional(CONF_ICON, default="mdi:sign-direction"): cv.icon,
-                cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
-                cv.Optional(
-                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
-                ): cv.entity_category,
-            }
-        ),
-        cv.Optional(STATUS): text_sensor.text_sensor_schema().extend(
-            {
-                cv.Optional(CONF_ICON, default="mdi:check-circle"): cv.icon,
-                cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
-                cv.Optional(
-                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
-                ): cv.entity_category,
-            }
-        ),
-        cv.Optional(FEATURES): text_sensor.text_sensor_schema().extend(
-            {
-                cv.Optional(CONF_ICON, default="mdi:cog"): cv.icon,
-                cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
-                cv.Optional(
-                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
-                ): cv.entity_category,
-            }
-        ),
-        cv.Optional(SENSOR_NAME): text_sensor.text_sensor_schema().extend(
-            {
-                cv.Optional(CONF_ICON, default="mdi:identifier"): cv.icon,
-                cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
-                cv.Optional(
-                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
-                ): cv.entity_category,
-            }
-        ),
-        cv.Optional(OPTIONAL_SENSORS): text_sensor.text_sensor_schema().extend(
-            {
-                cv.Optional(CONF_ICON, default="mdi:format-list-checks"): cv.icon,
-                cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
-                cv.Optional(
-                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
-                ): cv.entity_category,
-            }
-        ),
-    }
+            cv.Optional(VERSION): text_sensor.text_sensor_schema().extend(
+                {
+                    cv.Optional(CONF_ICON, default="mdi:git"): cv.icon,
+                    cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                    cv.Optional(
+                        CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                    ): cv.entity_category,
+                }
+            ),
+            cv.Optional(ENTRY_EXIT_EVENT): text_sensor.text_sensor_schema().extend(
+                {
+                    cv.Optional(CONF_ICON, default="mdi:sign-direction"): cv.icon,
+                    cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                    cv.Optional(
+                        CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                    ): cv.entity_category,
+                }
+            ),
+            cv.Optional(STATUS): text_sensor.text_sensor_schema().extend(
+                {
+                    cv.Optional(CONF_ICON, default="mdi:check-circle"): cv.icon,
+                    cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                    cv.Optional(
+                        CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                    ): cv.entity_category,
+                }
+            ),
+            cv.Optional(FEATURES): text_sensor.text_sensor_schema().extend(
+                {
+                    cv.Optional(CONF_ICON, default="mdi:cog"): cv.icon,
+                    cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                    cv.Optional(
+                        CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
+                    ): cv.entity_category,
+                }
+            ),
+            cv.Optional(SENSOR_NAME): text_sensor.text_sensor_schema().extend(
+                {
+                    cv.Optional(CONF_ICON, default="mdi:identifier"): cv.icon,
+                    cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                    cv.Optional(
+                        CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
+                    ): cv.entity_category,
+                }
+            ),
+            cv.Optional(OPTIONAL_SENSORS): text_sensor.text_sensor_schema().extend(
+                {
+                    cv.Optional(CONF_ICON, default="mdi:format-list-checks"): cv.icon,
+                    cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                    cv.Optional(
+                        CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_CONFIG
+                    ): cv.entity_category,
+                }
+            ),
+        }
     ),
-    _set_default_names,
     _validate_single_block,
 )
 

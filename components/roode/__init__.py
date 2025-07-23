@@ -1,12 +1,17 @@
 from typing import Dict, Union
 import esphome.codegen as cg
 import esphome.config_validation as cv
+from esphome.components import select
 from esphome.const import (
     CONF_HEIGHT,
     CONF_ID,
     CONF_INVERT,
     CONF_SENSOR,
     CONF_WIDTH,
+    CONF_NAME,
+    CONF_ICON,
+    CONF_ENTITY_CATEGORY,
+    ENTITY_CATEGORY_CONFIG,
 )
 from ..vl53l1x import distance_as_mm, NullableSchema, VL53L1X
 
@@ -125,6 +130,22 @@ async def to_code(config: Dict):
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)
+
+    sensor_mode_class = roode_ns.class_(
+        "SensorModeSelect", select.Select, cg.Component
+    )
+    sensor_mode_select_conf = {
+        CONF_ID: cg.ID(f"{config[CONF_ID].id}_sensor_mode", type=sensor_mode_class),
+        CONF_NAME: "sensor mode",
+        CONF_ICON: "mdi:menu-down",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_CONFIG,
+    }
+    sensor_mode_select = await select.new_select(
+        sensor_mode_select_conf, options=["no_sensors", "all_sensors"]
+    )
+    await cg.register_component(sensor_mode_select, sensor_mode_select_conf)
+    cg.add(sensor_mode_select.set_parent(roode))
+    cg.add(roode.set_sensor_mode_select(sensor_mode_select))
 
 
 def setup_zone(name: str, config: Dict, roode: cg.Pvariable):

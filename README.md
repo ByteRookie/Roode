@@ -425,11 +425,10 @@ text_sensor:
     enabled_features:
       name: $friendly_name enabled features
       ## This sensor is a text_sensor that lists all enabled features
-select:
-  - platform: roode
-    sensor_mode:
-      name: $friendly_name sensor mode
 ```
+Roode also exposes a `sensor_mode` select entity automatically. This dropdown
+allows choosing between `no_sensors` and `all_sensors` without any YAML
+configuration.
 The features string lists items as `name:value` pairs separated by new lines.
 The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
 `cpu_cores`, `ram`, `flash`, `calibration_value` and `calibration`.
@@ -475,6 +474,7 @@ calibration:6:01PM
 | `sensor_status` | sensor | Numeric VL53L1X status code (0=ok) |
 | `interrupt_status` | sensor | VL53L1X GPIO1 interrupt pin level |
 | `manual_adjustment_count` | sensor | Total manual people-count corrections |
+| `sensor_mode` | select | Choose between `no_sensors` and `all_sensors` |
 | `version` | text_sensor | Firmware version string |
 | `entry_exit_event` | text_sensor | Last entry or exit direction |
 | `sensor_status` (text) | text_sensor | "ok", "timeout", "reinitializing", "error" or "offline" |

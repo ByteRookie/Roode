@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import select
-from esphome.const import ICON_MENU_DOWN, ENTITY_CATEGORY_CONFIG
+from esphome.const import ENTITY_CATEGORY_CONFIG
 
 from . import Roode, CONF_ROODE_ID, roode_ns
 
@@ -14,7 +14,7 @@ OPTIONS = ["no_sensors", "all_sensors"]
 
 CONFIG_SCHEMA = select.select_schema(
     SensorModeSelect,
-    icon=ICON_MENU_DOWN,
+    icon="mdi:menu-down",
     entity_category=ENTITY_CATEGORY_CONFIG,
 ).extend({cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode)})
 

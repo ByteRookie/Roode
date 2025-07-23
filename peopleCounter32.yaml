@@ -188,7 +188,3 @@ text_sensor:
     id: uptime_human
     icon: mdi:clock-start
 
-select:
-  - platform: roode
-    sensor_mode:
-      name: $friendly_name sensor mode

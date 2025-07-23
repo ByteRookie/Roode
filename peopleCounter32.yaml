@@ -187,4 +187,3 @@ text_sensor:
     name: $friendly_name Uptime Human Readable
     id: uptime_human
     icon: mdi:clock-start
-

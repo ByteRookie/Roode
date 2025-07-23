@@ -143,7 +143,9 @@ async def to_code(config: Dict):
     sensor_mode_select_conf = sensor_mode_select_schema(
         {
             CONF_ID: ID(
-                f"{config[CONF_ID].id}_sensor_mode", type=sensor_mode_class
+                f"{config[CONF_ID].id}_sensor_mode",
+                is_declaration=True,
+                type=sensor_mode_class,
             ),
             CONF_NAME: "sensor mode",
         }

@@ -263,17 +263,9 @@ void Roode::update() {
     if (val.has_value())
       interrupt_status_sensor->publish_state(*val ? 1 : 0);
   }
-  if (people_counter != nullptr && fabs(people_counter->state - expected_counter_) > 0.001f) {
-    int diff = (int) roundf(people_counter->state - expected_counter_);
-    manual_adjustment_count_ += abs(diff);
-    expected_counter_ = people_counter->state;
-    if (manual_adjustment_sensor != nullptr)
-      manual_adjustment_sensor->publish_state(manual_adjustment_count_);
-    if (diff != 0) {
-      std::string sign = diff > 0 ? "+" : "";
-      log_event("manual_adjust " + sign + std::to_string(diff) + " total=" + std::to_string(manual_adjustment_count_));
-    }
-  }
+  publish_sensor_configuration(entry, exit, true);
+  publish_sensor_configuration(entry, exit, false);
+  publish_feature_list();
 }
 
 void Roode::loop() {
@@ -298,8 +290,7 @@ void Roode::loop() {
   } else {
     invalid_read_count_ = 0;
   }
-  if (invalid_read_count_ > invalid_distance_limit_ &&
-      (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
+  if (invalid_read_count_ > invalid_distance_limit_ && (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
     ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
     restart_sensor();
   }
@@ -750,7 +741,6 @@ void Roode::publish_feature_list() {
   log_event(std::string("features_enabled: ") + feature_list);
 }
 
-
 void Roode::update_status_text(const std::string &status) {
   if (status_text_sensor != nullptr && status != last_status_text_) {
     status_text_sensor->publish_state(status);
@@ -769,8 +759,7 @@ void Roode::sensor_task(void *param) {
   for (;;) {
     self->use_sensor_task_ = true;
     uint32_t now = millis();
-    if (self->last_loop_update_ts_ != 0 &&
-        (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
+    if (self->last_loop_update_ts_ != 0 && (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
         (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
       ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", self->restart_timeout_ms_ / 1000);
       self->restart_sensor();

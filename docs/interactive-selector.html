@@ -3,11 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <title>Roode Configuration Helper</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
 <style>
 body { font-family: sans-serif; padding: 1rem; }
-select { width: 300px; height: 150px; }
 label { display: block; margin-top: 1rem; }
+.copy-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 </head>
 <body>
 <h2>Roode Configuration Helper</h2>
@@ -21,10 +28,10 @@ label { display: block; margin-top: 1rem; }
 <select id="features" multiple></select>
 </label>
 
-<h3>Selected Sensors</h3>
+<h3>Selected Sensors <button class="copy-btn" id="copySensors" title="Copy to clipboard">📋</button></h3>
 <pre id="sensorList"></pre>
 
-<h3>Selected Features</h3>
+<h3>Selected Features <button class="copy-btn" id="copyFeatures" title="Copy to clipboard">📋</button></h3>
 <pre id="featureList"></pre>
 
 <script>
@@ -77,28 +84,42 @@ const features = [
  'roode.zones.entry/exit'
 ];
 
-function populateSelect(id, values) {
-  const select = document.getElementById(id);
+function populateSelect(selectEl, values) {
   values.forEach(v => {
     const opt = document.createElement('option');
     opt.value = v;
     opt.textContent = v;
-    select.appendChild(opt);
+    selectEl.appendChild(opt);
   });
 }
 
-function update() {
-  const sensors = Array.from(document.getElementById('sensors').selectedOptions).map(o => o.value);
-  const features = Array.from(document.getElementById('features').selectedOptions).map(o => o.value);
-  document.getElementById('sensorList').textContent = sensors.join(', ');
-  document.getElementById('featureList').textContent = features.join(', ');
-}
+document.addEventListener('DOMContentLoaded', () => {
+  const sensorSelect = document.getElementById('sensors');
+  const featureSelect = document.getElementById('features');
+  populateSelect(sensorSelect, sensors);
+  populateSelect(featureSelect, features);
 
-populateSelect('sensors', sensors);
-populateSelect('features', features);
+  const sensorChoices = new Choices(sensorSelect, { removeItemButton: true });
+  const featureChoices = new Choices(featureSelect, { removeItemButton: true });
 
-document.getElementById('sensors').addEventListener('change', update);
-document.getElementById('features').addEventListener('change', update);
+  function update() {
+    const sensorVals = sensorChoices.getValue(true);
+    const featureVals = featureChoices.getValue(true);
+    document.getElementById('sensorList').textContent = sensorVals.join(', ');
+    document.getElementById('featureList').textContent = featureVals.join(', ');
+  }
+
+  sensorSelect.addEventListener('change', update);
+  featureSelect.addEventListener('change', update);
+
+  document.getElementById('copySensors').addEventListener('click', () => {
+    navigator.clipboard.writeText(document.getElementById('sensorList').textContent);
+  });
+
+  document.getElementById('copyFeatures').addEventListener('click', () => {
+    navigator.clipboard.writeText(document.getElementById('featureList').textContent);
+  });
+});
 </script>
 
 </body>

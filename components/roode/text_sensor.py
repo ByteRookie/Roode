@@ -48,7 +48,6 @@ def _set_default_names(config):
 
 
 CONFIG_SCHEMA = cv.All(
-    _set_default_names,
     cv.Schema(
         {
             cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
@@ -108,6 +107,7 @@ CONFIG_SCHEMA = cv.All(
             ),
         }
     ),
+    _set_default_names,
     _validate_single_block,
 )
 

@@ -27,6 +27,8 @@ static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
 
+enum SensorMode { SENSOR_MODE_NONE, SENSOR_MODE_ALL };
+
 /*
 Use the VL53L1X_SetTimingBudget function to set the TB in milliseconds. The TB
 values available are [15, 20, 33, 50, 100, 200, 500]. This function must be
@@ -200,7 +202,6 @@ class Roode : public PollingComponent {
   TaskHandle_t sensor_task_handle_{nullptr};
   uint8_t multicore_retry_count_{0};
 
-  enum SensorMode { SENSOR_MODE_NONE, SENSOR_MODE_ALL };
   SensorMode sensor_mode_{SENSOR_MODE_ALL};
 
   enum FSMState { STATE_IDLE, STATE_ENTRY_ACTIVE, STATE_BOTH_ACTIVE };

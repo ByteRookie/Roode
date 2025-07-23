@@ -17,9 +17,9 @@ void SensorModeSelect::control(const std::string &value) {
   if (this->parent_ == nullptr)
     return;
   if (value == "no_sensors")
-    this->parent_->set_sensor_mode(Roode::SENSOR_MODE_NONE);
+    this->parent_->set_sensor_mode(SENSOR_MODE_NONE);
   else
-    this->parent_->set_sensor_mode(Roode::SENSOR_MODE_ALL);
+    this->parent_->set_sensor_mode(SENSOR_MODE_ALL);
 }
 
 }  // namespace roode

@@ -13,6 +13,7 @@
 #include "../vl53l1x/vl53l1x.h"
 #include "esphome/core/preferences.h"
 #include "orientation.h"
+#include "sensor_mode_select.h"
 #include "zone.h"
 
 using namespace esphome::vl53l1x;

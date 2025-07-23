@@ -1,4 +1,5 @@
-#include "select.h"
+#include "sensor_mode_select.h"
+#include "roode.h"
 
 namespace esphome {
 namespace roode {

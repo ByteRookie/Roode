@@ -2,10 +2,12 @@
 
 #include "esphome/components/select/select.h"
 #include "esphome/core/component.h"
-#include "../roode.h"
+#include <string>
 
 namespace esphome {
 namespace roode {
+
+class Roode;
 
 class SensorModeSelect : public Component, public select::Select, public Parented<Roode> {
  public:

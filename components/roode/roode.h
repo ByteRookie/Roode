@@ -6,6 +6,9 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/components/select/select.h"
+#include "esphome/components/number/number.h"
+#include "esphome/components/switch/switch.h"
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
@@ -114,6 +117,31 @@ class Roode : public PollingComponent {
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
+  void set_invalid_distance_limit_number(number::Number *num) { invalid_distance_limit_number_ = num; }
+  void set_restart_timeout_number(number::Number *num) { restart_timeout_number_ = num; }
+  void set_detection_min_number(number::Number *num) { detection_min_number_ = num; }
+  void set_detection_max_number(number::Number *num) { detection_max_number_ = num; }
+  void set_filter_mode_select(select::Select *sel) { filter_mode_select_ = sel; }
+  void set_log_fallback_switch(switch_::Switch *sw) { log_fallback_switch_ = sw; }
+  void set_force_single_core_switch(switch_::Switch *sw) { force_single_core_switch_ = sw; }
+  void set_sampling_number(number::Number *num) { sampling_number_ = num; }
+  void set_filter_window_number(number::Number *num) { filter_window_number_ = num; }
+  void set_calibration_ranging_select(select::Select *sel) { calibration_ranging_select_ = sel; }
+  void set_calibration_offset_number(number::Number *num) { calibration_offset_number_ = num; }
+  void set_calibration_crosstalk_number(number::Number *num) { calibration_crosstalk_number_ = num; }
+  void set_calibration_persistence_switch(switch_::Switch *sw) { calibration_persistence_switch_ = sw; }
+  void set_zones_invert_switch(switch_::Switch *sw) { zones_invert_switch_ = sw; }
+  void set_entry_roi_height_number(number::Number *num) { entry_roi_height_number_ = num; }
+  void set_entry_roi_center_number(number::Number *num) { entry_roi_center_number_ = num; }
+  void set_entry_threshold_min_number(number::Number *num) { entry_threshold_min_number_ = num; }
+  void set_entry_threshold_max_number(number::Number *num) { entry_threshold_max_number_ = num; }
+  void set_exit_roi_height_number(number::Number *num) { exit_roi_height_number_ = num; }
+  void set_exit_roi_center_number(number::Number *num) { exit_roi_center_number_ = num; }
+  void set_exit_threshold_min_number(number::Number *num) { exit_threshold_min_number_ = num; }
+  void set_exit_threshold_max_number(number::Number *num) { exit_threshold_max_number_ = num; }
+  void set_roi_height_number(number::Number *num) { roi_height_number_ = num; }
+  void set_roi_width_number(number::Number *num) { roi_width_number_ = num; }
+  void set_refresh_mode_select(select::Select *sel) { refresh_mode_select_ = sel; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
   void set_filter_mode(FilterMode mode) {
     filter_mode_ = mode;
@@ -167,6 +195,31 @@ class Roode : public PollingComponent {
   text_sensor::TextSensor *status_text_sensor{nullptr};
   sensor::Sensor *manual_adjustment_sensor{nullptr};
   sensor::Sensor *interrupt_status_sensor{nullptr};
+  number::Number *invalid_distance_limit_number_{nullptr};
+  number::Number *restart_timeout_number_{nullptr};
+  number::Number *detection_min_number_{nullptr};
+  number::Number *detection_max_number_{nullptr};
+  select::Select *filter_mode_select_{nullptr};
+  switch_::Switch *log_fallback_switch_{nullptr};
+  switch_::Switch *force_single_core_switch_{nullptr};
+  number::Number *sampling_number_{nullptr};
+  number::Number *filter_window_number_{nullptr};
+  select::Select *calibration_ranging_select_{nullptr};
+  number::Number *calibration_offset_number_{nullptr};
+  number::Number *calibration_crosstalk_number_{nullptr};
+  switch_::Switch *calibration_persistence_switch_{nullptr};
+  switch_::Switch *zones_invert_switch_{nullptr};
+  number::Number *entry_roi_height_number_{nullptr};
+  number::Number *entry_roi_center_number_{nullptr};
+  number::Number *entry_threshold_min_number_{nullptr};
+  number::Number *entry_threshold_max_number_{nullptr};
+  number::Number *exit_roi_height_number_{nullptr};
+  number::Number *exit_roi_center_number_{nullptr};
+  number::Number *exit_threshold_min_number_{nullptr};
+  number::Number *exit_threshold_max_number_{nullptr};
+  number::Number *roi_height_number_{nullptr};
+  number::Number *roi_width_number_{nullptr};
+  select::Select *refresh_mode_select_{nullptr};
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;

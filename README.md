@@ -101,6 +101,8 @@ external_components:
     refresh: always
 vl53l1x:
 roode:
+  # The options below are now configured at runtime from Home Assistant.
+  # Leave them out of YAML unless you need to override the defaults.
 ```
 
 This uses the recommended default configuration.
@@ -342,6 +344,41 @@ reflections cause false triggers.
 | [peopleCounter8266.yaml](peopleCounter8266.yaml) | Minimal setup for ESP8266 |
 | [peopleCounter8266Dev.yaml](peopleCounter8266Dev.yaml) | Most advanced ESP8266 configuration |
 | [extra_sensors_example.yaml](extra_sensors_example.yaml) | Additional diagnostic sensors |
+
+### Home Assistant Runtime Settings
+
+Roode automatically creates Home Assistant helpers (`input_number`, `input_boolean`,
+and `input_select`) for all tuning options. These values are persisted and synced
+both ways at runtime. If a helper has not been changed, it retains the default
+shown in the YAML example above.
+
+| Setting | Entity | Range/Options |
+| --- | --- | --- |
+| `invalid_distance_limit` | `input_number.roode_invalid_distance_limit` | 1–100 |
+| `detection_thresholds.min` | `input_number.roode_detection_min_threshold` | 0–100 % |
+| `detection_thresholds.max` | `input_number.roode_detection_max_threshold` | 0–100 % |
+| `log_fallback_events` | `input_boolean.roode_log_fallback_events` | on/off |
+| `restart_timeout` | `input_number.roode_restart_timeout` | 1–120 s |
+| `force_single_core` | `input_boolean.roode_force_single_core` | on/off |
+| `calibration.ranging` | `input_select.roode_calibration_ranging` | auto, short, medium, long |
+| `calibration.offset` | `input_number.roode_calibration_offset` | −50…50 mm |
+| `calibration.crosstalk` | `input_number.roode_calibration_crosstalk` | 0–100000 cps |
+| `sampling` | `input_number.roode_sampling` | 1–6 |
+| `filter_mode` | `input_select.roode_filter_mode` | min, median, percentile10 |
+| `filter_window` | `input_number.roode_filter_window` | 3–9 (step 2) |
+| `calibration_persistence` | `input_boolean.roode_calibration_persistence` | on/off |
+| `zones.invert` | `input_boolean.roode_zones_invert` | on/off |
+| `zones.entry.roi.height` | `input_number.roode_entry_roi_height` | 4–16 |
+| `zones.entry.roi.center` | `input_number.roode_entry_roi_center` | 0–255 |
+| `zones.entry.detection_thresholds.min` | `input_number.roode_entry_threshold_min` | 0–100 % |
+| `zones.entry.detection_thresholds.max` | `input_number.roode_entry_threshold_max` | 0–100 % |
+| `zones.exit.roi.height` | `input_number.roode_exit_roi_height` | 4–16 |
+| `zones.exit.roi.center` | `input_number.roode_exit_roi_center` | 0–255 |
+| `zones.exit.detection_thresholds.min` | `input_number.roode_exit_threshold_min` | 0–100 % |
+| `zones.exit.detection_thresholds.max` | `input_number.roode_exit_threshold_max` | 0–100 % |
+| `roi.height` | `input_number.roode_roi_height` | 4–16 |
+| `roi.width` | `input_number.roode_roi_width` | 4–16 |
+| `refresh` | `input_select.roode_refresh_mode` | interrupt, polling |
 
 ### Sensors
 

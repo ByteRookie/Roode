@@ -7,7 +7,13 @@ from esphome.const import (
     CONF_INVERT,
     CONF_SENSOR,
     CONF_WIDTH,
+    CONF_NAME,
+    CONF_ICON,
+    CONF_ENTITY_CATEGORY,
+    ENTITY_CATEGORY_CONFIG,
 )
+from esphome import core
+from esphome.components import text_sensor
 from ..vl53l1x import distance_as_mm, NullableSchema, VL53L1X
 
 DEPENDENCIES = ["vl53l1x"]
@@ -125,6 +131,26 @@ async def to_code(config: Dict):
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)
+
+    # Auto-create configuration text sensors if they weren't explicitly added via
+    # a text_sensor block. When multiple Roode components are present each name
+    # includes the component ID to avoid duplicates.
+    from . import text_sensor as ts
+    rid = str(config[CONF_ID])
+    suffix = f" {rid}" if rid else ""
+    defined = ts.configured_sensors.get(rid, set())
+    defaults = {
+        ts.SENSOR_NAME: ("mdi:identifier", f"Roode Sensor Name{suffix}"),
+        ts.FEATURES: ("mdi:cog", f"Roode Enabled Features{suffix}"),
+        ts.OPTIONAL_SENSORS: ("mdi:format-list-checks", f"Roode Optional Sensors{suffix}"),
+    }
+    for key, (icon, name) in defaults.items():
+        if key in defined:
+            continue
+        sensor_id = core.ID(None, type=text_sensor.TextSensor)
+        conf = {CONF_ID: sensor_id, CONF_NAME: name, CONF_ICON: icon, CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_CONFIG}
+        sens = await text_sensor.new_text_sensor(conf)
+        cg.add(getattr(roode, f"set_{key}_text_sensor")(sens))
 
 
 def setup_zone(name: str, config: Dict, roode: cg.Pvariable):

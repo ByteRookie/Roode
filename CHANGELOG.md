@@ -16,6 +16,8 @@
   `optional_sensors` text sensors with `entity_category: config`
   to simplify configuration. Default names include the Roode ID to avoid
   duplicates when several sensors are present
+- These sensors are added even when the `text_sensor` block is omitted and can
+  be renamed by defining a single `platform: roode` block
 - Validation now errors if multiple `platform: roode` text sensor blocks use
   the same id, preventing duplicate entity names
 - Fix default text sensor names when the Roode id is omitted

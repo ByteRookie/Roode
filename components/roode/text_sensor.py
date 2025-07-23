@@ -23,6 +23,9 @@ TYPES = [VERSION, ENTRY_EXIT_EVENT, STATUS, FEATURES, SENSOR_NAME, OPTIONAL_SENS
 
 
 _defined_roode_ids = set()
+# Track which text sensors were explicitly defined for each Roode id so the
+# component can auto-create missing ones with sane defaults.
+configured_sensors = {}
 
 
 def _validate_single_block(config):
@@ -118,6 +121,8 @@ async def setup_conf(config, key, hub):
         sens = cg.new_Pvariable(conf[CONF_ID])
         await text_sensor.register_text_sensor(sens, conf)
         cg.add(getattr(hub, f"set_{key}_text_sensor")(sens))
+        rid = str(config[CONF_ROODE_ID].id)
+        configured_sensors.setdefault(rid, set()).add(key)
 
 
 async def to_code(config):

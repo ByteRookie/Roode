@@ -347,7 +347,7 @@ reflections cause false triggers.
 
 ### Interactive Selector Tool
 
-Use the [interactive configuration tool](https://byterookie.github.io/Roode/) to generate a ready‑to‑use YAML snippet. Fill in the required settings, pick the sensors and optional features from searchable multi‑select lists and then copy the output.
+Use the [interactive configuration tool](https://byterookie.github.io/Roode/) to generate a complete ESPHome configuration. Enter your Wi‑Fi credentials and other required values, select the desired sensors and features, then copy the final YAML and paste it straight into ESPHome.
 
 ### Sensors
 

@@ -21,6 +21,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
   - [Sampling and Filtering](#sampling-and-filtering)
 - [Configuration Reference](#configuration-reference)
   - [Example Configurations](#example-configurations)
+  - [Interactive Selector Tool](#interactive-selector-tool)
   - [Sensors](#sensors)
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
@@ -341,7 +342,12 @@ reflections cause false triggers.
 | [peopleCounter32Dev.yaml](peopleCounter32Dev.yaml) | Most advanced ESP32 configuration |
 | [peopleCounter8266.yaml](peopleCounter8266.yaml) | Minimal setup for ESP8266 |
 | [peopleCounter8266Dev.yaml](peopleCounter8266Dev.yaml) | Most advanced ESP8266 configuration |
+
 | [extra_sensors_example.yaml](extra_sensors_example.yaml) | Additional diagnostic sensors |
+
+### Interactive Selector Tool
+
+Use the [interactive configuration tool](webtool/index.html) to select sensors and features. If the dropdowns are not visible, open the page in Raw view.
 
 ### Sensors
 

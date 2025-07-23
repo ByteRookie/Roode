@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Roode Configuration Helper</title>
+<style>
+body { font-family: sans-serif; padding: 1rem; }
+select { width: 300px; height: 150px; }
+label { display: block; margin-top: 1rem; }
+</style>
+</head>
+<body>
+<h2>Roode Configuration Helper</h2>
+<p>Select sensors and configuration options to copy into your YAML.</p>
+
+<label>Sensors
+<select id="sensors" multiple></select>
+</label>
+
+<label>Features
+<select id="features" multiple></select>
+</label>
+
+<h3>Selected Sensors</h3>
+<pre id="sensorList"></pre>
+
+<h3>Selected Features</h3>
+<pre id="featureList"></pre>
+
+<script>
+const sensors = [
+ 'people_counter',
+ 'presence_sensor',
+ 'sensor_xshut_state',
+ 'distance_entry',
+ 'distance_exit',
+ 'max_threshold_entry',
+ 'max_threshold_exit',
+ 'min_threshold_entry',
+ 'min_threshold_exit',
+ 'roi_height_entry',
+ 'roi_width_entry',
+ 'roi_height_exit',
+ 'roi_width_exit',
+ 'loop_time',
+ 'cpu_usage',
+ 'ram_free',
+ 'flash_free',
+ 'sensor_status',
+ 'interrupt_status',
+ 'manual_adjustment_count',
+ 'version',
+ 'entry_exit_event',
+ 'sensor_status (text)',
+ 'enabled_features'
+];
+
+const features = [
+ 'vl53l1x.sensor_id',
+ 'vl53l1x.address & vl53l1x.pins.xshut',
+ 'vl53l1x.timeout',
+ 'vl53l1x.pins.interrupt',
+ 'vl53l1x.calibration.ranging',
+ 'vl53l1x.calibration.offset',
+ 'vl53l1x.calibration.crosstalk',
+ 'roode.sampling',
+ 'roode.orientation',
+ 'roode.roi',
+ 'roode.detection_thresholds',
+ 'roode.calibration_persistence',
+ 'roode.filter_mode & roode.filter_window',
+ 'roode.log_fallback_events',
+ 'roode.force_single_core',
+ 'roode.invalid_distance_limit',
+ 'roode.restart_timeout',
+ 'roode.zones.invert',
+ 'roode.zones.entry/exit'
+];
+
+function populateSelect(id, values) {
+  const select = document.getElementById(id);
+  values.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v;
+    select.appendChild(opt);
+  });
+}
+
+function update() {
+  const sensors = Array.from(document.getElementById('sensors').selectedOptions).map(o => o.value);
+  const features = Array.from(document.getElementById('features').selectedOptions).map(o => o.value);
+  document.getElementById('sensorList').textContent = sensors.join(', ');
+  document.getElementById('featureList').textContent = features.join(', ');
+}
+
+populateSelect('sensors', sensors);
+populateSelect('features', features);
+
+document.getElementById('sensors').addEventListener('change', update);
+document.getElementById('features').addEventListener('change', update);
+</script>
+
+</body>
+</html>

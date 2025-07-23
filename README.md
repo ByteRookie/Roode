@@ -347,7 +347,7 @@ reflections cause false triggers.
 
 ### Interactive Selector Tool
 
-Use the [interactive configuration tool](webtool/index.html) to select sensors and features. If the dropdowns are not visible, open the page in Raw view.
+Use the [interactive configuration tool](docs/interactive-selector.html) to select sensors and features. The file resides in the repository's `docs/` folder so it can be served with **GitHub Pages**. If Pages is enabled, the tool loads directly in your browser; otherwise open the file and choose **Raw** to run it locally.
 
 ### Sensors
 

@@ -1,8 +1,10 @@
 from typing import OrderedDict
 
+from esphome.core import ID
+
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.const import CONF_ICON, CONF_MAX_VALUE
+from esphome.const import CONF_ICON, CONF_MAX_VALUE, CONF_ID, CONF_NAME
 from esphome.cpp_generator import MockObj
 
 from ..persisted_number import (
@@ -56,8 +58,8 @@ async def to_code(config: OrderedDict):
         await setup_people_counter(config[CONF_PEOPLE_COUNTER], hub)
     for key, opts in SETTINGS.items():
         conf = OrderedDict()
-        conf["id"] = cg.new_Pvariable(cg.declare_id(PersistedNumber))
-        conf["name"] = f"Roode {key}"
+        conf[CONF_ID] = ID(None, is_declaration=True, type=PersistedNumber)
+        conf[CONF_NAME] = f"Roode {key}"
         num = await new_persisted_number(
             conf,
             min_value=opts["min"],

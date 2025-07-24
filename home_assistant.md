@@ -48,4 +48,7 @@ Example calls:
 - service: esphome.roode32_exposed_sensors
   data:
     sensors: "distance_entry, distance_exit"
+
+The firmware restarts after changes so newly exposed sensors are discovered by
+Home Assistant.
 ```

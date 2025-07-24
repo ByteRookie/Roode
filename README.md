@@ -659,7 +659,9 @@ This service is only available when API services are enabled.
 The setting is saved in flash and restored on boot. Pass `ALL`, `NONE` or a comma
 separated list of sensor names. Omitting the argument only reports the current
 list without making changes. The `exposed_sensors` text sensor publishes the
-resulting list after each call.
+resulting list after each call. Because ESPHome does not create new entities at
+runtime, the device restarts after changes so Home Assistant can discover the
+updated sensor list.
 
 Example calls:
 

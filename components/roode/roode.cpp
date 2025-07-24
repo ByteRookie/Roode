@@ -877,6 +877,9 @@ void Roode::exposed_sensors(std::string sensors) {
   if (exposed_sensors_sensor != nullptr) {
     exposed_sensors_sensor->publish_state(get_exposed_sensors_list());
   }
+  if (!sensors.empty()) {
+    App.safe_reboot();
+  }
 }
 }  // namespace roode
 }  // namespace esphome

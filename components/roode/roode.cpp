@@ -824,7 +824,11 @@ void Roode::register_roode_sensor(sensor::Sensor *sensor) {
 void Roode::update_sensor_visibility() {
   for (size_t i = 0; i < roode_sensors_.size(); i++) {
     bool expose = (sensor_mask_ >> i) & 1u;
-    roode_sensors_[i]->set_internal(!expose);
+    auto *sens = roode_sensors_[i];
+    bool changed = sens->is_internal() == !expose;
+    sens->set_internal(!expose);
+    if (changed && expose)
+      sens->publish_state(sens->state);
   }
 }
 

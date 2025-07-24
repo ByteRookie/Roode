@@ -660,9 +660,20 @@ separated list of sensor names. Omitting the argument only reports the current
 list without making changes. The `exposed_sensors` text sensor publishes the
 resulting list after each call.
 
-Example automation:
+Example calls:
 
 ```yaml
+# Expose every available sensor
+- service: esphome.roode32_exposed_sensors
+  data:
+    sensors: ALL
+
+# Hide all sensors
+- service: esphome.roode32_exposed_sensors
+  data:
+    sensors: NONE
+
+# Expose only selected sensors
 - service: esphome.roode32_exposed_sensors
   data:
     sensors: "distance_entry, distance_exit"

@@ -655,6 +655,7 @@ these sensors.
 ### Exposed sensors service
 
 Use the `exposed_sensors` service to control which sensors Roode exposes to Home Assistant.
+This service is only available when API services are enabled.
 The setting is saved in flash and restored on boot. Pass `ALL`, `NONE` or a comma
 separated list of sensor names. Omitting the argument only reports the current
 list without making changes. The `exposed_sensors` text sensor publishes the

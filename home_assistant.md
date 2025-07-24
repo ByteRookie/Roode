@@ -25,7 +25,7 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
 ```
 
 To control which sensors are visible in Home Assistant, call the `exposed_sensors`
-service with one of three options:
+service (requires API services to be enabled) with one of three options:
 
 * `ALL` – expose every Roode sensor
 * `NONE` – hide all sensors

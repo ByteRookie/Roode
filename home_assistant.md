@@ -26,60 +26,9 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
 
 ## Runtime configuration service
 
-Add the `config` service under the `api:` section of your ESPHome YAML to change
-any Roode option without reflashing. Call the service using the device name with
-`_config` appended, e.g. `esphome.roode32_config`.
-
-```yaml
-api:
-  services:
-    - service: config
-      variables:
-        orientation: string
-        sampling: int
-        filter_mode: string
-        filter_window: int
-        log_fallback_events: bool
-        calibration_persistence: bool
-        force_single_core: bool
-        invalid_distance_limit: int
-        restart_timeout: int
-        invert_zones: bool
-        entry_min: int
-        entry_max: int
-        exit_min: int
-        exit_max: int
-        entry_roi_height: int
-        entry_roi_width: int
-        exit_roi_height: int
-        exit_roi_width: int
-      then:
-        - lambda: |
-            auto r = id(roode_platform);
-            r->set_orientation(orientation == "perpendicular" ? esphome::roode::Perpendicular : esphome::roode::Parallel);
-            r->set_sampling_size(sampling);
-            if (filter_mode == "median")
-              r->set_filter_mode(esphome::roode::FILTER_MEDIAN);
-            else if (filter_mode == "percentile10")
-              r->set_filter_mode(esphome::roode::FILTER_PERCENTILE10);
-            else
-              r->set_filter_mode(esphome::roode::FILTER_MIN);
-            r->set_filter_window(filter_window);
-            r->set_log_fallback_events(log_fallback_events);
-            r->set_calibration_persistence(calibration_persistence);
-            r->set_force_single_core(force_single_core);
-            r->set_invalid_distance_limit(invalid_distance_limit);
-            r->set_restart_timeout(restart_timeout * 1000);
-            r->set_invert_direction(invert_zones);
-            r->entry->threshold->min = entry_min;
-            r->entry->threshold->max = entry_max;
-            r->exit->threshold->min = exit_min;
-            r->exit->threshold->max = exit_max;
-            r->entry->roi_override->height = entry_roi_height;
-            r->entry->roi_override->width = entry_roi_width;
-            r->exit->roi_override->height = exit_roi_height;
-            r->exit->roi_override->width = exit_roi_width;
-```
+Roode exposes a `config` API service automatically. Call the service using the
+device name with `_config` appended, e.g. `esphome.roode32_config`. All settings
+below can be changed at runtime without reflashing the device.
 
 ### Parameters
 

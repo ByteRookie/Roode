@@ -2,6 +2,7 @@
 #include "Arduino.h"
 #include <string>
 #include <optional>
+#include <array>
 #include <vector>
 #include <algorithm>
 #include <ctime>
@@ -126,6 +127,16 @@ void Roode::dump_config() {
 
 void Roode::setup() {
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
+#ifdef USE_API_SERVICES
+  this->register_service(
+      &Roode::on_config, "config",
+      {"orientation",      "sampling",          "filter_mode",      "filter_window",
+       "log_fallback_events", "calibration_persistence", "force_single_core",
+       "invalid_distance_limit", "restart_timeout", "invert_zones",
+       "entry_min",          "entry_max",        "exit_min",         "exit_max",
+       "entry_roi_height",   "entry_roi_width",   "exit_roi_height",
+       "exit_roi_width"});
+#endif
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
   }
@@ -692,6 +703,38 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
   if (exit_roi_width_sensor != nullptr) {
     exit_roi_width_sensor->publish_state(exit->roi->width);
   }
+}
+
+void Roode::on_config(std::string orientation, int sampling, std::string filter_mode,
+                      int filter_window, bool log_fallback_events,
+                      bool calibration_persistence, bool force_single_core,
+                      int invalid_distance_limit, int restart_timeout,
+                      bool invert_zones, int entry_min, int entry_max, int exit_min,
+                      int exit_max, int entry_roi_height, int entry_roi_width,
+                      int exit_roi_height, int exit_roi_width) {
+  this->set_orientation(orientation == "perpendicular" ? Perpendicular : Parallel);
+  this->set_sampling_size(static_cast<uint8_t>(sampling));
+  if (filter_mode == "median")
+    this->set_filter_mode(FILTER_MEDIAN);
+  else if (filter_mode == "percentile10")
+    this->set_filter_mode(FILTER_PERCENTILE10);
+  else
+    this->set_filter_mode(FILTER_MIN);
+  this->set_filter_window(filter_window);
+  this->set_log_fallback_events(log_fallback_events);
+  this->set_calibration_persistence(calibration_persistence);
+  this->set_force_single_core(force_single_core);
+  this->set_invalid_distance_limit(static_cast<uint8_t>(invalid_distance_limit));
+  this->set_restart_timeout(restart_timeout * 1000);
+  this->set_invert_direction(invert_zones);
+  this->entry->threshold->min = entry_min;
+  this->entry->threshold->max = entry_max;
+  this->exit->threshold->min = exit_min;
+  this->exit->threshold->max = exit_max;
+  this->entry->roi_override->height = entry_roi_height;
+  this->entry->roi_override->width = entry_roi_width;
+  this->exit->roi_override->height = exit_roi_height;
+  this->exit->roi_override->width = exit_roi_width;
 }
 
 void Roode::publish_feature_list() {

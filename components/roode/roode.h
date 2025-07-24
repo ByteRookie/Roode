@@ -9,6 +9,7 @@
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
+#include "esphome/components/api/custom_api_device.h"
 #include "../vl53l1x/vl53l1x.h"
 #include "esphome/core/preferences.h"
 #include "orientation.h"
@@ -55,7 +56,7 @@ static int time_budget_in_ms_medium_long = 50;
 static int time_budget_in_ms_long = 100;
 static int time_budget_in_ms_max = 200;  // max range: 4m
 
-class Roode : public PollingComponent {
+class Roode : public PollingComponent, public api::CustomAPIDevice {
  public:
   Roode() { instance_ = this; }
   void setup() override;
@@ -131,6 +132,13 @@ class Roode : public PollingComponent {
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
+  void on_config(std::string orientation, int sampling, std::string filter_mode,
+                 int filter_window, bool log_fallback_events,
+                 bool calibration_persistence, bool force_single_core,
+                 int invalid_distance_limit, int restart_timeout, bool invert_zones,
+                 int entry_min, int entry_max, int exit_min, int exit_max,
+                 int entry_roi_height, int entry_roi_width, int exit_roi_height,
+                 int exit_roi_width);
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
   void set_exit_threshold_percentages(uint8_t min, uint8_t max) { exit->set_threshold_percentages(min, max); }
   void apply_cpu_optimizations(float cpu);

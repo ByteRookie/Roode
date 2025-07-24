@@ -20,6 +20,15 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
     entity_id: input_number.set_people32
   action:
     service: esphome.roode32_set_counter
-    data:
-      newCount: "{{ states('input_number.set_people32') | int }}"
+  data:
+    newCount: "{{ states('input_number.set_people32') | int }}"
+```
+
+To control which sensors are visible in Home Assistant, call the `exposed_sensors`
+service with a comma-separated list of sensor names, or `ALL`/`NONE`:
+
+```yaml
+- service: esphome.roode32_exposed_sensors
+  data:
+    sensors: "distance_entry, distance_exit"
 ```

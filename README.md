@@ -425,6 +425,9 @@ text_sensor:
     enabled_features:
       name: $friendly_name enabled features
       ## This sensor is a text_sensor that lists all enabled features
+  - platform: roode
+    exposed_sensors:
+      name: $friendly_name exposed sensors
 ```
 The features string lists items as `name:value` pairs separated by new lines.
 The current output includes: `xshut`, `refresh`, `cpu_mode`, `cpu`,
@@ -475,6 +478,7 @@ calibration:6:01PM
 | `entry_exit_event` | text_sensor | Last entry or exit direction |
 | `sensor_status` (text) | text_sensor | "ok", "timeout", "reinitializing", "error" or "offline" |
 | `enabled_features` | text_sensor | List of active runtime features |
+| `exposed_sensors` | text_sensor | Names of sensors currently exposed to HA |
 
 
 ### Threshold distance
@@ -641,11 +645,28 @@ Optional sensors provide insight into Roode's operation:
   and a text-sensor `sensor_status` exposes the same status string.
 - ROI size and threshold sensors allow live tuning of each zone.
 - `manual_adjustment_count` records people-count corrections.
+- The `exposed_sensors` text sensor lists which sensors are visible to Home Assistant.
 - The sensor automatically restarts if polling stops for the configured `restart_timeout`
   or after 10 consecutive read errors. All restart triggers share this cooldown.
 
 See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
 these sensors.
+
+### Exposed sensors service
+
+Use the `exposed_sensors` service to control which sensors Roode exposes to Home Assistant.
+The setting is saved in flash and restored on boot. Pass `ALL`, `NONE` or a comma
+separated list of sensor names. Omitting the argument only reports the current
+list without making changes. The `exposed_sensors` text sensor publishes the
+resulting list after each call.
+
+Example automation:
+
+```yaml
+- service: esphome.roode32_exposed_sensors
+  data:
+    sensors: "distance_entry, distance_exit"
+```
 
 
 ## FAQ/Troubleshoot

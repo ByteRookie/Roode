@@ -26,7 +26,27 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
 
 ## Adjustable Sensor Settings
 
-The following `input_number` helpers expose Roode configuration options so they can be updated directly from Home Assistant. Each helper uses `mode: box` so the value can be typed in. Home Assistant persists these values across restarts.
+Roode automatically creates a set of `input_number` helpers on first boot.
+Home Assistant stores these values persistently so they survive reboots and you
+can tweak them from the UI at any time. The table below lists each helper and
+its purpose.
+
+| Setting                    | Entity ID                                    | Range / Step             | Purpose                                   |
+| -------------------------- | -------------------------------------------- | ------------------------ | ----------------------------------------- |
+| `invalid_distance_limit`   | `input_number.roode_invalid_distance_limit`  | 1–100, step: 1          | Number of bad reads before restart        |
+| `restart_timeout`          | `input_number.roode_restart_timeout`         | 1–120 sec, step: 1      | Cooldown before sensor restarts           |
+| `sampling`                 | `input_number.roode_sampling`                | 1–6, step: 1            | Smoothing level (raw data averaging)      |
+| `filter_window`            | `input_number.roode_filter_window`           | 3–9, step: 2            | Window size for smoothing filtered values |
+| `calibration.offset`       | `input_number.roode_calibration_offset`      | -50 to 50 mm, step: 1    | Offset adjustment after calibration       |
+| `calibration.crosstalk`    | `input_number.roode_calibration_crosstalk`   | 0–100000 cps, step: 1000 | Crosstalk calibration value               |
+| `detection_thresholds.min` | `input_number.roode_detection_min_threshold` | 0–100%, step: 1         | Minimum threshold (global)                |
+| `detection_thresholds.max` | `input_number.roode_detection_max_threshold` | 0–100%, step: 1         | Maximum threshold (global)                |
+| `roi.height`               | `input_number.roode_roi_height`              | 4–16, step: 1           | Region of Interest (height)               |
+| `roi.width`                | `input_number.roode_roi_width`               | 4–16, step: 1           | Region of Interest (width)                |
+
+The configuration below shows the automatically created helpers with their
+default values. You only need to add this YAML if you want to customise the
+names or units.
 
 ```yaml
 input_number:

@@ -28,19 +28,21 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
 
 Roode automatically exposes the following sensor settings as persistent
 `input_number` helpers. They appear the first time the device boots and retain
-their values through reboots, so no extra configuration is required. The table
-below lists each helper and its purpose.
+their values through reboots, so no extra configuration is required. Each helper
+starts at the same default value as the corresponding setting and can be changed
+in real time. The table below lists every helper, its default range and its
+purpose.
 
-| Setting                    | Entity ID                                    | Range / Step             | Purpose                                   |
-| -------------------------- | -------------------------------------------- | ------------------------ | ----------------------------------------- |
-| `invalid_distance_limit`   | `input_number.roode_invalid_distance_limit`  | 1–100, step: 1          | Number of bad reads before restart        |
-| `restart_timeout`          | `input_number.roode_restart_timeout`         | 1–120 sec, step: 1      | Cooldown before sensor restarts           |
-| `sampling`                 | `input_number.roode_sampling`                | 1–6, step: 1            | Smoothing level (raw data averaging)      |
-| `filter_window`            | `input_number.roode_filter_window`           | 3–9, step: 2            | Window size for smoothing filtered values |
-| `calibration.offset`       | `input_number.roode_calibration_offset`      | -50 to 50 mm, step: 1    | Offset adjustment after calibration       |
-| `calibration.crosstalk`    | `input_number.roode_calibration_crosstalk`   | 0–100000 cps, step: 1000 | Crosstalk calibration value               |
-| `detection_thresholds.min` | `input_number.roode_detection_min_threshold` | 0–100%, step: 1         | Minimum threshold (global)                |
-| `detection_thresholds.max` | `input_number.roode_detection_max_threshold` | 0–100%, step: 1         | Maximum threshold (global)                |
-| `roi.height`               | `input_number.roode_roi_height`              | 4–16, step: 1           | Region of Interest (height)               |
-| `roi.width`                | `input_number.roode_roi_width`               | 4–16, step: 1           | Region of Interest (width)                |
+| Setting                    | Entity ID                                    | Range / Step             | Default | Purpose                                   |
+| -------------------------- | -------------------------------------------- | ------------------------ | ------- | ----------------------------------------- |
+| `invalid_distance_limit`   | `input_number.roode_invalid_distance_limit`  | 1–100, step: 1           | 10      | Number of bad reads before restart        |
+| `restart_timeout`          | `input_number.roode_restart_timeout`         | 1–120 sec, step: 1       | 30      | Cooldown before sensor restarts           |
+| `sampling`                 | `input_number.roode_sampling`                | 1–6, step: 1             | 2       | Smoothing level (raw data averaging)      |
+| `filter_window`            | `input_number.roode_filter_window`           | 3–9, step: 2             | 5       | Window size for smoothing filtered values |
+| `calibration.offset`       | `input_number.roode_calibration_offset`      | -50 to 50 mm, step: 1    | 0       | Offset adjustment after calibration       |
+| `calibration.crosstalk`    | `input_number.roode_calibration_crosstalk`   | 0–100000 cps, step: 1000 | 0       | Crosstalk calibration value               |
+| `detection_thresholds.min` | `input_number.roode_detection_min_threshold` | 0–100%, step: 1          | 15      | Minimum threshold (global)                |
+| `detection_thresholds.max` | `input_number.roode_detection_max_threshold` | 0–100%, step: 1          | 80      | Maximum threshold (global)                |
+| `roi.height`               | `input_number.roode_roi_height`              | 4–16, step: 1            | 16      | Region of Interest (height)               |
+| `roi.width`                | `input_number.roode_roi_width`               | 4–16, step: 1            | 6       | Region of Interest (width)                |
 

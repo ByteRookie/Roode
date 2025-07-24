@@ -11,6 +11,7 @@ class PersistedNumber : public number::Number, public Component {
  public:
   float get_setup_priority() const override { return setup_priority::HARDWARE; }
   void set_restore_value(bool restore) { this->restore_value_ = restore; }
+  void set_default_value(float value) { this->default_value_ = value; }
   void setup() override;
 
  protected:
@@ -18,6 +19,7 @@ class PersistedNumber : public number::Number, public Component {
 
   bool restore_value_{false};
   ESPPreferenceObject pref_;
+  float default_value_{0.0f};
 };
 
 }  // namespace number

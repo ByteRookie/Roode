@@ -25,6 +25,7 @@ async def new_persisted_number(
     min_value: float,
     max_value: float,
     step: Optional[float] = None,
+    default_value: Optional[float] = None,
 ):
     var = await number.new_number(
         config, min_value=min_value, max_value=max_value, step=step
@@ -32,4 +33,6 @@ async def new_persisted_number(
     await cg.register_component(var, config)
     if CONF_RESTORE_VALUE in config:
         cg.add(var.set_restore_value(config[CONF_RESTORE_VALUE]))
+    if default_value is not None:
+        cg.add(var.set_default_value(default_value))
     return var

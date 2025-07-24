@@ -6,6 +6,7 @@
 #include <vector>
 #include <algorithm>
 #include <ctime>
+#include "esphome/components/json/json_util.h"
 
 namespace esphome {
 namespace roode {
@@ -128,15 +129,10 @@ void Roode::dump_config() {
 void Roode::setup() {
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
 #ifdef USE_API_SERVICES
-  this->register_service(
-      &Roode::on_config, "config",
-      {"orientation",      "sampling",          "filter_mode",      "filter_window",
-       "log_fallback_events", "calibration_persistence", "force_single_core",
-       "invalid_distance_limit", "restart_timeout", "invert_zones",
-       "entry_min",          "entry_max",        "exit_min",         "exit_max",
-       "entry_roi_height",   "entry_roi_width",   "exit_roi_height",
-       "exit_roi_width"});
+  this->register_service(&Roode::on_config, "config", {"json"});
 #endif
+  config_pref_ = global_preferences->make_preference<ConfigPrefs>(fnv1_hash(std::string("roode_config_") + this->get_object_id()));
+  load_prefs();
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
   }
@@ -705,62 +701,128 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
   }
 }
 
-void Roode::on_config(std::string orientation, int32_t sampling,
-                      std::string filter_mode, int32_t filter_window,
-                      int32_t log_fallback_events, int32_t calibration_persistence,
-                      int32_t force_single_core, int32_t invalid_distance_limit,
-                      int32_t restart_timeout, int32_t invert_zones,
-                      int32_t entry_min, int32_t entry_max, int32_t exit_min,
-                      int32_t exit_max, int32_t entry_roi_height,
-                      int32_t entry_roi_width, int32_t exit_roi_height,
-                      int32_t exit_roi_width) {
-  if (!orientation.empty() && orientation != "null")
-    this->set_orientation(orientation == "perpendicular" ? Perpendicular : Parallel);
-  if (sampling >= 0)
-    this->set_sampling_size(static_cast<uint8_t>(sampling));
-  if (!filter_mode.empty() && filter_mode != "null") {
-    if (filter_mode == "median")
-      this->set_filter_mode(FILTER_MEDIAN);
-    else if (filter_mode == "percentile10")
-      this->set_filter_mode(FILTER_PERCENTILE10);
-    else
-      this->set_filter_mode(FILTER_MIN);
-  }
-  if (filter_window >= 0)
-    this->set_filter_window(filter_window);
-  if (log_fallback_events >= 0)
-    this->set_log_fallback_events(log_fallback_events != 0);
-  if (calibration_persistence >= 0)
-    this->set_calibration_persistence(calibration_persistence != 0);
-  if (force_single_core >= 0)
-    this->set_force_single_core(force_single_core != 0);
-  if (invalid_distance_limit >= 0)
-    this->set_invalid_distance_limit(static_cast<uint8_t>(invalid_distance_limit));
-  if (restart_timeout >= 0)
-    this->set_restart_timeout(restart_timeout * 1000);
-  if (invert_zones >= 0)
-    this->set_invert_direction(invert_zones != 0);
-  if (entry_min >= 0)
-    this->entry->threshold->min = entry_min;
-  if (entry_max >= 0)
-    this->entry->threshold->max = entry_max;
-  if (exit_min >= 0)
-    this->exit->threshold->min = exit_min;
-  if (exit_max >= 0)
-    this->exit->threshold->max = exit_max;
-  if (entry_roi_height >= 0)
-    this->entry->roi_override->height = entry_roi_height;
-  if (entry_roi_width >= 0)
-    this->entry->roi_override->width = entry_roi_width;
-  if (exit_roi_height >= 0)
-    this->exit->roi_override->height = exit_roi_height;
-  if (exit_roi_width >= 0)
-    this->exit->roi_override->width = exit_roi_width;
+void Roode::on_config(std::string json) {
+  json::parse_json(json, [this](JsonObject root) {
+    if (root.containsKey("orientation")) {
+      std::string val = root["orientation"].as<std::string>();
+      set_orientation(val == "perpendicular" ? Perpendicular : Parallel);
+      config_.orientation = orientation_;
+    }
+    if (root.containsKey("sampling")) {
+      int v = root["sampling"].as<int>();
+      set_sampling_size(static_cast<uint8_t>(v));
+      config_.samples = samples;
+    }
+    if (root.containsKey("filter_mode")) {
+      std::string val = root["filter_mode"].as<std::string>();
+      if (val == "median")
+        set_filter_mode(FILTER_MEDIAN);
+      else if (val == "percentile10")
+        set_filter_mode(FILTER_PERCENTILE10);
+      else
+        set_filter_mode(FILTER_MIN);
+      config_.filter_mode = static_cast<uint8_t>(filter_mode_);
+    }
+    if (root.containsKey("filter_window")) {
+      int v = root["filter_window"].as<int>();
+      set_filter_window(static_cast<uint8_t>(v));
+      config_.filter_window = filter_window_;
+    }
+    if (root.containsKey("log_fallback_events")) {
+      bool v = root["log_fallback_events"].as<bool>();
+      set_log_fallback_events(v);
+      config_.log_fallback_events = v;
+    }
+    if (root.containsKey("calibration_persistence")) {
+      bool v = root["calibration_persistence"].as<bool>();
+      set_calibration_persistence(v);
+      config_.calibration_persistence = v;
+    }
+    if (root.containsKey("force_single_core")) {
+      bool v = root["force_single_core"].as<bool>();
+      set_force_single_core(v);
+      config_.force_single_core = v;
+    }
+    if (root.containsKey("invalid_distance_limit")) {
+      int v = root["invalid_distance_limit"].as<int>();
+      set_invalid_distance_limit(static_cast<uint8_t>(v));
+      config_.invalid_distance_limit = invalid_distance_limit_;
+    }
+    if (root.containsKey("restart_timeout")) {
+      int v = root["restart_timeout"].as<int>();
+      set_restart_timeout(v * 1000);
+      config_.restart_timeout_ms = restart_timeout_ms_;
+    }
+    if (root.containsKey("invert_zones")) {
+      bool v = root["invert_zones"].as<bool>();
+      set_invert_direction(v);
+      config_.invert_direction = v;
+    }
+    if (root.containsKey("entry_min")) {
+      entry->threshold->min = root["entry_min"].as<int>();
+      config_.entry_min = entry->threshold->min;
+    }
+    if (root.containsKey("entry_max")) {
+      entry->threshold->max = root["entry_max"].as<int>();
+      config_.entry_max = entry->threshold->max;
+    }
+    if (root.containsKey("exit_min")) {
+      exit->threshold->min = root["exit_min"].as<int>();
+      config_.exit_min = exit->threshold->min;
+    }
+    if (root.containsKey("exit_max")) {
+      exit->threshold->max = root["exit_max"].as<int>();
+      config_.exit_max = exit->threshold->max;
+    }
+    if (root.containsKey("entry_roi_height")) {
+      entry->roi_override->height = root["entry_roi_height"].as<int>();
+      config_.entry_roi_height = entry->roi_override->height;
+    }
+    if (root.containsKey("entry_roi_width")) {
+      entry->roi_override->width = root["entry_roi_width"].as<int>();
+      config_.entry_roi_width = entry->roi_override->width;
+    }
+    if (root.containsKey("exit_roi_height")) {
+      exit->roi_override->height = root["exit_roi_height"].as<int>();
+      config_.exit_roi_height = exit->roi_override->height;
+    }
+    if (root.containsKey("exit_roi_width")) {
+      exit->roi_override->width = root["exit_roi_width"].as<int>();
+      config_.exit_roi_width = exit->roi_override->width;
+    }
+    return true;
+  });
 
   this->entry->reset_roi(orientation_ == Parallel ? 167 : 195);
   this->exit->reset_roi(orientation_ == Parallel ? 231 : 60);
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
+  save_prefs();
+}
+
+void Roode::save_prefs() { config_pref_.save(&config_); }
+
+void Roode::load_prefs() {
+  if (config_pref_.load(&config_)) {
+    set_orientation(config_.orientation == 1 ? Perpendicular : Parallel);
+    set_sampling_size(config_.samples);
+    set_filter_mode(static_cast<FilterMode>(config_.filter_mode));
+    set_filter_window(config_.filter_window);
+    set_log_fallback_events(config_.log_fallback_events);
+    set_calibration_persistence(config_.calibration_persistence);
+    set_force_single_core(config_.force_single_core);
+    set_invalid_distance_limit(config_.invalid_distance_limit);
+    set_restart_timeout(config_.restart_timeout_ms);
+    set_invert_direction(config_.invert_direction);
+    entry->threshold->min = config_.entry_min;
+    entry->threshold->max = config_.entry_max;
+    exit->threshold->min = config_.exit_min;
+    exit->threshold->max = config_.exit_max;
+    entry->roi_override->height = config_.entry_roi_height;
+    entry->roi_override->width = config_.entry_roi_width;
+    exit->roi_override->height = config_.exit_roi_height;
+    exit->roi_override->width = config_.exit_roi_width;
+  }
 }
 
 void Roode::publish_feature_list() {

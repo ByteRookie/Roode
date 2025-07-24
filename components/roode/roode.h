@@ -13,6 +13,7 @@
 #include "esphome/components/api/custom_api_device.h"
 #include "../vl53l1x/vl53l1x.h"
 #include "esphome/core/preferences.h"
+#include "esphome/components/json/json_util.h"
 #include "orientation.h"
 #include "zone.h"
 
@@ -133,14 +134,9 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
-  void on_config(std::string orientation, int32_t sampling, std::string filter_mode,
-                 int32_t filter_window, int32_t log_fallback_events,
-                 int32_t calibration_persistence, int32_t force_single_core,
-                 int32_t invalid_distance_limit, int32_t restart_timeout,
-                 int32_t invert_zones, int32_t entry_min, int32_t entry_max,
-                 int32_t exit_min, int32_t exit_max, int32_t entry_roi_height,
-                 int32_t entry_roi_width, int32_t exit_roi_height,
-                 int32_t exit_roi_width);
+  void save_prefs();
+  void load_prefs();
+  void on_config(std::string json);
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
   void set_exit_threshold_percentages(uint8_t min, uint8_t max) { exit->set_threshold_percentages(min, max); }
   void apply_cpu_optimizations(float cpu);
@@ -188,6 +184,28 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   ESPPreferenceObject calibration_prefs_[2];
   bool calibration_persistence_{false};
   bool fail_safe_triggered_{false};
+
+  struct ConfigPrefs {
+    uint8_t orientation;
+    uint8_t samples;
+    uint8_t filter_mode;
+    uint8_t filter_window;
+    bool log_fallback_events;
+    bool calibration_persistence;
+    bool force_single_core;
+    uint8_t invalid_distance_limit;
+    uint32_t restart_timeout_ms;
+    bool invert_direction;
+    uint16_t entry_min;
+    uint16_t entry_max;
+    uint16_t exit_min;
+    uint16_t exit_max;
+    uint8_t entry_roi_height;
+    uint8_t entry_roi_width;
+    uint8_t exit_roi_height;
+    uint8_t exit_roi_width;
+  } config_{};
+  ESPPreferenceObject config_pref_;
 
   FilterMode filter_mode_{FILTER_MIN};
   uint8_t filter_window_{5};

@@ -27,9 +27,10 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
 ## Runtime configuration service
 
 Roode exposes a `config` API service automatically. Call the service using the
-device name with `_config` appended, e.g. `esphome.roode32_config`. Any
-combination of settings can be passed to update the running configuration –
-omit a key to keep its current value.
+device name with `_config` appended, e.g. `esphome.roode32_config`. Send a JSON
+string in the `json` field with any combination of settings to update. Omit a
+key to keep its current value. Updated settings are stored in flash so they
+survive reboots.
 
 ### Parameters
 
@@ -55,29 +56,28 @@ omit a key to keep its current value.
 ```yaml
 - service: esphome.roode32_config
   data:
-    # General
-    orientation: perpendicular
-    sampling: 2
+    json: |
+      {
+        "orientation": "perpendicular",
+        "sampling": 2,
 
-    # Filtering
-    filter_mode: median
-    filter_window: 5
+        "filter_mode": "median",
+        "filter_window": 5,
 
-    # Logging & persistence
-    log_fallback_events: false
-    calibration_persistence: false
-    force_single_core: false
-    invalid_distance_limit: 10
-    restart_timeout: 30
+        "log_fallback_events": false,
+        "calibration_persistence": false,
+        "force_single_core": false,
+        "invalid_distance_limit": 10,
+        "restart_timeout": 30,
 
-    # Zones
-    invert_zones: false
-    entry_min: 200        # mm
-    entry_max: 85         # % of idle distance
-    exit_min: 200         # mm
-    exit_max: 85          # % of idle distance
-    entry_roi_height: 16  # pixels
-    entry_roi_width: 6    # pixels
-    exit_roi_height: 16   # pixels
-    exit_roi_width: 6     # pixels
+        "invert_zones": false,
+        "entry_min": 200,
+        "entry_max": 85,
+        "exit_min": 200,
+        "exit_max": 85,
+        "entry_roi_height": 16,
+        "entry_roi_width": 6,
+        "exit_roi_height": 16,
+        "exit_roi_width": 6
+      }
 ```

@@ -143,7 +143,9 @@ void Roode::setup() {
   if (!exposed_sensors_pref_.load(&sensor_mask_)) {
     sensor_mask_ = 0xFFFFFFFF;
   }
+#ifdef USE_API_SERVICES
   register_service(&Roode::exposed_sensors, "exposed_sensors", {"sensors"});
+#endif
 
   // Initialize filtering options before calibrating so threshold sampling uses
   // the configured window and mode

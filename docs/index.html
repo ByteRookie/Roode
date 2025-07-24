@@ -208,7 +208,11 @@ document.addEventListener('DOMContentLoaded', () => {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(r => {
-        if (!r.ok) throw new Error('bad');
+        if (!r.ok) {
+          return r.text().then(t => {
+            throw new Error(`${r.status} ${r.statusText} - ${t}`);
+          });
+        }
         return r.json();
       })
       .then(states => {
@@ -225,8 +229,8 @@ document.addEventListener('DOMContentLoaded', () => {
             list.appendChild(li);
           });
       })
-      .catch(() => {
-        status.textContent = 'Failed to connect. Please enter details below.';
+      .catch(err => {
+        status.textContent = 'Failed: ' + err.message;
         document.getElementById('haManual').style.display = 'block';
         disconnectBtn.style.display = 'none';
       });
@@ -244,6 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('haAuth').addEventListener('click', () => {
     const url = document.getElementById('haUrl').value.replace(/\/$/, '');
     if (!url) return;
+    localStorage.setItem('ha_url', url); // remember URL for redirect
     const redirect = location.origin + location.pathname;
     const authUrl = `${url}/auth/authorize?response_type=token&client_id=${encodeURIComponent(redirect)}&redirect_uri=${encodeURIComponent(redirect)}`;
     window.location.href = authUrl;

@@ -2,7 +2,7 @@ from typing import OrderedDict
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.const import CONF_ICON, CONF_MAX_VALUE
+from esphome.const import CONF_ICON, CONF_MAX_VALUE, CONF_NAME, CONF_ID
 from esphome.cpp_generator import MockObj
 
 from ..persisted_number import PERSISTED_NUMBER_SCHEMA, new_persisted_number

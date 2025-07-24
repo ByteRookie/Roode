@@ -13,7 +13,6 @@
 #include "esphome/components/api/custom_api_device.h"
 #include "../vl53l1x/vl53l1x.h"
 #include "esphome/core/preferences.h"
-#include "esphome/components/json/json_util.h"
 #include "orientation.h"
 #include "zone.h"
 

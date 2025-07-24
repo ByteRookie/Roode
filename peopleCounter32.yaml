@@ -4,11 +4,9 @@ substitutions:
   friendly_name: $devicename
 
 external_components:
-  refresh: always
-  source:
-    type: git
-    url: https://github.com/Lyr3x/Roode
-    ref: master
+  - source:
+      type: local
+      path: ./components
 
 esphome:
   name: $devicename
@@ -66,13 +64,15 @@ vl53l1x:
   pins:
     xshut:
       number: GPIO3
-      mode: OUTPUT_PULLUP
-      ignore_strapping_warning: true
+      mode:
+        output: true
+        pullup: true
     interrupt:
       number: GPIO1
       mode: INPUT_PULLUP
 
 roode:
+  id: roode_platform
   # Smooth out measurements using the minimum of this many readings.
   sampling: 2
   # This controls the Region of Interest size to sample.

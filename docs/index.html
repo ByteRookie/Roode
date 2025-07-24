@@ -60,6 +60,7 @@
     <section id="ha-connect">
       <h2>Home Assistant</h2>
       <p id="haStatus">Attempting to detect Home Assistant…</p>
+      <button id="haDisconnect" style="display:none">Disconnect</button>
       <label style="display:none" id="haManual">
         URL
         <input id="haUrl" placeholder="http://homeassistant.local:8123" style="width:100%">
@@ -201,6 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function listRoodeDevices(url, token) {
     const status = document.getElementById('haStatus');
+    const disconnectBtn = document.getElementById('haDisconnect');
     status.textContent = 'Connecting to ' + url + '...';
     fetch(`${url}/api/states`, {
       headers: { 'Authorization': `Bearer ${token}` }
@@ -211,6 +213,8 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .then(states => {
         status.textContent = 'Connected to Home Assistant';
+        disconnectBtn.style.display = 'inline';
+        document.getElementById('haManual').style.display = 'none';
         const list = document.getElementById('deviceList');
         list.innerHTML = '';
         states.filter(s => (s.entity_id && s.entity_id.toLowerCase().includes('roode')) ||
@@ -224,6 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(() => {
         status.textContent = 'Failed to connect. Please enter details below.';
         document.getElementById('haManual').style.display = 'block';
+        disconnectBtn.style.display = 'none';
       });
   }
 
@@ -242,6 +247,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const redirect = location.origin + location.pathname;
     const authUrl = `${url}/auth/authorize?response_type=token&client_id=${encodeURIComponent(redirect)}&redirect_uri=${encodeURIComponent(redirect)}`;
     window.location.href = authUrl;
+  });
+
+  document.getElementById('haDisconnect').addEventListener('click', () => {
+    localStorage.removeItem('ha_url');
+    localStorage.removeItem('ha_token');
+    document.getElementById('deviceList').innerHTML = '';
+    document.getElementById('haStatus').textContent = 'Disconnected.';
+    document.getElementById('haManual').style.display = 'block';
+    document.getElementById('haDisconnect').style.display = 'none';
   });
 
   (function autoDetect() {
@@ -263,6 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       document.getElementById('haStatus').textContent = 'Enter Home Assistant URL and token:';
       document.getElementById('haManual').style.display = 'block';
+      document.getElementById('haDisconnect').style.display = 'none';
     }
   })();
 

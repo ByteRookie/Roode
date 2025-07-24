@@ -63,6 +63,8 @@
       <label style="display:none" id="haManual">
         URL
         <input id="haUrl" placeholder="http://homeassistant.local:8123" style="width:100%">
+        <button id="haAuth">Authenticate</button>
+        <br>
         Token
         <input id="haToken" placeholder="Long-lived access token" style="width:100%" type="password">
         <button id="haConnect">Connect</button>
@@ -234,10 +236,27 @@ document.addEventListener('DOMContentLoaded', () => {
     listRoodeDevices(url, token);
   });
 
+  document.getElementById('haAuth').addEventListener('click', () => {
+    const url = document.getElementById('haUrl').value.replace(/\/$/, '');
+    if (!url) return;
+    const redirect = location.origin + location.pathname;
+    const authUrl = `${url}/auth/authorize?response_type=token&client_id=${encodeURIComponent(redirect)}&redirect_uri=${encodeURIComponent(redirect)}`;
+    window.location.href = authUrl;
+  });
+
   (function autoDetect() {
     const storedUrl = localStorage.getItem('ha_url') || 'http://homeassistant.local:8123';
     const storedToken = localStorage.getItem('ha_token');
     document.getElementById('haUrl').value = storedUrl;
+    const params = new URLSearchParams(location.hash.slice(1));
+    if (params.has('access_token')) {
+      const token = params.get('access_token');
+      localStorage.setItem('ha_url', storedUrl);
+      localStorage.setItem('ha_token', token);
+      history.replaceState(null, '', location.pathname);
+      listRoodeDevices(storedUrl, token);
+      return;
+    }
     if (storedToken) document.getElementById('haToken').value = storedToken;
     if (storedToken) {
       listRoodeDevices(storedUrl, storedToken);

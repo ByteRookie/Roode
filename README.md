@@ -349,7 +349,7 @@ reflections cause false triggers.
 
 Use the [interactive selector tool](https://byterookie.github.io/Roode/) to choose sensors and features. Each dropdown lists a short description next to the friendly name, and the results are comma-separated lists ready for your YAML. You can paste an existing list into either output box to reselect items automatically.
 
-The tool tries to auto-detect your Home Assistant instance (using a saved token if available) and will list all Roode devices it finds. If automatic detection fails, simply enter your URL and token manually.
+The tool tries to auto-detect your Home Assistant instance (using a saved token if available) and will list all Roode devices it finds. If automatic detection fails, enter your URL and click **Authenticate** to sign in through Home Assistant. Manual token entry remains available as a fallback.
 
 ### Sensors
 

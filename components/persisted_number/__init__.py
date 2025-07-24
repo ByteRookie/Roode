@@ -26,7 +26,7 @@ async def new_persisted_number(
     max_value: float,
     step: Optional[float] = None,
 ):
-    config = PERSISTED_NUMBER_SCHEMA(config)
+    config = cv.Schema(PERSISTED_NUMBER_SCHEMA, extra=cv.ALLOW_EXTRA)(config)
     var = await number.new_number(
         config, min_value=min_value, max_value=max_value, step=step
     )

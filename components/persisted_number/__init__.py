@@ -30,6 +30,8 @@ async def new_persisted_number(
     var = await number.new_number(
         config, min_value=min_value, max_value=max_value, step=step
     )
+    from esphome.core import CORE
+    CORE.component_ids.add(config[CONF_ID].id)
     await cg.register_component(var, config)
     if CONF_RESTORE_VALUE in config:
         cg.add(var.set_restore_value(config[CONF_RESTORE_VALUE]))

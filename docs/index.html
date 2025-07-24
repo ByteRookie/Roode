@@ -59,14 +59,14 @@
 
     <section id="ha-connect">
       <h2>Home Assistant</h2>
-      <p>Connect to your local or remote Home Assistant and list all Roode devices.</p>
-      <label>URL
+      <p id="haStatus">Attempting to detect Home Assistant…</p>
+      <label style="display:none" id="haManual">
+        URL
         <input id="haUrl" placeholder="http://homeassistant.local:8123" style="width:100%">
-      </label>
-      <label>Token
+        Token
         <input id="haToken" placeholder="Long-lived access token" style="width:100%" type="password">
+        <button id="haConnect">Connect</button>
       </label>
-      <button id="haConnect">Connect</button>
       <ul id="deviceList"></ul>
     </section>
   </main>
@@ -197,15 +197,18 @@ document.addEventListener('DOMContentLoaded', () => {
     navigator.clipboard.writeText(document.getElementById('featureOutput').value);
   });
 
-  document.getElementById('haConnect').addEventListener('click', () => {
-    const url = document.getElementById('haUrl').value.replace(/\/$/, '');
-    const token = document.getElementById('haToken').value;
-    if (!url || !token) return;
+  function listRoodeDevices(url, token) {
+    const status = document.getElementById('haStatus');
+    status.textContent = 'Connecting to ' + url + '...';
     fetch(`${url}/api/states`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('bad');
+        return r.json();
+      })
       .then(states => {
+        status.textContent = 'Connected to Home Assistant';
         const list = document.getElementById('deviceList');
         list.innerHTML = '';
         states.filter(s => (s.entity_id && s.entity_id.toLowerCase().includes('roode')) ||
@@ -216,8 +219,33 @@ document.addEventListener('DOMContentLoaded', () => {
             list.appendChild(li);
           });
       })
-      .catch(() => alert('Failed to connect to Home Assistant'));
+      .catch(() => {
+        status.textContent = 'Failed to connect. Please enter details below.';
+        document.getElementById('haManual').style.display = 'block';
+      });
+  }
+
+  document.getElementById('haConnect').addEventListener('click', () => {
+    const url = document.getElementById('haUrl').value.replace(/\/$/, '');
+    const token = document.getElementById('haToken').value;
+    if (!url || !token) return;
+    localStorage.setItem('ha_url', url);
+    localStorage.setItem('ha_token', token);
+    listRoodeDevices(url, token);
   });
+
+  (function autoDetect() {
+    const storedUrl = localStorage.getItem('ha_url') || 'http://homeassistant.local:8123';
+    const storedToken = localStorage.getItem('ha_token');
+    document.getElementById('haUrl').value = storedUrl;
+    if (storedToken) document.getElementById('haToken').value = storedToken;
+    if (storedToken) {
+      listRoodeDevices(storedUrl, storedToken);
+    } else {
+      document.getElementById('haStatus').textContent = 'Enter Home Assistant URL and token:';
+      document.getElementById('haManual').style.display = 'block';
+    }
+  })();
 
   update();
 });

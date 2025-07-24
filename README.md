@@ -347,7 +347,9 @@ reflections cause false triggers.
 
 ### Interactive Selector Tool
 
-Use the [interactive selector tool](https://byterookie.github.io/Roode/) to choose sensors and features. Each dropdown lists a short description next to the friendly name, and the results are comma-separated lists ready for your YAML. You can also paste an existing list into either output box to reselect those items automatically. The tool can connect to your Home Assistant instance (local or remote) so you can list all detected Roode devices.
+Use the [interactive selector tool](https://byterookie.github.io/Roode/) to choose sensors and features. Each dropdown lists a short description next to the friendly name, and the results are comma-separated lists ready for your YAML. You can paste an existing list into either output box to reselect items automatically.
+
+The tool tries to auto-detect your Home Assistant instance (using a saved token if available) and will list all Roode devices it finds. If automatic detection fails, simply enter your URL and token manually.
 
 ### Sensors
 

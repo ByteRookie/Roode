@@ -26,10 +26,9 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
 
 ## Adjustable Sensor Settings
 
-Roode automatically creates a set of `input_number` helpers on first boot.
-Home Assistant stores these values persistently so they survive reboots and you
-can tweak them from the UI at any time. The table below lists each helper and
-its purpose.
+Add the following `input_number` helpers to Home Assistant so each setting can
+be adjusted at runtime. Home Assistant stores these values persistently, so
+changes survive reboots. The table below lists each helper and its purpose.
 
 | Setting                    | Entity ID                                    | Range / Step             | Purpose                                   |
 | -------------------------- | -------------------------------------------- | ------------------------ | ----------------------------------------- |
@@ -44,9 +43,8 @@ its purpose.
 | `roi.height`               | `input_number.roode_roi_height`              | 4–16, step: 1           | Region of Interest (height)               |
 | `roi.width`                | `input_number.roode_roi_width`               | 4–16, step: 1           | Region of Interest (width)                |
 
-The configuration below shows the automatically created helpers with their
-default values. You only need to add this YAML if you want to customise the
-names or units.
+The configuration below defines every helper with its default values. You can
+customise the names or units if desired.
 
 ```yaml
 input_number:

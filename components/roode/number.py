@@ -27,8 +27,10 @@ CONFIG_SCHEMA = cv.Schema(
 
 
 async def setup_people_counter(config: OrderedDict, hub: MockObj):
+    max_val = config.get(CONF_MAX_VALUE, 10)
+    clean = OrderedDict({k: v for k, v in config.items() if k != CONF_MAX_VALUE})
     counter = await new_persisted_number(
-        config, min_value=0, step=1, max_value=config[CONF_MAX_VALUE]
+        clean, min_value=0, step=1, max_value=max_val
     )
     cg.add(hub.set_people_counter(counter))
 

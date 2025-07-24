@@ -112,6 +112,17 @@ class Roode : public PollingComponent {
   void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
   void set_sensor_status_text_sensor(text_sensor::TextSensor *sensor_) { status_text_sensor = sensor_; }
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
+  // Numbers for runtime adjustable settings
+  void set_invalid_distance_limit_number(number::Number *n) { invalid_distance_limit_number_ = n; }
+  void set_restart_timeout_number(number::Number *n) { restart_timeout_number_ = n; }
+  void set_sampling_number(number::Number *n) { sampling_number_ = n; }
+  void set_filter_window_number(number::Number *n) { filter_window_number_ = n; }
+  void set_offset_number(number::Number *n) { offset_number_ = n; }
+  void set_crosstalk_number(number::Number *n) { crosstalk_number_ = n; }
+  void set_min_threshold_number(number::Number *n) { min_threshold_number_ = n; }
+  void set_max_threshold_number(number::Number *n) { max_threshold_number_ = n; }
+  void set_roi_height_number(number::Number *n) { roi_height_number_ = n; }
+  void set_roi_width_number(number::Number *n) { roi_width_number_ = n; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
@@ -135,6 +146,7 @@ class Roode : public PollingComponent {
   void set_exit_threshold_percentages(uint8_t min, uint8_t max) { exit->set_threshold_percentages(min, max); }
   void apply_cpu_optimizations(float cpu);
   void reset_cpu_optimizations(float cpu);
+  void apply_number_settings();
   void update_metrics();
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
@@ -167,6 +179,17 @@ class Roode : public PollingComponent {
   text_sensor::TextSensor *status_text_sensor{nullptr};
   sensor::Sensor *manual_adjustment_sensor{nullptr};
   sensor::Sensor *interrupt_status_sensor{nullptr};
+  // Runtime configurable numbers
+  number::Number *invalid_distance_limit_number_{nullptr};
+  number::Number *restart_timeout_number_{nullptr};
+  number::Number *sampling_number_{nullptr};
+  number::Number *filter_window_number_{nullptr};
+  number::Number *offset_number_{nullptr};
+  number::Number *crosstalk_number_{nullptr};
+  number::Number *min_threshold_number_{nullptr};
+  number::Number *max_threshold_number_{nullptr};
+  number::Number *roi_height_number_{nullptr};
+  number::Number *roi_width_number_{nullptr};
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;

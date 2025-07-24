@@ -282,6 +282,7 @@ void Roode::loop() {
     // Skip execution from main loop
     return;
   }
+  apply_number_settings();
   uint32_t now = millis();
   if (last_loop_update_ts_ != 0 && (now - last_loop_update_ts_ > restart_timeout_ms_) &&
       (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
@@ -554,6 +555,31 @@ void Roode::reset_cpu_optimizations(float cpu) {
   entry->set_filter_mode(default_filter_mode_);
   exit->set_filter_mode(default_filter_mode_);
   cpu_optimizations_active_ = false;
+}
+
+void Roode::apply_number_settings() {
+  if (invalid_distance_limit_number_ != nullptr)
+    invalid_distance_limit_ = (uint8_t) invalid_distance_limit_number_->state;
+  if (restart_timeout_number_ != nullptr)
+    restart_timeout_ms_ = (uint32_t) (restart_timeout_number_->state * 1000);
+  if (sampling_number_ != nullptr)
+    set_sampling_size((uint8_t) sampling_number_->state);
+  if (filter_window_number_ != nullptr)
+    set_filter_window((uint8_t) filter_window_number_->state);
+  if (offset_number_ != nullptr)
+    distanceSensor->set_offset((int16_t) offset_number_->state);
+  if (crosstalk_number_ != nullptr)
+    distanceSensor->set_xtalk((uint16_t) crosstalk_number_->state);
+  if (min_threshold_number_ != nullptr && max_threshold_number_ != nullptr) {
+    set_entry_threshold_percentages((uint8_t) min_threshold_number_->state,
+                                   (uint8_t) max_threshold_number_->state);
+    set_exit_threshold_percentages((uint8_t) min_threshold_number_->state,
+                                  (uint8_t) max_threshold_number_->state);
+  }
+  if (roi_height_number_ != nullptr)
+    entry->roi->height = exit->roi->height = (uint8_t) roi_height_number_->state;
+  if (roi_width_number_ != nullptr)
+    entry->roi->width = exit->roi->width = (uint8_t) roi_width_number_->state;
 }
 
 void Roode::update_metrics() {

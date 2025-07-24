@@ -5,11 +5,28 @@ import esphome.config_validation as cv
 from esphome.const import CONF_ICON, CONF_MAX_VALUE
 from esphome.cpp_generator import MockObj
 
-from ..persisted_number import PERSISTED_NUMBER_SCHEMA, new_persisted_number
+from ..persisted_number import (
+    PERSISTED_NUMBER_SCHEMA,
+    new_persisted_number,
+    PersistedNumber,
+)
 from . import Roode, CONF_ROODE_ID
 
 DEPENDENCIES = ["roode"]
 AUTO_LOAD = ["number", "persisted_number"]
+
+SETTINGS = {
+    "invalid_distance_limit": {"min": 1, "max": 100, "step": 1},
+    "restart_timeout": {"min": 1, "max": 120, "step": 1},
+    "sampling": {"min": 1, "max": 6, "step": 1},
+    "filter_window": {"min": 3, "max": 9, "step": 2},
+    "calibration_offset": {"min": -50, "max": 50, "step": 1},
+    "calibration_crosstalk": {"min": 0, "max": 100000, "step": 1000},
+    "detection_min_threshold": {"min": 0, "max": 100, "step": 1},
+    "detection_max_threshold": {"min": 0, "max": 100, "step": 1},
+    "roi_height": {"min": 4, "max": 16, "step": 1},
+    "roi_width": {"min": 4, "max": 16, "step": 1},
+}
 
 CONF_PEOPLE_COUNTER = "people_counter"
 
@@ -37,3 +54,11 @@ async def to_code(config: OrderedDict):
     hub = await cg.get_variable(config[CONF_ROODE_ID])
     if CONF_PEOPLE_COUNTER in config:
         await setup_people_counter(config[CONF_PEOPLE_COUNTER], hub)
+    for key, opts in SETTINGS.items():
+        conf = OrderedDict()
+        conf["id"] = cg.new_Pvariable(cg.declare_id(PersistedNumber))
+        conf["name"] = f"Roode {key}"
+        num = await new_persisted_number(
+            conf, min_value=opts["min"], max_value=opts["max"], step=opts["step"]
+        )
+        cg.add(getattr(hub, f"set_{key}_number")(num))

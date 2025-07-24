@@ -782,6 +782,10 @@ void Roode::on_config(std::string json) {
       entry->roi_override->width = root["entry_roi_width"].as<int>();
       config_.entry_roi_width = entry->roi_override->width;
     }
+    if (root.containsKey("entry_roi_center")) {
+      entry->roi_override->center = root["entry_roi_center"].as<int>();
+      config_.entry_roi_center = entry->roi_override->center;
+    }
     if (root.containsKey("exit_roi_height")) {
       exit->roi_override->height = root["exit_roi_height"].as<int>();
       config_.exit_roi_height = exit->roi_override->height;
@@ -789,6 +793,10 @@ void Roode::on_config(std::string json) {
     if (root.containsKey("exit_roi_width")) {
       exit->roi_override->width = root["exit_roi_width"].as<int>();
       config_.exit_roi_width = exit->roi_override->width;
+    }
+    if (root.containsKey("exit_roi_center")) {
+      exit->roi_override->center = root["exit_roi_center"].as<int>();
+      config_.exit_roi_center = exit->roi_override->center;
     }
     return true;
   });
@@ -822,6 +830,8 @@ void Roode::load_prefs() {
     entry->roi_override->width = config_.entry_roi_width;
     exit->roi_override->height = config_.exit_roi_height;
     exit->roi_override->width = config_.exit_roi_width;
+    entry->roi_override->center = config_.entry_roi_center;
+    exit->roi_override->center = config_.exit_roi_center;
   }
 }
 

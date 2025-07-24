@@ -50,6 +50,7 @@ survive reboots.
 | `entry_max` / `exit_max` | Maximum threshold | `85%` of idle distance |
 | `entry_roi_height` / `exit_roi_height` | ROI height | `16` px |
 | `entry_roi_width` / `exit_roi_width` | ROI width | `6` px |
+| `entry_roi_center` / `exit_roi_center` | ROI center | `167` / `231` (parallel) |
 
 ### Example
 
@@ -77,7 +78,9 @@ survive reboots.
         "exit_max": 85,
         "entry_roi_height": 16,
         "entry_roi_width": 6,
+        "entry_roi_center": 195,
         "exit_roi_height": 16,
-        "exit_roi_width": 6
+        "exit_roi_width": 6,
+        "exit_roi_center": 60
       }
 ```

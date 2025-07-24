@@ -203,6 +203,8 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
     uint8_t entry_roi_width;
     uint8_t exit_roi_height;
     uint8_t exit_roi_width;
+    uint8_t entry_roi_center;
+    uint8_t exit_roi_center;
   } config_{};
   ESPPreferenceObject config_pref_;
 

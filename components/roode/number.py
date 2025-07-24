@@ -28,7 +28,9 @@ CONFIG_SCHEMA = cv.Schema(
 
 async def setup_people_counter(config: OrderedDict, hub: MockObj):
     max_val = config.get(CONF_MAX_VALUE, 10)
-    clean = OrderedDict({k: v for k, v in config.items() if k != CONF_MAX_VALUE})
+    clean = OrderedDict({k: v for k, v in config.items() if k != CONF_MAX_VALUE and k != CONF_NAME})
+    # Use the ID as the default name so each device gets a unique entity
+    clean[CONF_NAME] = str(config[CONF_ID])
     counter = await new_persisted_number(
         clean, min_value=0, step=1, max_value=max_val
     )

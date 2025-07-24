@@ -2,7 +2,7 @@ from typing import OrderedDict
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.const import CONF_ICON, CONF_MAX_VALUE
+from esphome.const import CONF_ICON, CONF_MAX_VALUE, CONF_NAME, CONF_ID
 from esphome.cpp_generator import MockObj
 
 from ..persisted_number import PERSISTED_NUMBER_SCHEMA, new_persisted_number
@@ -29,8 +29,10 @@ CONFIG_SCHEMA = cv.Schema(
 async def setup_people_counter(config: OrderedDict, hub: MockObj):
     max_val = config.get(CONF_MAX_VALUE, 10)
     clean = OrderedDict(
-        {k: v for k, v in config.items() if k != CONF_MAX_VALUE}
+        {k: v for k, v in config.items() if k not in (CONF_MAX_VALUE, CONF_NAME)}
     )
+    # Use the ID as the name so each device has a unique entity
+    clean[CONF_NAME] = str(config[CONF_ID])
     counter = await new_persisted_number(
         clean,
         min_value=0,

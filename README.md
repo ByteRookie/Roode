@@ -351,6 +351,8 @@ Use the [interactive selector tool](https://byterookie.github.io/Roode/) to choo
 
 The tool tries to auto-detect your Home Assistant instance (using a saved token if available) and will list all Roode devices it finds. When connected, a status line confirms the link and you can disconnect with one click. If auto detection fails, enter your URL and click **Authenticate** to sign in through Home Assistant. Manual token entry remains available as a fallback, and any error message from Home Assistant is shown on the page.
 
+If the page reports `Failed to fetch`, your browser likely blocked the request because the tool is hosted on a different domain than Home Assistant. Save the HTML file from `docs/` and open it locally or host it under your Home Assistant domain to bypass this restriction.
+
 ### Sensors
 
 #### People Counter

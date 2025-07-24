@@ -230,7 +230,11 @@ document.addEventListener('DOMContentLoaded', () => {
           });
       })
       .catch(err => {
-        status.textContent = 'Failed: ' + err.message;
+        let msg = err.message || 'Unknown error';
+        if (msg === 'Failed to fetch') {
+          msg += ' - the browser blocked the request. This usually happens when Home Assistant is on a different host and does not allow cross-origin requests.';
+        }
+        status.textContent = 'Failed: ' + msg;
         document.getElementById('haManual').style.display = 'block';
         disconnectBtn.style.display = 'none';
       });

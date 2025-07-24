@@ -830,6 +830,13 @@ void Roode::update_sensor_visibility() {
     if (changed && expose)
       sens->publish_state(sens->state);
   }
+  if (enabled_features_sensor != nullptr) {
+    bool expose = sensor_mask_ != 0;
+    bool changed = enabled_features_sensor->is_internal() != !expose;
+    enabled_features_sensor->set_internal(!expose);
+    if (changed && expose)
+      enabled_features_sensor->publish_state(enabled_features_sensor->state);
+  }
 }
 
 std::string Roode::get_exposed_sensors_list() const {

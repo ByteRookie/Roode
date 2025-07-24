@@ -857,6 +857,16 @@ static std::string trim(const std::string &s) {
   return s.substr(start, end - start + 1);
 }
 
+static std::string canon(const std::string &s) {
+  std::string out;
+  for (char c : s) {
+    if (c == ' ' || c == '_' || c == '-')
+      continue;
+    out += static_cast<char>(tolower(static_cast<unsigned char>(c)));
+  }
+  return out;
+}
+
 void Roode::exposed_sensors(std::string sensors) {
   if (!sensors.empty()) {
     std::string up = sensors;
@@ -871,8 +881,12 @@ void Roode::exposed_sensors(std::string sensors) {
       std::string item;
       while (std::getline(ss, item, ',')) {
         std::string name = trim(item);
+        std::string needle = canon(name);
         for (size_t i = 0; i < roode_sensors_.size(); i++) {
-          if (roode_sensors_[i]->get_name() == name) {
+          std::string hay = canon(roode_sensors_[i]->get_name());
+          if (hay == needle ||
+              (hay.size() > needle.size() &&
+               hay.rfind(needle) == hay.size() - needle.size())) {
             sensor_mask_ |= (1u << i);
           }
         }

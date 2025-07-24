@@ -30,8 +30,9 @@ service (requires API services to be enabled) with one of three options:
 * `ALL` – expose every Roode sensor and the `enabled_features` text sensor
 * `NONE` – hide all optional sensors. Only Occupancy, Presence and Uptime
   sensors stay visible and the `enabled_features` text sensor is hidden
-* A comma-separated list of specific sensor names. The `enabled_features` text
-  sensor remains visible
+* A comma-separated list of specific sensor names. Names are matched
+  case-insensitively and may omit the friendly name prefix. The `enabled_features`
+  text sensor remains visible
 
 Example calls:
 
@@ -46,10 +47,10 @@ Example calls:
   data:
     sensors: NONE
 
-# Expose just the entry and exit distance sensors
+# Expose only selected sensors
 - service: esphome.roode32_exposed_sensors
   data:
-    sensors: "distance_entry, distance_exit"
+    sensors: "cpu_usage, interrupt_status"
 
 The firmware restarts after changes so newly exposed sensors are discovered by
 Home Assistant.

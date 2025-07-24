@@ -660,7 +660,9 @@ The setting is saved in flash and restored on boot. Pass `ALL`, `NONE` or a comm
 separated list of sensor names. Omitting the argument only reports the current
 list without making changes. When `NONE` is used the core sensors – Occupancy,
 Presence and Uptime (Human) – remain visible while the `enabled_features` text
-sensor is hidden. The `exposed_sensors` text sensor publishes the resulting list
+sensor is hidden. Names in a list are compared case-insensitively and may omit
+the friendly name prefix, so `cpu_usage` matches a sensor named
+"My Counter cpu usage". The `exposed_sensors` text sensor publishes the resulting list
 after each call. Because ESPHome does not create
 new entities at runtime, the device restarts after changes so Home Assistant can
 discover the updated sensor list.
@@ -681,7 +683,7 @@ Example calls:
 # Expose only selected sensors
 - service: esphome.roode32_exposed_sensors
   data:
-    sensors: "distance_entry, distance_exit"
+    sensors: "cpu_usage, interrupt_status"
 ```
 
 

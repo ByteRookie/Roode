@@ -56,6 +56,19 @@
       <h3>Selected Features <button class="copy-btn" id="copyFeatures" title="Copy to clipboard">📋</button></h3>
       <textarea id="featureOutput"></textarea>
     </section>
+
+    <section id="ha-connect">
+      <h2>Home Assistant</h2>
+      <p>Connect to your local or remote Home Assistant and list all Roode devices.</p>
+      <label>URL
+        <input id="haUrl" placeholder="http://homeassistant.local:8123" style="width:100%">
+      </label>
+      <label>Token
+        <input id="haToken" placeholder="Long-lived access token" style="width:100%" type="password">
+      </label>
+      <button id="haConnect">Connect</button>
+      <ul id="deviceList"></ul>
+    </section>
   </main>
 
 <script>
@@ -182,6 +195,28 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('copyFeatures').addEventListener('click', () => {
     navigator.clipboard.writeText(document.getElementById('featureOutput').value);
+  });
+
+  document.getElementById('haConnect').addEventListener('click', () => {
+    const url = document.getElementById('haUrl').value.replace(/\/$/, '');
+    const token = document.getElementById('haToken').value;
+    if (!url || !token) return;
+    fetch(`${url}/api/states`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(states => {
+        const list = document.getElementById('deviceList');
+        list.innerHTML = '';
+        states.filter(s => (s.entity_id && s.entity_id.toLowerCase().includes('roode')) ||
+          (s.attributes.friendly_name && s.attributes.friendly_name.toLowerCase().includes('roode')))
+          .forEach(s => {
+            const li = document.createElement('li');
+            li.textContent = s.attributes.friendly_name || s.entity_id;
+            list.appendChild(li);
+          });
+      })
+      .catch(() => alert('Failed to connect to Home Assistant'));
   });
 
   update();

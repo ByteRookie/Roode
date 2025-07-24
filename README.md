@@ -395,6 +395,8 @@ number:
 
 Regardless of how close we can get, people counting will never be perfect.
 This allows the current people count to be adjusted easily via Home Assistant.
+Make sure this number has a unique name in your ESPHome setup to avoid
+validation errors about duplicate entities.
 
 #### Other sensors available
 

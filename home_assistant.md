@@ -32,19 +32,19 @@ below can be changed at runtime without reflashing the device.
 
 ### Parameters
 
-| Name | Purpose |
-| --- | --- |
-| `orientation` | `parallel` or `perpendicular` sensor orientation |
-| `sampling` | Number of raw readings averaged |
-| `filter_mode` | `min`, `median`, or `percentile10` filtering |
-| `filter_window` | Size of the filter window |
-| `log_fallback_events` | Enable extra event logging |
-| `calibration_persistence` | Save calibration data in flash |
-| `force_single_core` | Disable ESP32 dual core optimizations |
-| `invalid_distance_limit` | Allowed suspect readings before restart |
-| `restart_timeout` | Cooldown in seconds between restarts |
-| `invert_zones` | Swap entry and exit zones |
-| `entry_min` / `exit_min` | Minimum threshold in mm for each zone |
-| `entry_max` / `exit_max` | Maximum threshold in mm for each zone |
-| `entry_roi_height` / `exit_roi_height` | ROI height in pixels for each zone |
-| `entry_roi_width` / `exit_roi_width` | ROI width in pixels for each zone |
+| Name | Purpose | Type/Range |
+| --- | --- | --- |
+| `orientation` | Sensor orientation | `parallel` or `perpendicular` |
+| `sampling` | Number of raw readings averaged | integer `1`-`10` |
+| `filter_mode` | Ranging data filter | `min`, `median`, or `percentile10` |
+| `filter_window` | Size of filter window | integer `1`-`20` |
+| `log_fallback_events` | Enable extra event logging | boolean |
+| `calibration_persistence` | Save calibration data in flash | boolean |
+| `force_single_core` | Disable ESP32 dual core optimizations | boolean |
+| `invalid_distance_limit` | Allowed suspect readings before restart | integer (counts) |
+| `restart_timeout` | Cooldown between restarts | integer seconds |
+| `invert_zones` | Swap entry and exit zones | boolean |
+| `entry_min` / `exit_min` | Minimum threshold in mm | integer millimeters |
+| `entry_max` / `exit_max` | Maximum threshold in mm | integer millimeters |
+| `entry_roi_height` / `exit_roi_height` | ROI height in pixels | integer pixels |
+| `entry_roi_width` / `exit_roi_width` | ROI width in pixels | integer pixels |

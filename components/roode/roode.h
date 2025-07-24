@@ -2,6 +2,7 @@
 #include <math.h>
 #include <string>
 #include "Arduino.h"
+#include <cstdint>
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
@@ -132,13 +133,14 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
-  void on_config(std::string orientation, int sampling, std::string filter_mode,
-                 int filter_window, bool log_fallback_events,
+  void on_config(std::string orientation, int32_t sampling, std::string filter_mode,
+                 int32_t filter_window, bool log_fallback_events,
                  bool calibration_persistence, bool force_single_core,
-                 int invalid_distance_limit, int restart_timeout, bool invert_zones,
-                 int entry_min, int entry_max, int exit_min, int exit_max,
-                 int entry_roi_height, int entry_roi_width, int exit_roi_height,
-                 int exit_roi_width);
+                 int32_t invalid_distance_limit, int32_t restart_timeout,
+                 bool invert_zones, int32_t entry_min, int32_t entry_max,
+                 int32_t exit_min, int32_t exit_max, int32_t entry_roi_height,
+                 int32_t entry_roi_width, int32_t exit_roi_height,
+                 int32_t exit_roi_width);
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
   void set_exit_threshold_percentages(uint8_t min, uint8_t max) { exit->set_threshold_percentages(min, max); }
   void apply_cpu_optimizations(float cpu);

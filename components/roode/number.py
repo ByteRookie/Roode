@@ -10,6 +10,9 @@ from esphome.const import (
     CONF_ID,
     CONF_NAME,
     CONF_DISABLED_BY_DEFAULT,
+    CONF_MODE,
+    CONF_RESTORE_VALUE,
+    NUMBER_MODE_BOX,
 )
 from esphome.cpp_generator import MockObj
 
@@ -67,6 +70,8 @@ async def to_code(config: OrderedDict):
         conf[CONF_ID] = ID(None, is_declaration=True, type=PersistedNumber)
         conf[CONF_NAME] = f"Roode {key}"
         conf[CONF_DISABLED_BY_DEFAULT] = False
+        conf[CONF_MODE] = NUMBER_MODE_BOX
+        conf[CONF_RESTORE_VALUE] = True
         num = await new_persisted_number(
             conf,
             min_value=opts["min"],

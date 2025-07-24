@@ -8,6 +8,7 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
+#include "esphome/components/api/custom_api_device.h"
 #include "esphome/core/log.h"
 #include "../vl53l1x/vl53l1x.h"
 #include "esphome/core/preferences.h"
@@ -55,7 +56,7 @@ static int time_budget_in_ms_medium_long = 50;
 static int time_budget_in_ms_long = 100;
 static int time_budget_in_ms_max = 200;  // max range: 4m
 
-class Roode : public PollingComponent {
+class Roode : public PollingComponent, public api::CustomAPIDevice {
  public:
   Roode() { instance_ = this; }
   void setup() override;
@@ -112,6 +113,7 @@ class Roode : public PollingComponent {
   void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
   void set_sensor_status_text_sensor(text_sensor::TextSensor *sensor_) { status_text_sensor = sensor_; }
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
+  void set_exposed_sensors_text_sensor(text_sensor::TextSensor *sensor_) { exposed_sensors_sensor = sensor_; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
@@ -136,6 +138,10 @@ class Roode : public PollingComponent {
   void apply_cpu_optimizations(float cpu);
   void reset_cpu_optimizations(float cpu);
   void update_metrics();
+  void register_roode_sensor(sensor::Sensor *sensor);
+  void exposed_sensors(std::string sensors);
+  std::string get_exposed_sensors_list() const;
+  void update_sensor_visibility();
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
   static void log_event(const std::string &msg);
@@ -167,6 +173,11 @@ class Roode : public PollingComponent {
   text_sensor::TextSensor *status_text_sensor{nullptr};
   sensor::Sensor *manual_adjustment_sensor{nullptr};
   sensor::Sensor *interrupt_status_sensor{nullptr};
+  text_sensor::TextSensor *exposed_sensors_sensor{nullptr};
+
+  std::vector<sensor::Sensor *> roode_sensors_{};
+  ESPPreferenceObject exposed_sensors_pref_;
+  uint32_t sensor_mask_{0xFFFFFFFF};
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;

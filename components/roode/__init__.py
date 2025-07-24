@@ -17,7 +17,9 @@ MULTI_CONF = True
 CONF_ROODE_ID = "roode_id"
 
 roode_ns = cg.esphome_ns.namespace("roode")
-Roode = roode_ns.class_("Roode", cg.PollingComponent)
+api_ns = cg.esphome_ns.namespace("api")
+CustomAPIDevice = api_ns.class_("CustomAPIDevice")
+Roode = roode_ns.class_("Roode", cg.PollingComponent, CustomAPIDevice)
 
 CONF_AUTO = "auto"
 CONF_ORIENTATION = "orientation"

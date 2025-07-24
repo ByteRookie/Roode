@@ -15,8 +15,9 @@ VERSION = "version"
 ENTRY_EXIT_EVENT = "entry_exit_event"
 STATUS = "sensor_status"
 FEATURES = "enabled_features"
+EXPOSED = "exposed_sensors"
 
-TYPES = [VERSION, ENTRY_EXIT_EVENT, STATUS, FEATURES]
+TYPES = [VERSION, ENTRY_EXIT_EVENT, STATUS, FEATURES, EXPOSED]
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -51,6 +52,15 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(FEATURES): text_sensor.text_sensor_schema().extend(
             {
                 cv.Optional(CONF_ICON, default="mdi:cog"): cv.icon,
+                cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                ): cv.entity_category,
+            }
+        ),
+        cv.Optional(EXPOSED): text_sensor.text_sensor_schema().extend(
+            {
+                cv.Optional(CONF_ICON, default="mdi:eye"): cv.icon,
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
                 cv.Optional(
                     CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC

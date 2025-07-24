@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <ctime>
+#include <sstream>
 
 namespace esphome {
 namespace roode {
@@ -138,6 +139,12 @@ void Roode::setup() {
     return;
   }
 
+  exposed_sensors_pref_ = global_preferences->make_preference<uint32_t>(0xA2);
+  if (!exposed_sensors_pref_.load(&sensor_mask_)) {
+    sensor_mask_ = 0xFFFFFFFF;
+  }
+  register_service(&Roode::exposed_sensors, "exposed_sensors", {"sensors"});
+
   // Initialize filtering options before calibrating so threshold sampling uses
   // the configured window and mode
   entry->set_filter_window(filter_window_);
@@ -244,6 +251,9 @@ void Roode::setup() {
 
   publish_feature_list();
   update_status_text("ok");
+  update_sensor_visibility();
+  if (exposed_sensors_sensor != nullptr)
+    exposed_sensors_sensor->publish_state(get_exposed_sensors_list());
 }
 
 void Roode::update() {
@@ -802,6 +812,64 @@ void Roode::sensor_task(void *param) {
     self->loop_count_++;
     self->update_metrics();
     vTaskDelay(pdMS_TO_TICKS(self->polling_interval_ms_));
+  }
+}
+
+void Roode::register_roode_sensor(sensor::Sensor *sensor) {
+  roode_sensors_.push_back(sensor);
+}
+
+void Roode::update_sensor_visibility() {
+  for (size_t i = 0; i < roode_sensors_.size(); i++) {
+    bool expose = (sensor_mask_ >> i) & 1u;
+    roode_sensors_[i]->set_internal(!expose);
+  }
+}
+
+std::string Roode::get_exposed_sensors_list() const {
+  std::string out;
+  for (size_t i = 0; i < roode_sensors_.size(); i++) {
+    if ((sensor_mask_ >> i) & 1u) {
+      if (!out.empty()) out += ", ";
+      out += roode_sensors_[i]->get_name();
+    }
+  }
+  return out;
+}
+
+static std::string trim(const std::string &s) {
+  size_t start = s.find_first_not_of(" \t");
+  size_t end = s.find_last_not_of(" \t");
+  if (start == std::string::npos) return "";
+  return s.substr(start, end - start + 1);
+}
+
+void Roode::exposed_sensors(std::string sensors) {
+  if (!sensors.empty()) {
+    std::string up = sensors;
+    std::transform(up.begin(), up.end(), up.begin(), ::toupper);
+    if (up == "ALL") {
+      sensor_mask_ = (roode_sensors_.size() >= 32) ? 0xFFFFFFFF : ((1u << roode_sensors_.size()) - 1u);
+    } else if (up == "NONE") {
+      sensor_mask_ = 0;
+    } else {
+      sensor_mask_ = 0;
+      std::stringstream ss(sensors);
+      std::string item;
+      while (std::getline(ss, item, ',')) {
+        std::string name = trim(item);
+        for (size_t i = 0; i < roode_sensors_.size(); i++) {
+          if (roode_sensors_[i]->get_name() == name) {
+            sensor_mask_ |= (1u << i);
+          }
+        }
+      }
+    }
+    exposed_sensors_pref_.save(&sensor_mask_);
+    update_sensor_visibility();
+  }
+  if (exposed_sensors_sensor != nullptr) {
+    exposed_sensors_sensor->publish_state(get_exposed_sensors_list());
   }
 }
 }  // namespace roode

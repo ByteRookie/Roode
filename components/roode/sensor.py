@@ -156,51 +156,68 @@ async def to_code(config):
     if CONF_DISTANCE_ENTRY in config:
         distance = await sensor.new_sensor(config[CONF_DISTANCE_ENTRY])
         cg.add(var.set_distance_entry(distance))
+        cg.add(var.register_roode_sensor(distance))
     if CONF_DISTANCE_EXIT in config:
         distance = await sensor.new_sensor(config[CONF_DISTANCE_EXIT])
         cg.add(var.set_distance_exit(distance))
+        cg.add(var.register_roode_sensor(distance))
     if CONF_MAX_THRESHOLD_ENTRY in config:
         count = await sensor.new_sensor(config[CONF_MAX_THRESHOLD_ENTRY])
         cg.add(var.set_max_threshold_entry_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_MAX_THRESHOLD_EXIT in config:
         count = await sensor.new_sensor(config[CONF_MAX_THRESHOLD_EXIT])
         cg.add(var.set_max_threshold_exit_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_MIN_THRESHOLD_ENTRY in config:
         count = await sensor.new_sensor(config[CONF_MIN_THRESHOLD_ENTRY])
         cg.add(var.set_min_threshold_entry_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_MIN_THRESHOLD_EXIT in config:
         count = await sensor.new_sensor(config[CONF_MIN_THRESHOLD_EXIT])
         cg.add(var.set_min_threshold_exit_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_ROI_HEIGHT_ENTRY in config:
         count = await sensor.new_sensor(config[CONF_ROI_HEIGHT_ENTRY])
         cg.add(var.set_entry_roi_height_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_ROI_WIDTH_ENTRY in config:
         count = await sensor.new_sensor(config[CONF_ROI_WIDTH_ENTRY])
         cg.add(var.set_entry_roi_width_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_ROI_HEIGHT_EXIT in config:
         count = await sensor.new_sensor(config[CONF_ROI_HEIGHT_EXIT])
         cg.add(var.set_exit_roi_height_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_ROI_WIDTH_EXIT in config:
         count = await sensor.new_sensor(config[CONF_ROI_WIDTH_EXIT])
         cg.add(var.set_exit_roi_width_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if SENSOR_STATUS in config:
         count = await sensor.new_sensor(config[SENSOR_STATUS])
         cg.add(var.set_sensor_status_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_LOOP_TIME in config:
         count = await sensor.new_sensor(config[CONF_LOOP_TIME])
         cg.add(var.set_loop_time_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_CPU_USAGE in config:
         count = await sensor.new_sensor(config[CONF_CPU_USAGE])
         cg.add(var.set_cpu_usage_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_RAM_FREE in config:
         count = await sensor.new_sensor(config[CONF_RAM_FREE])
         cg.add(var.set_ram_free_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_FLASH_FREE in config:
         count = await sensor.new_sensor(config[CONF_FLASH_FREE])
         cg.add(var.set_flash_free_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_INTERRUPT_STATUS in config:
         count = await sensor.new_sensor(config[CONF_INTERRUPT_STATUS])
         cg.add(var.set_interrupt_status_sensor(count))
+        cg.add(var.register_roode_sensor(count))
     if CONF_MANUAL_ADJUST in config:
         count = await sensor.new_sensor(config[CONF_MANUAL_ADJUST])
         cg.add(var.set_manual_adjustment_sensor(count))
+        cg.add(var.register_roode_sensor(count))

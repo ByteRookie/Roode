@@ -4,7 +4,13 @@ from esphome.core import ID
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.const import CONF_ICON, CONF_MAX_VALUE, CONF_ID, CONF_NAME
+from esphome.const import (
+    CONF_ICON,
+    CONF_MAX_VALUE,
+    CONF_ID,
+    CONF_NAME,
+    CONF_DISABLED_BY_DEFAULT,
+)
 from esphome.cpp_generator import MockObj
 
 from ..persisted_number import (
@@ -60,6 +66,7 @@ async def to_code(config: OrderedDict):
         conf = OrderedDict()
         conf[CONF_ID] = ID(None, is_declaration=True, type=PersistedNumber)
         conf[CONF_NAME] = f"Roode {key}"
+        conf[CONF_DISABLED_BY_DEFAULT] = False
         num = await new_persisted_number(
             conf,
             min_value=opts["min"],

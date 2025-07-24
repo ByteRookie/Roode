@@ -28,7 +28,7 @@ To control which sensors are visible in Home Assistant, call the `exposed_sensor
 service (requires API services to be enabled) with one of three options:
 
 * `ALL` – expose every Roode sensor
-* `NONE` – hide all sensors
+* `NONE` – hide all optional sensors (Occupancy, Presence and Uptime remain)
 * A comma-separated list of specific sensor names
 
 Example calls:

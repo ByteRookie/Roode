@@ -34,9 +34,15 @@ service (requires API services to be enabled) with one of three options:
   case-insensitively and may omit the friendly name prefix. The `enabled_features`
   text sensor remains visible
 
+The repository includes `custom_components/roode/services.yaml` so the service
+UI in Home Assistant lists `ALL` and `NONE` while allowing custom values.
+
 Example calls:
 
 ```yaml
+# The Home Assistant service UI lists ALL and NONE as options
+# and allows typing a comma-separated list thanks to
+# custom_components/roode/services.yaml
 # Expose all sensors
 - service: esphome.roode32_exposed_sensors
   data:

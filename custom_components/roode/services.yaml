@@ -1,0 +1,13 @@
+exposed_sensors:
+  name: Exposed Sensors
+  description: Control which sensors the Roode device exposes to Home Assistant.
+  fields:
+    sensors:
+      name: Sensors
+      description: "Which sensors to expose. Use ALL, NONE or provide a comma-separated list of sensor names."
+      selector:
+        select:
+          options:
+            - ALL
+            - NONE
+          custom_value: true

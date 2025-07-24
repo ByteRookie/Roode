@@ -665,7 +665,9 @@ the friendly name prefix, so `cpu_usage` matches a sensor named
 "My Counter cpu usage". The `exposed_sensors` text sensor publishes the resulting list
 after each call. Because ESPHome does not create
 new entities at runtime, the device restarts after changes so Home Assistant can
-discover the updated sensor list.
+discover the updated sensor list. The file `custom_components/roode/services.yaml`
+defines the service so the Home Assistant UI lists `ALL` and `NONE` as options
+while still allowing free text for a list of sensor names.
 
 Example calls:
 

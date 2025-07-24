@@ -819,6 +819,11 @@ void Roode::sensor_task(void *param) {
 
 void Roode::register_roode_sensor(sensor::Sensor *sensor) {
   roode_sensors_.push_back(sensor);
+  size_t idx = roode_sensors_.size() - 1;
+  bool expose = (sensor_mask_ >> idx) & 1u;
+  sensor->set_internal(!expose);
+  if (expose)
+    sensor->publish_state(sensor->state);
 }
 
 void Roode::update_sensor_visibility() {

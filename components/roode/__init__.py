@@ -2,7 +2,7 @@ from typing import Dict, Union, OrderedDict
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.core import ID
-from esphome.components import switch, number
+from esphome.components import switch
 from ..persisted_number import new_persisted_number, PersistedNumber
 from ..persisted_select import new_persisted_select
 from ..persisted_switch import new_persisted_switch

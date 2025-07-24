@@ -1,3 +1,4 @@
+---
 substitutions:
   devicename: roode32
   friendly_name: $devicename
@@ -57,9 +58,9 @@ i2c:
 vl53l1x:
   sensor_id: 1
   calibration:
-    # The ranging mode is different based on how long the distance is that the sensor need to measure.
-    # The longer the distance, the more time the sensor needs to take a measurement.
-    # Available options are: auto, shortest, short, medium, long, longer, longest
+    # The ranging mode depends on the measurement distance.
+    # Longer distances take more time.
+    # Options: auto, shortest, short, medium, long, longer, longest
     ranging: auto
   pins:
     xshut:
@@ -71,20 +72,19 @@ vl53l1x:
       mode: INPUT_PULLUP
 
 roode:
-  id: roode_platform
-  # Smooth out measurements by using the minimum distance from this number of readings
+  # Smooth out measurements using the minimum of this many readings.
   sampling: 2
-  # This controls the size of the Region of Interest the sensor should take readings in.
-  roi: { height: 16, width: 6 }
-  # The detection thresholds for determining whether a measurement should count as a person crossing.
-  # A reading must be greater than the minimum and less than the maximum to count as a crossing.
-  # These can be given as absolute distances or as percentages.
-  # Percentages are based on the automatically determined idle or resting distance.
-  detection_thresholds: # defaults for both zones. These also default to 0% & 85% as previously done.
+  # This controls the Region of Interest size to sample.
+  roi: {height: 16, width: 6}
+  # Detection thresholds for counting a crossing.
+  # A reading must be > min and < max.
+  # Thresholds may be absolute distances or percentages.
+  # Percentages are based on the resting distance.
+  detection_thresholds:   # defaults for both zones: 0% and 85%
     # min: 234mm # absolute distance
-    max: 85% # percent based on idle distance
-  # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
-  # This allows for detecting whether a crossing is an entry or exit based on which zones was crossed first.
+    max: 85%   # percent of idle distance
+  # Roode splits the reading area into two zones.
+  # This detects entry vs exit based on zone order.
   zones:
     invert: true
 

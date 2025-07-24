@@ -134,10 +134,10 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
   void on_config(std::string orientation, int32_t sampling, std::string filter_mode,
-                 int32_t filter_window, bool log_fallback_events,
-                 bool calibration_persistence, bool force_single_core,
+                 int32_t filter_window, int32_t log_fallback_events,
+                 int32_t calibration_persistence, int32_t force_single_core,
                  int32_t invalid_distance_limit, int32_t restart_timeout,
-                 bool invert_zones, int32_t entry_min, int32_t entry_max,
+                 int32_t invert_zones, int32_t entry_min, int32_t entry_max,
                  int32_t exit_min, int32_t exit_max, int32_t entry_roi_height,
                  int32_t entry_roi_width, int32_t exit_roi_height,
                  int32_t exit_roi_width);

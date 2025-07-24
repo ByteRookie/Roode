@@ -707,36 +707,60 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
 
 void Roode::on_config(std::string orientation, int32_t sampling,
                       std::string filter_mode, int32_t filter_window,
-                      bool log_fallback_events, bool calibration_persistence,
-                      bool force_single_core, int32_t invalid_distance_limit,
-                      int32_t restart_timeout, bool invert_zones,
+                      int32_t log_fallback_events, int32_t calibration_persistence,
+                      int32_t force_single_core, int32_t invalid_distance_limit,
+                      int32_t restart_timeout, int32_t invert_zones,
                       int32_t entry_min, int32_t entry_max, int32_t exit_min,
                       int32_t exit_max, int32_t entry_roi_height,
                       int32_t entry_roi_width, int32_t exit_roi_height,
                       int32_t exit_roi_width) {
-  this->set_orientation(orientation == "perpendicular" ? Perpendicular : Parallel);
-  this->set_sampling_size(static_cast<uint8_t>(sampling));
-  if (filter_mode == "median")
-    this->set_filter_mode(FILTER_MEDIAN);
-  else if (filter_mode == "percentile10")
-    this->set_filter_mode(FILTER_PERCENTILE10);
-  else
-    this->set_filter_mode(FILTER_MIN);
-  this->set_filter_window(filter_window);
-  this->set_log_fallback_events(log_fallback_events);
-  this->set_calibration_persistence(calibration_persistence);
-  this->set_force_single_core(force_single_core);
-  this->set_invalid_distance_limit(static_cast<uint8_t>(invalid_distance_limit));
-  this->set_restart_timeout(restart_timeout * 1000);
-  this->set_invert_direction(invert_zones);
-  this->entry->threshold->min = entry_min;
-  this->entry->threshold->max = entry_max;
-  this->exit->threshold->min = exit_min;
-  this->exit->threshold->max = exit_max;
-  this->entry->roi_override->height = entry_roi_height;
-  this->entry->roi_override->width = entry_roi_width;
-  this->exit->roi_override->height = exit_roi_height;
-  this->exit->roi_override->width = exit_roi_width;
+  if (!orientation.empty() && orientation != "null")
+    this->set_orientation(orientation == "perpendicular" ? Perpendicular : Parallel);
+  if (sampling >= 0)
+    this->set_sampling_size(static_cast<uint8_t>(sampling));
+  if (!filter_mode.empty() && filter_mode != "null") {
+    if (filter_mode == "median")
+      this->set_filter_mode(FILTER_MEDIAN);
+    else if (filter_mode == "percentile10")
+      this->set_filter_mode(FILTER_PERCENTILE10);
+    else
+      this->set_filter_mode(FILTER_MIN);
+  }
+  if (filter_window >= 0)
+    this->set_filter_window(filter_window);
+  if (log_fallback_events >= 0)
+    this->set_log_fallback_events(log_fallback_events != 0);
+  if (calibration_persistence >= 0)
+    this->set_calibration_persistence(calibration_persistence != 0);
+  if (force_single_core >= 0)
+    this->set_force_single_core(force_single_core != 0);
+  if (invalid_distance_limit >= 0)
+    this->set_invalid_distance_limit(static_cast<uint8_t>(invalid_distance_limit));
+  if (restart_timeout >= 0)
+    this->set_restart_timeout(restart_timeout * 1000);
+  if (invert_zones >= 0)
+    this->set_invert_direction(invert_zones != 0);
+  if (entry_min >= 0)
+    this->entry->threshold->min = entry_min;
+  if (entry_max >= 0)
+    this->entry->threshold->max = entry_max;
+  if (exit_min >= 0)
+    this->exit->threshold->min = exit_min;
+  if (exit_max >= 0)
+    this->exit->threshold->max = exit_max;
+  if (entry_roi_height >= 0)
+    this->entry->roi_override->height = entry_roi_height;
+  if (entry_roi_width >= 0)
+    this->entry->roi_override->width = entry_roi_width;
+  if (exit_roi_height >= 0)
+    this->exit->roi_override->height = exit_roi_height;
+  if (exit_roi_width >= 0)
+    this->exit->roi_override->width = exit_roi_width;
+
+  this->entry->reset_roi(orientation_ == Parallel ? 167 : 195);
+  this->exit->reset_roi(orientation_ == Parallel ? 231 : 60);
+  publish_sensor_configuration(entry, exit, true);
+  publish_sensor_configuration(entry, exit, false);
 }
 
 void Roode::publish_feature_list() {

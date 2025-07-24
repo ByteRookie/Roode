@@ -27,24 +27,57 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
 ## Runtime configuration service
 
 Roode exposes a `config` API service automatically. Call the service using the
-device name with `_config` appended, e.g. `esphome.roode32_config`. All settings
-below can be changed at runtime without reflashing the device.
+device name with `_config` appended, e.g. `esphome.roode32_config`. Any
+combination of settings can be passed to update the running configuration –
+omit a key to keep its current value.
 
 ### Parameters
 
-| Name | Purpose | Type/Range |
+| Name | Purpose | Recommended Value |
 | --- | --- | --- |
 | `orientation` | Sensor orientation | `parallel` or `perpendicular` |
-| `sampling` | Number of raw readings averaged | integer `1`-`10` |
+| `sampling` | Number of raw readings averaged | `2` (1–10 readings) |
 | `filter_mode` | Ranging data filter | `min`, `median`, or `percentile10` |
-| `filter_window` | Size of filter window | integer `1`-`20` |
-| `log_fallback_events` | Enable extra event logging | boolean |
-| `calibration_persistence` | Save calibration data in flash | boolean |
-| `force_single_core` | Disable ESP32 dual core optimizations | boolean |
-| `invalid_distance_limit` | Allowed suspect readings before restart | integer (counts) |
-| `restart_timeout` | Cooldown between restarts | integer seconds |
-| `invert_zones` | Swap entry and exit zones | boolean |
-| `entry_min` / `exit_min` | Minimum threshold in mm | integer millimeters |
-| `entry_max` / `exit_max` | Maximum threshold in mm | integer millimeters |
-| `entry_roi_height` / `exit_roi_height` | ROI height in pixels | integer pixels |
-| `entry_roi_width` / `exit_roi_width` | ROI width in pixels | integer pixels |
+| `filter_window` | Size of filter window | `5` (1–20 samples) |
+| `log_fallback_events` | Enable extra event logging | `false` |
+| `calibration_persistence` | Save calibration data in flash | `false` |
+| `force_single_core` | Disable ESP32 dual core optimizations | `false` |
+| `invalid_distance_limit` | Allowed suspect readings before restart | `10` reads |
+| `restart_timeout` | Cooldown between restarts | `30` seconds |
+| `invert_zones` | Swap entry and exit zones | `false` |
+| `entry_min` / `exit_min` | Minimum threshold | `200` mm |
+| `entry_max` / `exit_max` | Maximum threshold | `85%` of idle distance |
+| `entry_roi_height` / `exit_roi_height` | ROI height | `16` px |
+| `entry_roi_width` / `exit_roi_width` | ROI width | `6` px |
+
+### Example
+
+```yaml
+- service: esphome.roode32_config
+  data:
+    # General
+    orientation: perpendicular
+    sampling: 2
+
+    # Filtering
+    filter_mode: median
+    filter_window: 5
+
+    # Logging & persistence
+    log_fallback_events: false
+    calibration_persistence: false
+    force_single_core: false
+    invalid_distance_limit: 10
+    restart_timeout: 30
+
+    # Zones
+    invert_zones: false
+    entry_min: 200        # mm
+    entry_max: 85         # % of idle distance
+    exit_min: 200         # mm
+    exit_max: 85          # % of idle distance
+    entry_roi_height: 16  # pixels
+    entry_roi_width: 6    # pixels
+    exit_roi_height: 16   # pixels
+    exit_roi_width: 6     # pixels
+```

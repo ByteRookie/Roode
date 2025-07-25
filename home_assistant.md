@@ -37,6 +37,10 @@ service (requires API services to be enabled) with one of three options:
 The repository includes `custom_components/roode/services.yaml` so the service
 UI in Home Assistant lists `ALL` and `NONE` while allowing custom values.
 
+Only real sensors can be selected. Configuration parameters like `sampling` or
+`force_single_core` are not sensors and will be ignored. Check the names shown
+by the `exposed_sensors` text sensor before calling the service.
+
 Example calls:
 
 ```yaml

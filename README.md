@@ -669,6 +669,10 @@ discover the updated sensor list. The file `custom_components/roode/services.yam
 defines the service so the Home Assistant UI lists `ALL` and `NONE` as options
 while still allowing free text for a list of sensor names.
 
+Only actual sensors can be managed this way; configuration settings such as
+`sampling` or `force_single_core` are not sensor names. Check the entity names in
+Home Assistant or the `exposed_sensors` text sensor before calling the service.
+
 Example calls:
 
 ```yaml

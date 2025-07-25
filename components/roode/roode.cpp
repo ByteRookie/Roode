@@ -310,8 +310,7 @@ void Roode::loop() {
   } else {
     invalid_read_count_ = 0;
   }
-  if (invalid_read_count_ > invalid_distance_limit_ &&
-      (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
+  if (invalid_read_count_ > invalid_distance_limit_ && (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
     ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
     restart_sensor();
   }
@@ -762,7 +761,6 @@ void Roode::publish_feature_list() {
   log_event(std::string("features_enabled: ") + feature_list);
 }
 
-
 void Roode::update_status_text(const std::string &status) {
   if (status_text_sensor != nullptr && status != last_status_text_) {
     status_text_sensor->publish_state(status);
@@ -781,8 +779,7 @@ void Roode::sensor_task(void *param) {
   for (;;) {
     self->use_sensor_task_ = true;
     uint32_t now = millis();
-    if (self->last_loop_update_ts_ != 0 &&
-        (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
+    if (self->last_loop_update_ts_ != 0 && (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
         (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
       ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", self->restart_timeout_ms_ / 1000);
       self->restart_sensor();
@@ -848,7 +845,8 @@ std::string Roode::get_exposed_sensors_list() const {
   std::string out;
   for (size_t i = 0; i < roode_sensors_.size(); i++) {
     if ((sensor_mask_ >> i) & 1u) {
-      if (!out.empty()) out += ", ";
+      if (!out.empty())
+        out += ", ";
       out += roode_sensors_[i]->get_name();
     }
   }
@@ -858,7 +856,8 @@ std::string Roode::get_exposed_sensors_list() const {
 static std::string trim(const std::string &s) {
   size_t start = s.find_first_not_of(" \t");
   size_t end = s.find_last_not_of(" \t");
-  if (start == std::string::npos) return "";
+  if (start == std::string::npos)
+    return "";
   return s.substr(start, end - start + 1);
 }
 
@@ -874,38 +873,49 @@ static std::string canon(const std::string &s) {
 
 void Roode::exposed_sensors(std::string sensors) {
   if (!sensors.empty()) {
+    uint32_t original = sensor_mask_;
+    uint32_t new_mask = sensor_mask_;
+    bool matched = false;
     std::string up = sensors;
     std::transform(up.begin(), up.end(), up.begin(), ::toupper);
     if (up == "ALL") {
-      sensor_mask_ = (roode_sensors_.size() >= 32) ? 0xFFFFFFFF : ((1u << roode_sensors_.size()) - 1u);
+      new_mask = (roode_sensors_.size() >= 32) ? 0xFFFFFFFF : ((1u << roode_sensors_.size()) - 1u);
+      matched = true;
     } else if (up == "NONE") {
-      sensor_mask_ = 0;
+      new_mask = 0;
+      matched = true;
     } else {
-      sensor_mask_ = 0;
+      new_mask = 0;
       std::stringstream ss(sensors);
       std::string item;
       while (std::getline(ss, item, ',')) {
         std::string name = trim(item);
+        if (name.empty())
+          continue;
         std::string needle = canon(name);
         for (size_t i = 0; i < roode_sensors_.size(); i++) {
           std::string hay = canon(roode_sensors_[i]->get_name());
-          if (hay == needle ||
-              (hay.size() > needle.size() &&
-               hay.rfind(needle) == hay.size() - needle.size())) {
-            sensor_mask_ |= (1u << i);
+          if (hay == needle || (hay.size() > needle.size() && hay.rfind(needle) == hay.size() - needle.size())) {
+            new_mask |= (1u << i);
+            matched = true;
           }
         }
       }
     }
-    exposed_sensors_pref_.save(&sensor_mask_);
-    update_sensor_visibility();
+    if (!matched) {
+      ESP_LOGW(TAG, "exposed_sensors: no matching sensors for '%s'", sensors.c_str());
+    } else if (new_mask != original) {
+      sensor_mask_ = new_mask;
+      exposed_sensors_pref_.save(&sensor_mask_);
+      update_sensor_visibility();
+      if (exposed_sensors_sensor != nullptr)
+        exposed_sensors_sensor->publish_state(get_exposed_sensors_list());
+      App.safe_reboot();
+      return;
+    }
   }
-  if (exposed_sensors_sensor != nullptr) {
+  if (exposed_sensors_sensor != nullptr)
     exposed_sensors_sensor->publish_state(get_exposed_sensors_list());
-  }
-  if (!sensors.empty()) {
-    App.safe_reboot();
-  }
 }
 }  // namespace roode
 }  // namespace esphome

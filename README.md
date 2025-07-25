@@ -661,13 +661,14 @@ separated list of sensor names. Omitting the argument only reports the current
 list without making changes. When `NONE` is used the core sensors – Occupancy,
 Presence and Uptime (Human) – remain visible while the `enabled_features` text
 sensor is hidden. Names in a list are compared case-insensitively and may omit
-the friendly name prefix, so `cpu_usage` matches a sensor named
-"My Counter cpu usage". The `exposed_sensors` text sensor publishes the resulting list
-after each call. Because ESPHome does not create
+the friendly name prefix; include `enabled_features` if you want that text sensor
+visible. The `exposed_sensors` text sensor publishes the resulting list after
+each call. Because ESPHome does not create
 new entities at runtime, the device restarts after changes so Home Assistant can
 discover the updated sensor list. The file `custom_components/roode/services.yaml`
-defines the service so the Home Assistant UI lists `ALL` and `NONE` as options
-while still allowing free text for a list of sensor names.
+defines a service labeled `_ Exposed Sensors` so the Home Assistant UI lists
+`ALL` and `NONE` as options while still allowing free text for a list of sensor
+names.
 
 Only actual sensors can be managed this way; configuration settings such as
 `sampling` or `force_single_core` are not sensor names. Check the entity names in
@@ -690,6 +691,10 @@ Example calls:
 - service: esphome.roode32_exposed_sensors
   data:
     sensors: "cpu_usage, interrupt_status"
+
+# Query current list without changing anything
+- service: esphome.roode32_exposed_sensors
+  data: {}
 ```
 
 

@@ -1,5 +1,5 @@
 exposed_sensors:
-  name: Exposed Sensors
+  name: "_ Exposed Sensors"
   description: Control which sensors the Roode device exposes to Home Assistant.
   fields:
     sensors:

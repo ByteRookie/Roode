@@ -26,6 +26,9 @@ namespace roode {
 static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
+// Bit index used to store the visibility state of the enabled_features text sensor
+static const uint8_t FEATURES_BIT = 31;
+static const uint32_t FEATURES_MASK = 1u << FEATURES_BIT;
 
 /*
 Use the VL53L1X_SetTimingBudget function to set the TB in milliseconds. The TB
@@ -110,7 +113,13 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   void set_xshut_state_binary_sensor(binary_sensor::BinarySensor *sens) { xshut_state_binary_sensor = sens; }
   void set_sensor_xshut_state_binary_sensor(binary_sensor::BinarySensor *sens) { xshut_state_binary_sensor = sens; }
   void set_interrupt_status_sensor(sensor::Sensor *sens) { interrupt_status_sensor = sens; }
-  void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
+  void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) {
+    enabled_features_sensor = sensor_;
+    if (sensor_ != nullptr) {
+      bool expose = (sensor_mask_ >> FEATURES_BIT) & 1u;
+      sensor_->set_internal(!expose);
+    }
+  }
   void set_sensor_status_text_sensor(text_sensor::TextSensor *sensor_) { status_text_sensor = sensor_; }
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
   void set_exposed_sensors_text_sensor(text_sensor::TextSensor *sensor_) { exposed_sensors_sensor = sensor_; }

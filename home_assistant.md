@@ -31,11 +31,12 @@ service (requires API services to be enabled) with one of three options:
 * `NONE` – hide all optional sensors. Only Occupancy, Presence and Uptime
   sensors stay visible and the `enabled_features` text sensor is hidden
 * A comma-separated list of specific sensor names. Names are matched
-  case-insensitively and may omit the friendly name prefix. The `enabled_features`
-  text sensor remains visible
+  case-insensitively and may omit the friendly name prefix. Include
+  `enabled_features` in the list if you want that text sensor visible
 
 The repository includes `custom_components/roode/services.yaml` so the service
-UI in Home Assistant lists `ALL` and `NONE` while allowing custom values.
+named `_ Exposed Sensors` appears in the UI, listing `ALL` and `NONE` while
+allowing custom values.
 
 Only real sensors can be selected. Configuration parameters like `sampling` or
 `force_single_core` are not sensors and will be ignored. Check the names shown
@@ -61,6 +62,10 @@ Example calls:
 - service: esphome.roode32_exposed_sensors
   data:
     sensors: "cpu_usage, interrupt_status"
+
+# Query current list without changing anything
+- service: esphome.roode32_exposed_sensors
+  data: {}
 
 The firmware restarts after changes so newly exposed sensors are discovered by
 Home Assistant.

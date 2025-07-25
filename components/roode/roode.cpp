@@ -833,7 +833,7 @@ void Roode::update_sensor_visibility() {
       sens->publish_state(sens->state);
   }
   if (enabled_features_sensor != nullptr) {
-    bool expose = sensor_mask_ != 0;
+    bool expose = (sensor_mask_ >> FEATURES_BIT) & 1u;
     bool changed = enabled_features_sensor->is_internal() != !expose;
     enabled_features_sensor->set_internal(!expose);
     if (changed && expose)
@@ -849,6 +849,11 @@ std::string Roode::get_exposed_sensors_list() const {
         out += ", ";
       out += roode_sensors_[i]->get_name();
     }
+  }
+  if (enabled_features_sensor != nullptr && ((sensor_mask_ >> FEATURES_BIT) & 1u)) {
+    if (!out.empty())
+      out += ", ";
+    out += enabled_features_sensor->get_name();
   }
   return out;
 }
@@ -880,6 +885,8 @@ void Roode::exposed_sensors(std::string sensors) {
     std::transform(up.begin(), up.end(), up.begin(), ::toupper);
     if (up == "ALL") {
       new_mask = (roode_sensors_.size() >= 32) ? 0xFFFFFFFF : ((1u << roode_sensors_.size()) - 1u);
+      if (enabled_features_sensor != nullptr)
+        new_mask |= FEATURES_MASK;
       matched = true;
     } else if (up == "NONE") {
       new_mask = 0;
@@ -897,6 +904,13 @@ void Roode::exposed_sensors(std::string sensors) {
           std::string hay = canon(roode_sensors_[i]->get_name());
           if (hay == needle || (hay.size() > needle.size() && hay.rfind(needle) == hay.size() - needle.size())) {
             new_mask |= (1u << i);
+            matched = true;
+          }
+        }
+        if (enabled_features_sensor != nullptr) {
+          std::string hay = canon(enabled_features_sensor->get_name());
+          if (hay == needle || (hay.size() > needle.size() && hay.rfind(needle) == hay.size() - needle.size())) {
+            new_mask |= FEATURES_MASK;
             matched = true;
           }
         }

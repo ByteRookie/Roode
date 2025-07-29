@@ -8,6 +8,8 @@ from esphome.const import (
     CONF_RESTORE_VALUE,
 )
 
+AUTO_LOAD = ["number"]
+
 PersistedNumber = number.number_ns.class_(
     "PersistedNumber", number.Number, cg.Component
 )

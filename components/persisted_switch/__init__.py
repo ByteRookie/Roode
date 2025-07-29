@@ -3,6 +3,8 @@ import esphome.config_validation as cv
 from esphome.components import switch
 from esphome.const import CONF_ID
 
+AUTO_LOAD = ["switch"]
+
 PersistedSwitch = switch.switch_ns.class_(
     "PersistedSwitch", switch.Switch, cg.Component
 )

@@ -6,6 +6,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/components/select/select.h"
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
@@ -133,6 +134,11 @@ class Roode : public PollingComponent {
   void set_restart_timeout_number(number::Number *num);
   void set_log_fallback_switch(switch_::Switch *sw);
   void set_force_single_core_switch(switch_::Switch *sw);
+  void set_sampling_number(number::Number *num);
+  void set_filter_window_number(number::Number *num);
+  void set_filter_mode_select(select::Select *sel);
+  void set_calibration_persistence_switch(switch_::Switch *sw);
+  void set_invert_direction_switch(switch_::Switch *sw);
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
@@ -152,8 +158,13 @@ class Roode : public PollingComponent {
   number::Number *people_counter{nullptr};
   number::Number *invalid_distance_limit_number{nullptr};
   number::Number *restart_timeout_number{nullptr};
+  number::Number *sampling_number{nullptr};
+  number::Number *filter_window_number{nullptr};
   switch_::Switch *log_fallback_switch{nullptr};
   switch_::Switch *force_single_core_switch{nullptr};
+  switch_::Switch *calibration_persistence_switch{nullptr};
+  switch_::Switch *invert_direction_switch{nullptr};
+  select::Select *filter_mode_select{nullptr};
   sensor::Sensor *max_threshold_entry_sensor{nullptr};
   sensor::Sensor *max_threshold_exit_sensor{nullptr};
   sensor::Sensor *min_threshold_entry_sensor{nullptr};

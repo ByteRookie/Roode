@@ -14,6 +14,8 @@ AUTO_LOAD = ["number", "persisted_number"]
 CONF_PEOPLE_COUNTER = "people_counter"
 CONF_INVALID_DISTANCE_LIMIT = "invalid_distance_limit"
 CONF_RESTART_TIMEOUT = "restart_timeout"
+CONF_SAMPLING = "sampling"
+CONF_FILTER_WINDOW = "filter_window"
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -35,6 +37,12 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional(CONF_ICON, default="mdi:timer" ): cv.icon,
                 cv.Optional(CONF_MAX_VALUE, 120): cv.int_range(1, 120),
             }
+        ),
+        cv.Optional(CONF_SAMPLING): PERSISTED_NUMBER_SCHEMA.extend(
+            {cv.Optional(CONF_MAX_VALUE, 6): cv.int_range(1, 6)}
+        ),
+        cv.Optional(CONF_FILTER_WINDOW): PERSISTED_NUMBER_SCHEMA.extend(
+            {cv.Optional(CONF_MAX_VALUE, 9): cv.int_range(3, 9)}
         ),
     }
 )
@@ -61,6 +69,20 @@ async def setup_restart_timeout(config: OrderedDict, hub: MockObj):
     cg.add(hub.set_restart_timeout_number(num))
 
 
+async def setup_sampling(config: OrderedDict, hub: MockObj):
+    num = await new_persisted_number(
+        config, min_value=1, max_value=config[CONF_MAX_VALUE], step=1
+    )
+    cg.add(hub.set_sampling_number(num))
+
+
+async def setup_filter_window(config: OrderedDict, hub: MockObj):
+    num = await new_persisted_number(
+        config, min_value=3, max_value=config[CONF_MAX_VALUE], step=1
+    )
+    cg.add(hub.set_filter_window_number(num))
+
+
 async def to_code(config: OrderedDict):
     hub = await cg.get_variable(config[CONF_ROODE_ID])
     if CONF_PEOPLE_COUNTER in config:
@@ -69,3 +91,7 @@ async def to_code(config: OrderedDict):
         await setup_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT], hub)
     if CONF_RESTART_TIMEOUT in config:
         await setup_restart_timeout(config[CONF_RESTART_TIMEOUT], hub)
+    if CONF_SAMPLING in config:
+        await setup_sampling(config[CONF_SAMPLING], hub)
+    if CONF_FILTER_WINDOW in config:
+        await setup_filter_window(config[CONF_FILTER_WINDOW], hub)

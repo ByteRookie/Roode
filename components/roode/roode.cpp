@@ -7,6 +7,7 @@
 #include <ctime>
 #include "esphome/components/number/number.h"
 #include "esphome/components/switch/switch.h"
+#include "esphome/components/select/select.h"
 
 namespace esphome {
 namespace roode {
@@ -792,6 +793,44 @@ void Roode::set_force_single_core_switch(switch_::Switch *sw) {
   this->force_single_core_switch = sw;
   force_single_core_ = sw->state;
   sw->add_on_state_callback([this](bool state) { this->set_force_single_core(state); });
+}
+
+void Roode::set_sampling_number(number::Number *num) {
+  this->sampling_number = num;
+  this->set_sampling_size(static_cast<uint8_t>(num->state));
+  num->add_on_state_callback([this](float value) { this->set_sampling_size(static_cast<uint8_t>(value)); });
+}
+
+void Roode::set_filter_window_number(number::Number *num) {
+  this->filter_window_number = num;
+  this->set_filter_window(static_cast<uint8_t>(num->state));
+  num->add_on_state_callback([this](float value) { this->set_filter_window(static_cast<uint8_t>(value)); });
+}
+
+void Roode::set_filter_mode_select(select::Select *sel) {
+  this->filter_mode_select = sel;
+  auto apply = [this](const std::string &value) {
+    FilterMode mode = FILTER_MIN;
+    if (value == "median")
+      mode = FILTER_MEDIAN;
+    else if (value == "percentile10")
+      mode = FILTER_PERCENTILE10;
+    this->set_filter_mode(mode);
+  };
+  apply(sel->state);
+  sel->add_on_state_callback(apply);
+}
+
+void Roode::set_calibration_persistence_switch(switch_::Switch *sw) {
+  this->calibration_persistence_switch = sw;
+  this->set_calibration_persistence(sw->state);
+  sw->add_on_state_callback([this](bool state) { this->set_calibration_persistence(state); });
+}
+
+void Roode::set_invert_direction_switch(switch_::Switch *sw) {
+  this->invert_direction_switch = sw;
+  this->set_invert_direction(sw->state);
+  sw->add_on_state_callback([this](bool state) { this->set_invert_direction(state); });
 }
 
 void Roode::sensor_task(void *param) {

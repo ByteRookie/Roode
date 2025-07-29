@@ -509,6 +509,7 @@ The most important one is the people counter.
 number:
   - platform: roode
     people_counter:
+      id: my_people_counter
       name: People Count
 ```
 

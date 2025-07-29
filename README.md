@@ -473,6 +473,10 @@ input_select:
   roode_refresh_mode:
     options: [interrupt, polling]
 ```
+\> **Note:** Don't copy this block into your ESPHome file. These helpers must be
+created in Home Assistant (for example in `configuration.yaml` or through the
+UI). Including them in the YAML you flash results in a `Component not found`
+error.
 
 ### Sensors
 

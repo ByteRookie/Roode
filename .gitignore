@@ -20,3 +20,5 @@ common/wifi.yaml
 common/secrets.yaml
 secrets.yaml
 __pycache__
+ci/.esphome/
+ci/.gitignore

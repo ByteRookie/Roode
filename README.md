@@ -182,13 +182,6 @@ roode:
     # min: 50mm
     # max: 234cm
 
-  # Persist calibration data so thresholds survive restarts
-  calibration_persistence: true
-
-  # Jitter reduction options
-  filter_mode: median  # min, median or percentile10
-  # Increase the window to 7 or 9 for heavy noise, drop to 3 for faster response
-  filter_window: 5     # number of samples used by the filter
   # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
 
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
@@ -498,7 +491,7 @@ select:
       name: Ranging Mode
     filter_mode:
       name: Filter Mode
-    refresh_mode:
+    refresh:
       name: Refresh Mode
 switch:
   - platform: roode

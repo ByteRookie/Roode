@@ -969,7 +969,7 @@ void Roode::set_ranging_select(select::Select *sel) {
       distanceSensor->set_ranging_mode_override(nullptr);
   };
   apply(sel->state);
-  sel->add_on_state_callback(apply);
+  sel->add_on_state_callback([apply](const std::string &val, size_t) { apply(val); });
 }
 
 void Roode::set_refresh_select(select::Select *sel) {
@@ -979,7 +979,7 @@ void Roode::set_refresh_select(select::Select *sel) {
     distanceSensor->set_force_polling(force);
   };
   apply(sel->state);
-  sel->add_on_state_callback(apply);
+  sel->add_on_state_callback([apply](const std::string &val, size_t) { apply(val); });
 }
 
 void Roode::set_filter_mode_select(select::Select *sel) {
@@ -993,7 +993,7 @@ void Roode::set_filter_mode_select(select::Select *sel) {
     this->set_filter_mode(mode);
   };
   apply(sel->state);
-  sel->add_on_state_callback(apply);
+  sel->add_on_state_callback([apply](const std::string &val, size_t) { apply(val); });
 }
 
 void Roode::set_calibration_persistence_switch(switch_::Switch *sw) {

@@ -140,6 +140,8 @@ class Roode : public PollingComponent {
   void set_exit_threshold_max_number(number::Number *num);
   void set_entry_roi_height_number(number::Number *num);
   void set_exit_roi_height_number(number::Number *num);
+  void set_roi_width_number(number::Number *num);
+  void set_roi_height_number(number::Number *num);
   void set_entry_roi_center_number(number::Number *num);
   void set_exit_roi_center_number(number::Number *num);
   void set_calibration_offset_number(number::Number *num);

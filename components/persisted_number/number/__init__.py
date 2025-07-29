@@ -9,7 +9,7 @@ CONFIG_SCHEMA = PERSISTED_NUMBER_SCHEMA.extend(
     {
         cv.Required(CONF_MIN_VALUE): cv.float_,
         cv.Required(CONF_MAX_VALUE): cv.float_,
-        cv.Required(CONF_STEP, default=1): cv.float_,
+        cv.Optional(CONF_STEP, default=1): cv.float_,
     }
 )
 

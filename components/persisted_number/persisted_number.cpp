@@ -12,17 +12,12 @@ auto PersistedNumber::control(float newValue) -> void {
 }
 
 auto PersistedNumber::setup() -> void {
-  float value;
-  if (!this->restore_value_) {
-    value = this->traits.get_min_value();
+  this->pref_ = global_preferences->make_preference<float>(this->get_object_id_hash());
+  float value = this->default_value_;
+  if (this->restore_value_ && this->pref_.load(&value)) {
+    ESP_LOGI("number", "'%s': Restored state %f", this->get_name().c_str(), value);
   } else {
-    this->pref_ = global_preferences->make_preference<float>(this->get_object_id_hash());
-    if (this->pref_.load(&value)) {
-      ESP_LOGI("number", "'%s': Restored state %f", this->get_name().c_str(), value);
-    } else {
-      ESP_LOGI("number", "'%s': No previous state found", this->get_name().c_str());
-      value = this->traits.get_min_value();
-    }
+    ESP_LOGI("number", "'%s': Using default %f", this->get_name().c_str(), value);
   }
   this->publish_state(value);
 }

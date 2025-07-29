@@ -42,13 +42,13 @@ CONFIG_SCHEMA = cv.Schema(
         ),
         cv.Optional(CONF_INVALID_DISTANCE_LIMIT): PERSISTED_NUMBER_SCHEMA.extend(
             {
-                cv.Optional(CONF_ICON, default="mdi:ruler" ): cv.icon,
+                cv.Optional(CONF_ICON, default="mdi:ruler"): cv.icon,
                 cv.Optional(CONF_MAX_VALUE, 100): cv.int_range(1, 100),
             }
         ),
         cv.Optional(CONF_RESTART_TIMEOUT): PERSISTED_NUMBER_SCHEMA.extend(
             {
-                cv.Optional(CONF_ICON, default="mdi:timer" ): cv.icon,
+                cv.Optional(CONF_ICON, default="mdi:timer"): cv.icon,
                 cv.Optional(CONF_MAX_VALUE, 120): cv.int_range(1, 120),
             }
         ),
@@ -64,106 +64,164 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ENTRY_THRESHOLD_MAX): PERSISTED_NUMBER_SCHEMA,
         cv.Optional(CONF_EXIT_THRESHOLD_MIN): PERSISTED_NUMBER_SCHEMA,
         cv.Optional(CONF_EXIT_THRESHOLD_MAX): PERSISTED_NUMBER_SCHEMA,
-        cv.Optional(CONF_ENTRY_ROI_HEIGHT): PERSISTED_NUMBER_SCHEMA.extend({cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}),
-        cv.Optional(CONF_EXIT_ROI_HEIGHT): PERSISTED_NUMBER_SCHEMA.extend({cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}),
-        cv.Optional(CONF_ROI_WIDTH): PERSISTED_NUMBER_SCHEMA.extend({cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}),
-        cv.Optional(CONF_ROI_HEIGHT): PERSISTED_NUMBER_SCHEMA.extend({cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}),
-        cv.Optional(CONF_ENTRY_ROI_CENTER): PERSISTED_NUMBER_SCHEMA.extend({cv.Optional(CONF_MAX_VALUE, 255): cv.int_range(0, 255)}),
-        cv.Optional(CONF_EXIT_ROI_CENTER): PERSISTED_NUMBER_SCHEMA.extend({cv.Optional(CONF_MAX_VALUE, 255): cv.int_range(0, 255)}),
-        cv.Optional(CONF_CALIBRATION_OFFSET): PERSISTED_NUMBER_SCHEMA.extend({cv.Optional(CONF_MAX_VALUE, 50): cv.int_range(-50, 50)}),
-        cv.Optional(CONF_CALIBRATION_CROSSTALK): PERSISTED_NUMBER_SCHEMA.extend({cv.Optional(CONF_MAX_VALUE, 100000): cv.int_range(0, 100000)}),
+        cv.Optional(CONF_ENTRY_ROI_HEIGHT): PERSISTED_NUMBER_SCHEMA.extend(
+            {cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}
+        ),
+        cv.Optional(CONF_EXIT_ROI_HEIGHT): PERSISTED_NUMBER_SCHEMA.extend(
+            {cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}
+        ),
+        cv.Optional(CONF_ROI_WIDTH): PERSISTED_NUMBER_SCHEMA.extend(
+            {cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}
+        ),
+        cv.Optional(CONF_ROI_HEIGHT): PERSISTED_NUMBER_SCHEMA.extend(
+            {cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}
+        ),
+        cv.Optional(CONF_ENTRY_ROI_CENTER): PERSISTED_NUMBER_SCHEMA.extend(
+            {cv.Optional(CONF_MAX_VALUE, 255): cv.int_range(0, 255)}
+        ),
+        cv.Optional(CONF_EXIT_ROI_CENTER): PERSISTED_NUMBER_SCHEMA.extend(
+            {cv.Optional(CONF_MAX_VALUE, 255): cv.int_range(0, 255)}
+        ),
+        cv.Optional(CONF_CALIBRATION_OFFSET): PERSISTED_NUMBER_SCHEMA.extend(
+            {cv.Optional(CONF_MAX_VALUE, 50): cv.int_range(-50, 50)}
+        ),
+        cv.Optional(CONF_CALIBRATION_CROSSTALK): PERSISTED_NUMBER_SCHEMA.extend(
+            {cv.Optional(CONF_MAX_VALUE, 100000): cv.int_range(0, 100000)}
+        ),
     }
 )
 
 
 async def setup_people_counter(config: OrderedDict, hub: MockObj):
     counter = await new_persisted_number(
-        config, min_value=0, step=1, max_value=config[CONF_MAX_VALUE]
+        config, min_value=0, step=1, max_value=config[CONF_MAX_VALUE], default_value=0
     )
     cg.add(hub.set_people_counter(counter))
 
 
 async def setup_invalid_distance_limit(config: OrderedDict, hub: MockObj):
     num = await new_persisted_number(
-        config, min_value=1, max_value=config[CONF_MAX_VALUE], step=1
+        config, min_value=1, max_value=config[CONF_MAX_VALUE], step=1, default_value=10
     )
     cg.add(hub.set_invalid_distance_limit_number(num))
 
 
 async def setup_restart_timeout(config: OrderedDict, hub: MockObj):
     num = await new_persisted_number(
-        config, min_value=1, max_value=config[CONF_MAX_VALUE], step=1
+        config, min_value=1, max_value=config[CONF_MAX_VALUE], step=1, default_value=30
     )
     cg.add(hub.set_restart_timeout_number(num))
 
 
 async def setup_sampling(config: OrderedDict, hub: MockObj):
     num = await new_persisted_number(
-        config, min_value=1, max_value=config[CONF_MAX_VALUE], step=1
+        config, min_value=1, max_value=config[CONF_MAX_VALUE], step=1, default_value=2
     )
     cg.add(hub.set_sampling_number(num))
 
 
 async def setup_filter_window(config: OrderedDict, hub: MockObj):
     num = await new_persisted_number(
-        config, min_value=3, max_value=config[CONF_MAX_VALUE], step=1
+        config, min_value=3, max_value=config[CONF_MAX_VALUE], step=1, default_value=5
     )
     cg.add(hub.set_filter_window_number(num))
 
+
 async def setup_detection_min(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=0, max_value=100, step=1)
+    num = await new_persisted_number(
+        config, min_value=0, max_value=100, step=1, default_value=0
+    )
     cg.add(hub.set_detection_min_number(num))
 
+
 async def setup_detection_max(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=0, max_value=100, step=1)
+    num = await new_persisted_number(
+        config, min_value=0, max_value=100, step=1, default_value=85
+    )
     cg.add(hub.set_detection_max_number(num))
 
+
 async def setup_entry_threshold_min(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=0, max_value=100, step=1)
+    num = await new_persisted_number(
+        config, min_value=0, max_value=100, step=1, default_value=0
+    )
     cg.add(hub.set_entry_threshold_min_number(num))
 
+
 async def setup_entry_threshold_max(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=0, max_value=100, step=1)
+    num = await new_persisted_number(
+        config, min_value=0, max_value=100, step=1, default_value=85
+    )
     cg.add(hub.set_entry_threshold_max_number(num))
 
+
 async def setup_exit_threshold_min(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=0, max_value=100, step=1)
+    num = await new_persisted_number(
+        config, min_value=0, max_value=100, step=1, default_value=0
+    )
     cg.add(hub.set_exit_threshold_min_number(num))
 
+
 async def setup_exit_threshold_max(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=0, max_value=100, step=1)
+    num = await new_persisted_number(
+        config, min_value=0, max_value=100, step=1, default_value=85
+    )
     cg.add(hub.set_exit_threshold_max_number(num))
 
+
 async def setup_entry_roi_height(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=4, max_value=16, step=1)
+    num = await new_persisted_number(
+        config, min_value=4, max_value=16, step=1, default_value=16
+    )
     cg.add(hub.set_entry_roi_height_number(num))
 
+
 async def setup_exit_roi_height(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=4, max_value=16, step=1)
+    num = await new_persisted_number(
+        config, min_value=4, max_value=16, step=1, default_value=16
+    )
     cg.add(hub.set_exit_roi_height_number(num))
 
+
 async def setup_roi_width(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=4, max_value=16, step=1)
+    num = await new_persisted_number(
+        config, min_value=4, max_value=16, step=1, default_value=6
+    )
     cg.add(hub.set_roi_width_number(num))
 
+
 async def setup_roi_height(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=4, max_value=16, step=1)
+    num = await new_persisted_number(
+        config, min_value=4, max_value=16, step=1, default_value=16
+    )
     cg.add(hub.set_roi_height_number(num))
 
+
 async def setup_entry_roi_center(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=0, max_value=255, step=1)
+    num = await new_persisted_number(
+        config, min_value=0, max_value=255, step=1, default_value=0
+    )
     cg.add(hub.set_entry_roi_center_number(num))
 
+
 async def setup_exit_roi_center(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=0, max_value=255, step=1)
+    num = await new_persisted_number(
+        config, min_value=0, max_value=255, step=1, default_value=0
+    )
     cg.add(hub.set_exit_roi_center_number(num))
 
+
 async def setup_calibration_offset(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=-50, max_value=50, step=1)
+    num = await new_persisted_number(
+        config, min_value=-50, max_value=50, step=1, default_value=0
+    )
     cg.add(hub.set_calibration_offset_number(num))
 
+
 async def setup_calibration_crosstalk(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(config, min_value=0, max_value=100000, step=1000)
+    num = await new_persisted_number(
+        config, min_value=0, max_value=100000, step=1000, default_value=0
+    )
     cg.add(hub.set_calibration_crosstalk_number(num))
 
 

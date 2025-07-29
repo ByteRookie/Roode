@@ -832,6 +832,46 @@ void Roode::set_detection_max_number(number::Number *num) {
   });
 }
 
+void Roode::set_entry_threshold_min_number(number::Number *num) {
+  this->entry_threshold_min_number = num;
+  uint8_t min = static_cast<uint8_t>(num->state);
+  entry->set_threshold_percentages(min, entry->threshold->max_percentage.value_or(80));
+  num->add_on_state_callback([this](float value) {
+    uint8_t min = static_cast<uint8_t>(value);
+    entry->set_threshold_percentages(min, entry->threshold->max_percentage.value_or(80));
+  });
+}
+
+void Roode::set_entry_threshold_max_number(number::Number *num) {
+  this->entry_threshold_max_number = num;
+  uint8_t max = static_cast<uint8_t>(num->state);
+  entry->set_threshold_percentages(entry->threshold->min_percentage.value_or(15), max);
+  num->add_on_state_callback([this](float value) {
+    uint8_t max = static_cast<uint8_t>(value);
+    entry->set_threshold_percentages(entry->threshold->min_percentage.value_or(15), max);
+  });
+}
+
+void Roode::set_exit_threshold_min_number(number::Number *num) {
+  this->exit_threshold_min_number = num;
+  uint8_t min = static_cast<uint8_t>(num->state);
+  exit->set_threshold_percentages(min, exit->threshold->max_percentage.value_or(80));
+  num->add_on_state_callback([this](float value) {
+    uint8_t min = static_cast<uint8_t>(value);
+    exit->set_threshold_percentages(min, exit->threshold->max_percentage.value_or(80));
+  });
+}
+
+void Roode::set_exit_threshold_max_number(number::Number *num) {
+  this->exit_threshold_max_number = num;
+  uint8_t max = static_cast<uint8_t>(num->state);
+  exit->set_threshold_percentages(exit->threshold->min_percentage.value_or(15), max);
+  num->add_on_state_callback([this](float value) {
+    uint8_t max = static_cast<uint8_t>(value);
+    exit->set_threshold_percentages(exit->threshold->min_percentage.value_or(15), max);
+  });
+}
+
 void Roode::set_entry_roi_height_number(number::Number *num) {
   this->entry_roi_height_number = num;
   entry->roi->set_height(static_cast<uint8_t>(num->state));

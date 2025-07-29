@@ -18,6 +18,10 @@ CONF_SAMPLING = "sampling"
 CONF_FILTER_WINDOW = "filter_window"
 CONF_DETECTION_MIN = "detection_threshold_min"
 CONF_DETECTION_MAX = "detection_threshold_max"
+CONF_ENTRY_THRESHOLD_MIN = "entry_threshold_min"
+CONF_ENTRY_THRESHOLD_MAX = "entry_threshold_max"
+CONF_EXIT_THRESHOLD_MIN = "exit_threshold_min"
+CONF_EXIT_THRESHOLD_MAX = "exit_threshold_max"
 CONF_ENTRY_ROI_HEIGHT = "entry_roi_height"
 CONF_EXIT_ROI_HEIGHT = "exit_roi_height"
 CONF_ROI_WIDTH = "roi_width"
@@ -56,6 +60,10 @@ CONFIG_SCHEMA = cv.Schema(
         ),
         cv.Optional(CONF_DETECTION_MIN): PERSISTED_NUMBER_SCHEMA,
         cv.Optional(CONF_DETECTION_MAX): PERSISTED_NUMBER_SCHEMA,
+        cv.Optional(CONF_ENTRY_THRESHOLD_MIN): PERSISTED_NUMBER_SCHEMA,
+        cv.Optional(CONF_ENTRY_THRESHOLD_MAX): PERSISTED_NUMBER_SCHEMA,
+        cv.Optional(CONF_EXIT_THRESHOLD_MIN): PERSISTED_NUMBER_SCHEMA,
+        cv.Optional(CONF_EXIT_THRESHOLD_MAX): PERSISTED_NUMBER_SCHEMA,
         cv.Optional(CONF_ENTRY_ROI_HEIGHT): PERSISTED_NUMBER_SCHEMA.extend({cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}),
         cv.Optional(CONF_EXIT_ROI_HEIGHT): PERSISTED_NUMBER_SCHEMA.extend({cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}),
         cv.Optional(CONF_ROI_WIDTH): PERSISTED_NUMBER_SCHEMA.extend({cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}),
@@ -110,6 +118,22 @@ async def setup_detection_max(config: OrderedDict, hub: MockObj):
     num = await new_persisted_number(config, min_value=0, max_value=100, step=1)
     cg.add(hub.set_detection_max_number(num))
 
+async def setup_entry_threshold_min(config: OrderedDict, hub: MockObj):
+    num = await new_persisted_number(config, min_value=0, max_value=100, step=1)
+    cg.add(hub.set_entry_threshold_min_number(num))
+
+async def setup_entry_threshold_max(config: OrderedDict, hub: MockObj):
+    num = await new_persisted_number(config, min_value=0, max_value=100, step=1)
+    cg.add(hub.set_entry_threshold_max_number(num))
+
+async def setup_exit_threshold_min(config: OrderedDict, hub: MockObj):
+    num = await new_persisted_number(config, min_value=0, max_value=100, step=1)
+    cg.add(hub.set_exit_threshold_min_number(num))
+
+async def setup_exit_threshold_max(config: OrderedDict, hub: MockObj):
+    num = await new_persisted_number(config, min_value=0, max_value=100, step=1)
+    cg.add(hub.set_exit_threshold_max_number(num))
+
 async def setup_entry_roi_height(config: OrderedDict, hub: MockObj):
     num = await new_persisted_number(config, min_value=4, max_value=16, step=1)
     cg.add(hub.set_entry_roi_height_number(num))
@@ -159,6 +183,14 @@ async def to_code(config: OrderedDict):
         await setup_detection_min(config[CONF_DETECTION_MIN], hub)
     if CONF_DETECTION_MAX in config:
         await setup_detection_max(config[CONF_DETECTION_MAX], hub)
+    if CONF_ENTRY_THRESHOLD_MIN in config:
+        await setup_entry_threshold_min(config[CONF_ENTRY_THRESHOLD_MIN], hub)
+    if CONF_ENTRY_THRESHOLD_MAX in config:
+        await setup_entry_threshold_max(config[CONF_ENTRY_THRESHOLD_MAX], hub)
+    if CONF_EXIT_THRESHOLD_MIN in config:
+        await setup_exit_threshold_min(config[CONF_EXIT_THRESHOLD_MIN], hub)
+    if CONF_EXIT_THRESHOLD_MAX in config:
+        await setup_exit_threshold_max(config[CONF_EXIT_THRESHOLD_MAX], hub)
     if CONF_ENTRY_ROI_HEIGHT in config:
         await setup_entry_roi_height(config[CONF_ENTRY_ROI_HEIGHT], hub)
     if CONF_EXIT_ROI_HEIGHT in config:

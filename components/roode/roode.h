@@ -134,6 +134,10 @@ class Roode : public PollingComponent {
   void set_restart_timeout_number(number::Number *num);
   void set_detection_min_number(number::Number *num);
   void set_detection_max_number(number::Number *num);
+  void set_entry_threshold_min_number(number::Number *num);
+  void set_entry_threshold_max_number(number::Number *num);
+  void set_exit_threshold_min_number(number::Number *num);
+  void set_exit_threshold_max_number(number::Number *num);
   void set_entry_roi_height_number(number::Number *num);
   void set_exit_roi_height_number(number::Number *num);
   void set_entry_roi_center_number(number::Number *num);
@@ -172,6 +176,10 @@ class Roode : public PollingComponent {
   number::Number *filter_window_number{nullptr};
   number::Number *detection_min_number{nullptr};
   number::Number *detection_max_number{nullptr};
+  number::Number *entry_threshold_min_number{nullptr};
+  number::Number *entry_threshold_max_number{nullptr};
+  number::Number *exit_threshold_min_number{nullptr};
+  number::Number *exit_threshold_max_number{nullptr};
   number::Number *entry_roi_height_number{nullptr};
   number::Number *exit_roi_height_number{nullptr};
   number::Number *roi_width_number{nullptr};

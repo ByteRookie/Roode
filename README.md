@@ -349,8 +349,10 @@ reflections cause false triggers.
 
 Roode uses Home Assistant helpers (`input_number`, `input_boolean`,
 and `input_select`) for all tuning options. Create these helpers manually with the
-names below. If a helper is absent, the device falls back to the default shown in
-the YAML example.
+names below inside your Home Assistant configuration (for example in
+`configuration.yaml` or through the UI). **Do not** add them to the ESPHome YAML.
+If a helper is absent, the device falls back to the default shown in the YAML
+example.
 
 | Setting | Entity | Range/Options |
 | --- | --- | --- |
@@ -380,7 +382,7 @@ the YAML example.
 | `roi.width` | `input_number.roode_roi_width` | 4–16 |
 | `refresh` | `input_select.roode_refresh_mode` | interrupt, polling |
 
-Example helper definitions:
+Example helper definitions (add these to Home Assistant, not your ESPHome YAML):
 
 ```yaml
 input_number:

@@ -20,19 +20,19 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
         cv.Optional(CONF_FILTER_MODE): PERSISTED_SELECT_SCHEMA.extend(
             {
-                cv.Required("options", default=list(FILTER_MODES.keys())):
+                cv.Optional("options", default=list(FILTER_MODES.keys())):
                     cv.ensure_list(cv.one_of(*FILTER_MODES.keys(), lower=True))
             }
         ),
         cv.Optional(CONF_CALIBRATION_RANGING): PERSISTED_SELECT_SCHEMA.extend(
             {
-                cv.Required("options", default=["auto", "short", "medium", "long"]):
+                cv.Optional("options", default=["auto", "short", "medium", "long"]):
                     cv.ensure_list(cv.one_of("auto", "short", "medium", "long", lower=True))
             }
         ),
         cv.Optional(CONF_REFRESH_MODE): PERSISTED_SELECT_SCHEMA.extend(
             {
-                cv.Required("options", default=["interrupt", "polling"]):
+                cv.Optional("options", default=["interrupt", "polling"]):
                     cv.ensure_list(cv.one_of("interrupt", "polling", lower=True))
             }
         ),

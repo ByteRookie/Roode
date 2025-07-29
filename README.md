@@ -450,21 +450,66 @@ calibration:6:01PM
 
 Add any of the input numbers, selects or switches from the table above under the
 `roode` platform to expose them in Home Assistant. Each entity retains its value
-across reboots. Example:
+across reboots. The block below lists every available option; remove any you do
+not need.
 
 ```yaml
 number:
   - platform: roode
+    invalid_distance_limit:
+      name: Invalid Distance Limit
+    detection_threshold_min:
+      name: Detection Min
+    detection_threshold_max:
+      name: Detection Max
     restart_timeout:
       name: Restart Timeout
-switch:
-  - platform: roode
-    force_single_core:
-      name: Force single core
+    sampling:
+      name: Sampling Size
+    filter_window:
+      name: Filter Window
+    entry_threshold_min:
+      name: Entry Min Threshold
+    entry_threshold_max:
+      name: Entry Max Threshold
+    exit_threshold_min:
+      name: Exit Min Threshold
+    exit_threshold_max:
+      name: Exit Max Threshold
+    entry_roi_height:
+      name: Entry ROI Height
+    entry_roi_center:
+      name: Entry ROI Center
+    exit_roi_height:
+      name: Exit ROI Height
+    exit_roi_center:
+      name: Exit ROI Center
+    roi_height:
+      name: ROI Height
+    roi_width:
+      name: ROI Width
+    calibration_offset:
+      name: Calibration Offset
+    calibration_crosstalk:
+      name: Calibration Crosstalk
 select:
   - platform: roode
+    calibration_ranging:
+      name: Ranging Mode
     filter_mode:
       name: Filter Mode
+    refresh_mode:
+      name: Refresh Mode
+switch:
+  - platform: roode
+    log_fallback_events:
+      name: Log Fallback Events
+    force_single_core:
+      name: Force Single Core
+    calibration_persistence:
+      name: Calibration Persistence
+    zones_invert:
+      name: Invert Zones
 ```
 
 #### Sensor Reference

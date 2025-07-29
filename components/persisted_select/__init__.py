@@ -12,7 +12,7 @@ PersistedSelect = select.select_ns.class_(
 PERSISTED_SELECT_SCHEMA = select.select_schema(PersistedSelect).extend(
     {
         cv.GenerateID(): cv.declare_id(PersistedSelect),
-        cv.Required("options"): cv.ensure_list(cv.string),
+        cv.Optional("options", default=[]): cv.ensure_list(cv.string),
     }
 )
 

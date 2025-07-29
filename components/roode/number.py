@@ -122,7 +122,7 @@ async def setup_sampling(config: OrderedDict, hub: MockObj):
 
 async def setup_filter_window(config: OrderedDict, hub: MockObj):
     num = await new_persisted_number(
-        config, min_value=3, max_value=config[CONF_MAX_VALUE], step=1, default_value=5
+        config, min_value=3, max_value=config[CONF_MAX_VALUE], step=2, default_value=5
     )
     cg.add(hub.set_filter_window_number(num))
 

@@ -26,11 +26,11 @@ CONFIG_SCHEMA = cv.Schema(
 )
 
 
-async def setup_people_counter(config: OrderedDict, hub: MockObj):
+async def setup_people_counter(config: OrderedDict, hub: MockObj, roode_id: str):
     clean = OrderedDict(config)
     max_val = clean.pop(CONF_MAX_VALUE, 10)
-    # Default the name to the ID so each device has a unique entity by default
-    clean.setdefault(CONF_NAME, str(clean[CONF_ID]))
+    # Prefix the name with the Roode ID to keep it unique across devices
+    clean.setdefault(CONF_NAME, f"{roode_id}_{clean[CONF_ID].id}")
     counter = await new_persisted_number(
         clean,
         min_value=0,
@@ -43,4 +43,6 @@ async def setup_people_counter(config: OrderedDict, hub: MockObj):
 async def to_code(config: OrderedDict):
     hub = await cg.get_variable(config[CONF_ROODE_ID])
     if CONF_PEOPLE_COUNTER in config:
-        await setup_people_counter(config[CONF_PEOPLE_COUNTER], hub)
+        await setup_people_counter(
+            config[CONF_PEOPLE_COUNTER], hub, config[CONF_ROODE_ID].id
+        )

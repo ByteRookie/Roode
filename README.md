@@ -4,7 +4,7 @@
 
 [![Roode community](https://img.shields.io/discord/879407995837087804.svg?label=Discord&logo=Discord&colorB=7289da&style=for-the-badge)](https://discord.gg/hU9SvSXMHs)
 
-A people counter that works with any smart home system that supports ESPHome/MQTT (e.g., Home Assistant). All necessary entities are created automatically.
+A people counter that works with any smart home system that supports ESPHome/MQTT (e.g., Home Assistant). Runtime settings use Home Assistant helpers which you must create manually.
 
 
 ## Table of Contents
@@ -347,10 +347,10 @@ reflections cause false triggers.
 
 ### Home Assistant Runtime Settings
 
-Roode automatically creates Home Assistant helpers (`input_number`, `input_boolean`,
-and `input_select`) for all tuning options. These values are persisted and synced
-both ways at runtime. If a helper has not been changed, it retains the default
-shown in the YAML example above.
+Roode uses Home Assistant helpers (`input_number`, `input_boolean`,
+and `input_select`) for all tuning options. Create these helpers manually with the
+names below. If a helper is absent, the device falls back to the default shown in
+the YAML example.
 
 | Setting | Entity | Range/Options |
 | --- | --- | --- |
@@ -379,6 +379,98 @@ shown in the YAML example above.
 | `roi.height` | `input_number.roode_roi_height` | 4–16 |
 | `roi.width` | `input_number.roode_roi_width` | 4–16 |
 | `refresh` | `input_select.roode_refresh_mode` | interrupt, polling |
+
+Example helper definitions:
+
+```yaml
+input_number:
+  roode_invalid_distance_limit:
+    min: 1
+    max: 100
+    step: 1
+  roode_detection_min_threshold:
+    min: 0
+    max: 100
+    step: 1
+  roode_detection_max_threshold:
+    min: 0
+    max: 100
+    step: 1
+  roode_restart_timeout:
+    min: 1
+    max: 120
+    step: 1
+  roode_calibration_offset:
+    min: -50
+    max: 50
+    step: 1
+  roode_calibration_crosstalk:
+    min: 0
+    max: 100000
+    step: 1000
+  roode_sampling:
+    min: 1
+    max: 6
+    step: 1
+  roode_filter_window:
+    min: 3
+    max: 9
+    step: 2
+  roode_entry_roi_height:
+    min: 4
+    max: 16
+    step: 1
+  roode_entry_roi_center:
+    min: 0
+    max: 255
+    step: 1
+  roode_entry_threshold_min:
+    min: 0
+    max: 100
+    step: 1
+  roode_entry_threshold_max:
+    min: 0
+    max: 100
+    step: 1
+  roode_exit_roi_height:
+    min: 4
+    max: 16
+    step: 1
+  roode_exit_roi_center:
+    min: 0
+    max: 255
+    step: 1
+  roode_exit_threshold_min:
+    min: 0
+    max: 100
+    step: 1
+  roode_exit_threshold_max:
+    min: 0
+    max: 100
+    step: 1
+  roode_roi_height:
+    min: 4
+    max: 16
+    step: 1
+  roode_roi_width:
+    min: 4
+    max: 16
+    step: 1
+
+input_boolean:
+  roode_log_fallback_events:
+  roode_force_single_core:
+  roode_calibration_persistence:
+  roode_zones_invert:
+
+input_select:
+  roode_calibration_ranging:
+    options: [auto, short, medium, long]
+  roode_filter_mode:
+    options: [min, median, percentile10]
+  roode_refresh_mode:
+    options: [interrupt, polling]
+```
 
 ### Sensors
 

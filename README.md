@@ -446,7 +446,9 @@ Add any of the input numbers, selects or switches from the table above under the
 across reboots and updates Roode immediately when changed. Updated values are pushed back
 to Home Assistant after calibration so both sides stay in sync. The block below lists every
 available option; remove any you do not need. When created for the first time each
-entity will use Roode's built-in default value.
+entity will use Roode's built-in default value. These defaults are hardcoded in
+firmware so the device always boots with sensible numbers even before Home Assistant
+has saved a value.
 
 ```yaml
 number:

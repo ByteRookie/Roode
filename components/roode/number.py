@@ -51,17 +51,21 @@ async def setup_invalid_distance_limit(config: OrderedDict, hub: MockObj):
     num = await new_persisted_number(
         config, min_value=1, max_value=config[CONF_MAX_VALUE], step=1
     )
-    cg.add(hub.set_invalid_distance_limit(num))
+    cg.add(hub.set_invalid_distance_limit_number(num))
 
 
 async def setup_restart_timeout(config: OrderedDict, hub: MockObj):
     num = await new_persisted_number(
         config, min_value=1, max_value=config[CONF_MAX_VALUE], step=1
     )
-    cg.add(hub.set_restart_timeout(num))
+    cg.add(hub.set_restart_timeout_number(num))
 
 
 async def to_code(config: OrderedDict):
     hub = await cg.get_variable(config[CONF_ROODE_ID])
     if CONF_PEOPLE_COUNTER in config:
         await setup_people_counter(config[CONF_PEOPLE_COUNTER], hub)
+    if CONF_INVALID_DISTANCE_LIMIT in config:
+        await setup_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT], hub)
+    if CONF_RESTART_TIMEOUT in config:
+        await setup_restart_timeout(config[CONF_RESTART_TIMEOUT], hub)

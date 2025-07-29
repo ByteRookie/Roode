@@ -129,6 +129,10 @@ class Roode : public PollingComponent {
   }
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
+  void set_invalid_distance_limit_number(number::Number *num);
+  void set_restart_timeout_number(number::Number *num);
+  void set_log_fallback_switch(switch_::Switch *sw);
+  void set_force_single_core_switch(switch_::Switch *sw);
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
@@ -146,6 +150,10 @@ class Roode : public PollingComponent {
   sensor::Sensor *distance_entry{nullptr};
   sensor::Sensor *distance_exit{nullptr};
   number::Number *people_counter{nullptr};
+  number::Number *invalid_distance_limit_number{nullptr};
+  number::Number *restart_timeout_number{nullptr};
+  switch_::Switch *log_fallback_switch{nullptr};
+  switch_::Switch *force_single_core_switch{nullptr};
   sensor::Sensor *max_threshold_entry_sensor{nullptr};
   sensor::Sensor *max_threshold_exit_sensor{nullptr};
   sensor::Sensor *min_threshold_entry_sensor{nullptr};

@@ -5,6 +5,8 @@
 #include <vector>
 #include <algorithm>
 #include <ctime>
+#include "esphome/components/number/number.h"
+#include "esphome/components/switch/switch.h"
 
 namespace esphome {
 namespace roode {
@@ -762,6 +764,34 @@ void Roode::restart_sensor() {
   distanceSensor->restart();
   last_sensor_restart_ts_ = millis();
   invalid_read_count_ = 0;
+}
+
+void Roode::set_invalid_distance_limit_number(number::Number *num) {
+  this->invalid_distance_limit_number = num;
+  this->invalid_distance_limit_ = static_cast<uint8_t>(num->state);
+  num->add_on_state_callback([this](float value) {
+    this->invalid_distance_limit_ = static_cast<uint8_t>(value);
+  });
+}
+
+void Roode::set_restart_timeout_number(number::Number *num) {
+  this->restart_timeout_number = num;
+  this->restart_timeout_ms_ = static_cast<uint32_t>(num->state) * 1000;
+  num->add_on_state_callback([this](float value) {
+    this->restart_timeout_ms_ = static_cast<uint32_t>(value) * 1000;
+  });
+}
+
+void Roode::set_log_fallback_switch(switch_::Switch *sw) {
+  this->log_fallback_switch = sw;
+  log_fallback_events_ = sw->state;
+  sw->add_on_state_callback([this](bool state) { this->set_log_fallback_events(state); });
+}
+
+void Roode::set_force_single_core_switch(switch_::Switch *sw) {
+  this->force_single_core_switch = sw;
+  force_single_core_ = sw->state;
+  sw->add_on_state_callback([this](bool state) { this->set_force_single_core(state); });
 }
 
 void Roode::sensor_task(void *param) {

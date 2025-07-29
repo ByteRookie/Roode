@@ -1,12 +1,19 @@
-from typing import Dict, Union
+from typing import Dict, Union, OrderedDict
 import esphome.codegen as cg
 import esphome.config_validation as cv
+from esphome.core import ID
+from esphome.components import switch
+from ..persisted_number import new_persisted_number, PersistedNumber
+from ..persisted_select import new_persisted_select
+from ..persisted_switch import new_persisted_switch
+from esphome.components.template import select as tselect
 from esphome.const import (
     CONF_HEIGHT,
     CONF_ID,
     CONF_INVERT,
     CONF_SENSOR,
     CONF_WIDTH,
+    CONF_RESTORE_MODE,
 )
 from ..vl53l1x import distance_as_mm, NullableSchema, VL53L1X
 
@@ -16,6 +23,9 @@ AUTO_LOAD = [
     "sensor",
     "binary_sensor",
     "text_sensor",
+    "number",
+    "switch",
+    "select",
 ]
 MULTI_CONF = True
 
@@ -89,33 +99,17 @@ CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(Roode),
         cv.GenerateID(CONF_SENSOR): cv.use_id(VL53L1X),
-        cv.Optional(CONF_ORIENTATION, default="parallel"): cv.enum(
-            ORIENTATION_VALUES
-        ),
-        cv.Optional(CONF_SAMPLING, default=2): cv.All(
-            cv.uint8_t,
-            cv.Range(min=1),
-        ),
+        cv.Optional(CONF_ORIENTATION, default="parallel"): cv.enum(ORIENTATION_VALUES),
+        cv.Optional(CONF_SAMPLING, default=2): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_ROI, default={}): ROI_SCHEMA,
         cv.Optional(CONF_DETECTION_THRESHOLDS, default={}): THRESHOLDS_SCHEMA,
         cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=False): cv.boolean,
-        cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(
-            FILTER_MODES,
-            upper=False,
-        ),
-        cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(
-            cv.uint8_t,
-            cv.Range(min=1),
-        ),
+        cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(FILTER_MODES, upper=False),
+        cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_LOG_FALLBACK, default=False): cv.boolean,
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
-        cv.Optional(CONF_INVALID_DISTANCE_LIMIT, default=10): cv.All(
-            cv.uint8_t,
-            cv.Range(min=1),
-        ),
-        cv.Optional(CONF_RESTART_TIMEOUT, default="30s"): (
-            cv.positive_time_period_milliseconds
-        ),
+        cv.Optional(CONF_INVALID_DISTANCE_LIMIT, default=10): cv.All(cv.uint8_t, cv.Range(min=1)),
+        cv.Optional(CONF_RESTART_TIMEOUT, default="30s"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
                 cv.Optional(CONF_INVERT, default=False): cv.boolean,
@@ -136,34 +130,203 @@ async def to_code(config: Dict):
 
     cg.add(roode.set_orientation(config[CONF_ORIENTATION]))
     cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
-    cg.add(
-        roode.set_calibration_persistence(
-            config[CONF_CALIBRATION_PERSISTENCE]
-        )
-    )
+    cg.add(roode.set_calibration_persistence(config[CONF_CALIBRATION_PERSISTENCE]))
     cg.add(roode.set_filter_mode(config[CONF_FILTER_MODE]))
     cg.add(roode.set_filter_window(config[CONF_FILTER_WINDOW]))
-    cg.add(
-        roode.set_log_fallback_events(
-            config[CONF_LOG_FALLBACK]
-        )
-    )
-    cg.add(
-        roode.set_force_single_core(
-            config[CONF_FORCE_SINGLE_CORE]
-        )
-    )
-    cg.add(
-        roode.set_invalid_distance_limit(
-            config[CONF_INVALID_DISTANCE_LIMIT]
-        )
-    )
-    cg.add(
-        roode.set_restart_timeout(
-            config[CONF_RESTART_TIMEOUT]
-        )
-    )
+    cg.add(roode.set_log_fallback_events(config[CONF_LOG_FALLBACK]))
+    cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
+    cg.add(roode.set_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT]))
+    cg.add(roode.set_restart_timeout(config[CONF_RESTART_TIMEOUT]))
 
+    # create UI controlled entities
+    id_base = config[CONF_ID].id
+    invalid_num = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_invalid_distance_limit", type=PersistedNumber)}),
+        min_value=1,
+        max_value=100,
+        step=1,
+    )
+    cg.add(roode.set_invalid_distance_limit_number(invalid_num))
+
+    restart_num = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_restart_timeout", type=PersistedNumber)}),
+        min_value=1,
+        max_value=120,
+        step=1,
+    )
+    cg.add(roode.set_restart_timeout_number(restart_num))
+
+    log_sw = await new_persisted_switch(
+        {
+            CONF_ID: ID(f"{id_base}_log_fallback_events", type=switch.Switch),
+            CONF_RESTORE_MODE: "RESTORE_DEFAULT_OFF",
+        }
+    )
+    cg.add(roode.set_log_fallback_switch(log_sw))
+
+    single_sw = await new_persisted_switch(
+        {
+            CONF_ID: ID(f"{id_base}_force_single_core", type=switch.Switch),
+            CONF_RESTORE_MODE: "RESTORE_DEFAULT_OFF",
+        }
+    )
+    cg.add(roode.set_force_single_core_switch(single_sw))
+
+    det_min = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_detection_min_threshold", type=PersistedNumber)}),
+        min_value=0,
+        max_value=100,
+        step=1,
+    )
+    cg.add(roode.set_detection_min_number(det_min))
+
+    det_max = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_detection_max_threshold", type=PersistedNumber)}),
+        min_value=0,
+        max_value=100,
+        step=1,
+    )
+    cg.add(roode.set_detection_max_number(det_max))
+
+    filter_select = await new_persisted_select(
+        OrderedDict({CONF_ID: ID(f"{id_base}_filter_mode", type=tselect.TemplateSelect)}),
+        options=["min", "median", "percentile10"],
+    )
+    cg.add(roode.set_filter_mode_select(filter_select))
+
+    sampling_num = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_sampling", type=PersistedNumber)}),
+        min_value=1,
+        max_value=6,
+        step=1,
+    )
+    cg.add(roode.set_sampling_number(sampling_num))
+
+    window_num = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_filter_window", type=PersistedNumber)}),
+        min_value=3,
+        max_value=9,
+        step=2,
+    )
+    cg.add(roode.set_filter_window_number(window_num))
+
+    range_sel = await new_persisted_select(
+        OrderedDict({CONF_ID: ID(f"{id_base}_calibration_ranging", type=tselect.TemplateSelect)}),
+        options=["auto", "short", "medium", "long"],
+    )
+    cg.add(roode.set_calibration_ranging_select(range_sel))
+
+    offset_num = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_calibration_offset", type=PersistedNumber)}),
+        min_value=-50,
+        max_value=50,
+        step=1,
+    )
+    cg.add(roode.set_calibration_offset_number(offset_num))
+
+    xtalk_num = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_calibration_crosstalk", type=PersistedNumber)}),
+        min_value=0,
+        max_value=100000,
+        step=1000,
+    )
+    cg.add(roode.set_calibration_crosstalk_number(xtalk_num))
+
+    cal_persist = await new_persisted_switch(
+        {CONF_ID: ID(f"{id_base}_calibration_persistence", type=switch.Switch), CONF_RESTORE_MODE: "RESTORE_DEFAULT_OFF"}
+    )
+    cg.add(roode.set_calibration_persistence_switch(cal_persist))
+
+    invert_sw = await new_persisted_switch(
+        {CONF_ID: ID(f"{id_base}_zones_invert", type=switch.Switch), CONF_RESTORE_MODE: "RESTORE_DEFAULT_OFF"}
+    )
+    cg.add(roode.set_zones_invert_switch(invert_sw))
+
+    entry_height = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_entry_roi_height", type=PersistedNumber)}),
+        min_value=4,
+        max_value=16,
+        step=1,
+    )
+    cg.add(roode.set_entry_roi_height_number(entry_height))
+
+    entry_center = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_entry_roi_center", type=PersistedNumber)}),
+        min_value=0,
+        max_value=255,
+        step=1,
+    )
+    cg.add(roode.set_entry_roi_center_number(entry_center))
+
+    entry_min = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_entry_threshold_min", type=PersistedNumber)}),
+        min_value=0,
+        max_value=100,
+        step=1,
+    )
+    cg.add(roode.set_entry_threshold_min_number(entry_min))
+
+    entry_max = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_entry_threshold_max", type=PersistedNumber)}),
+        min_value=0,
+        max_value=100,
+        step=1,
+    )
+    cg.add(roode.set_entry_threshold_max_number(entry_max))
+
+    exit_height = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_exit_roi_height", type=PersistedNumber)}),
+        min_value=4,
+        max_value=16,
+        step=1,
+    )
+    cg.add(roode.set_exit_roi_height_number(exit_height))
+
+    exit_center = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_exit_roi_center", type=PersistedNumber)}),
+        min_value=0,
+        max_value=255,
+        step=1,
+    )
+    cg.add(roode.set_exit_roi_center_number(exit_center))
+
+    exit_min = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_exit_threshold_min", type=PersistedNumber)}),
+        min_value=0,
+        max_value=100,
+        step=1,
+    )
+    cg.add(roode.set_exit_threshold_min_number(exit_min))
+
+    exit_max = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_exit_threshold_max", type=PersistedNumber)}),
+        min_value=0,
+        max_value=100,
+        step=1,
+    )
+    cg.add(roode.set_exit_threshold_max_number(exit_max))
+
+    roi_height = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_roi_height", type=PersistedNumber)}),
+        min_value=4,
+        max_value=16,
+        step=1,
+    )
+    cg.add(roode.set_roi_height_number(roi_height))
+
+    roi_width = await new_persisted_number(
+        OrderedDict({CONF_ID: ID(f"{id_base}_roi_width", type=PersistedNumber)}),
+        min_value=4,
+        max_value=16,
+        step=1,
+    )
+    cg.add(roode.set_roi_width_number(roi_width))
+
+    refresh_sel = await new_persisted_select(
+        OrderedDict({CONF_ID: ID(f"{id_base}_refresh_mode", type=tselect.TemplateSelect)}),
+        options=["interrupt", "polling"],
+    )
+    cg.add(roode.set_refresh_mode_select(refresh_sel))
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)

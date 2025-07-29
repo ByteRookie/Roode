@@ -102,7 +102,8 @@ button:
 number:
   - platform: roode
     people_counter:
-      name: $friendly_name people counter
+      id: people_counter
+      # leave name blank to let ESPHome default to unique ID
 
 binary_sensor:
   - platform: status

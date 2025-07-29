@@ -45,6 +45,8 @@ CONF_LOG_FALLBACK = "log_fallback_events"
 CONF_FORCE_SINGLE_CORE = "force_single_core"
 CONF_INVALID_DISTANCE_LIMIT = "invalid_distance_limit"
 CONF_RESTART_TIMEOUT = "restart_timeout"
+CONF_REFRESH_MODE = "refresh"
+CONF_CALIBRATION_RANGING = "calibration_ranging"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {

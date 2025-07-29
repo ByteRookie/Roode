@@ -59,7 +59,7 @@ void VL53L1X::setup() {
     delay(2);
   }
 
-  if (this->interrupt_pin.has_value()) {
+  if (this->interrupt_pin.has_value() && !force_polling_) {
     this->interrupt_pin.value()->pin_mode(gpio::FLAG_INPUT | gpio::FLAG_PULLUP);
     this->interrupt_pin.value()->setup();
     ESP_LOGD(TAG, "Interrupt pin configured");
@@ -246,7 +246,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
 
   // Decide whether we can use the interrupt pin for this reading
   uint8_t dataReady = false;
-  bool use_int = is_interrupt_enabled();
+  bool use_int = is_interrupt_enabled() && !force_polling_;
   if (!use_int && this->interrupt_pin.has_value() &&
       (millis() - last_interrupt_retry_ >= 1800000UL)) {
     if (validate_interrupt()) {
@@ -505,6 +505,20 @@ void VL53L1X::record_failure() {
     ESP_LOGW(TAG, "10 read errors — triggering recovery");
     soft_reset();
     consecutive_failures_ = 0;
+  }
+}
+
+void VL53L1X::apply_offset(int16_t val) {
+  this->offset = val;
+  if (!this->is_failed()) {
+    this->sensor.SetOffsetInMm(val);
+  }
+}
+
+void VL53L1X::apply_xtalk(uint16_t val) {
+  this->xtalk = val;
+  if (!this->is_failed()) {
+    this->sensor.SetXTalk(val);
   }
 }
 

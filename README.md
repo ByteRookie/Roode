@@ -310,12 +310,12 @@ reflections cause false triggers.
 | `vl53l1x.timeout` | Optional | `2s` | How long to wait for a measurement | Long ranges may need more time | Increase in 500&nbsp;ms steps until errors stop | `timeout: 2s` | `timeout: 3s` |
 | `vl53l1x.pins.interrupt` | Optional | none | GPIO for data ready signal | Efficient updates | Use if you can spare a pin | *(not set)* | `interrupt: GPIO32` |
 | `vl53l1x.calibration.ranging` | Optional | `auto` | Measurement range preset | Known distance extremes | Pick the shortest range that works | `ranging: auto` | `ranging: long` |
-| `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration | *(not set)* | `offset: 20mm` |
-| `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Only adjust with ST's calibration output | *(not set)* | `crosstalk: 100000cps` |
+| `input_number.roode_calibration_offset` | Optional | `0` | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration | – | – |
+| `input_number.roode_calibration_crosstalk` | Optional | `0` | Photon count correction | Strong reflections | Only adjust with ST's calibration output | – | – |
 | `input_number.roode_sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Try 3–5 for noisy areas; above 5 adds lag | – | – |
 | `roode.orientation` | Optional | `parallel` | Sensor pad orientation | Sensor rotated 90° | Set to `perpendicular` | `orientation: parallel` | `orientation: perpendicular` |
 | `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Change by 2–4 units or use `auto` to learn | `roi: { height: 16, width: 6 }` | `roi: auto` |
-| `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% (or ~50 mm) each time | `detection_thresholds: { min: 5%, max: 85% }` | `detection_thresholds: { min: 50mm, max: 234cm }` |
+| `input_number.roode_detection_min_threshold` & `input_number.roode_detection_max_threshold` | Optional | `0` / `85` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% each time | – | – |
 | `input_boolean.roode_calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning | – | – |
 | `input_select.roode_filter_mode` & `input_number.roode_filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows | – | – |
 | `input_boolean.roode_log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | – | – |
@@ -323,6 +323,7 @@ reflections cause false triggers.
 | `input_number.roode_invalid_distance_limit` | Optional | `10` | Consecutive suspect readings before restart | Sporadic zero/4 m values | Increase if noise triggers resets | – | – |
 | `input_number.roode_restart_timeout` | Optional | `30` | Cooldown and timeout before restart | Slow updates or many resets | Shorten for faster recovery | – | – |
 | `input_boolean.roode_zones_invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | – | – |
+| `input_select.roode_refresh_mode` | Optional | `interrupt` | Choose interrupt or polling mode | Debugging | Force polling if interrupts unreliable | – | – |
 | `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
 
 

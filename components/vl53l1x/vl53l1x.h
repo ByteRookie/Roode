@@ -51,7 +51,11 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   void set_ranging_mode_override(const RangingMode *mode) { this->ranging_mode_override = {mode}; }
   void set_offset(int16_t val) { this->offset = val; }
   void set_xtalk(uint16_t val) { this->xtalk = val; }
+  void apply_offset(int16_t val);
+  void apply_xtalk(uint16_t val);
   void set_timeout(uint16_t val) { this->timeout = val; }
+  void set_force_polling(bool force) { this->force_polling_ = force; }
+  bool is_force_polling() const { return force_polling_; }
 
   bool is_interrupt_enabled() const { return interrupt_active_ && interrupt_pin.has_value(); }
 
@@ -89,6 +93,7 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   uint8_t interrupt_miss_count_{0};
   uint32_t last_interrupt_retry_{0};
   uint8_t consecutive_failures_{0};
+  bool force_polling_{false};
 };
 
 }  // namespace vl53l1x

@@ -8,6 +8,7 @@
 #include "esphome/components/number/number.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/select/select.h"
+#include "../vl53l1x/ranging.h"
 
 namespace esphome {
 namespace roode {
@@ -805,6 +806,117 @@ void Roode::set_filter_window_number(number::Number *num) {
   this->filter_window_number = num;
   this->set_filter_window(static_cast<uint8_t>(num->state));
   num->add_on_state_callback([this](float value) { this->set_filter_window(static_cast<uint8_t>(value)); });
+}
+
+void Roode::set_detection_min_number(number::Number *num) {
+  this->detection_min_number = num;
+  uint8_t min = static_cast<uint8_t>(num->state);
+  entry->set_threshold_percentages(min, entry->threshold->max_percentage.value_or(80));
+  exit->set_threshold_percentages(min, exit->threshold->max_percentage.value_or(80));
+  num->add_on_state_callback([this](float value) {
+    uint8_t min = static_cast<uint8_t>(value);
+    entry->set_threshold_percentages(min, entry->threshold->max_percentage.value_or(80));
+    exit->set_threshold_percentages(min, exit->threshold->max_percentage.value_or(80));
+  });
+}
+
+void Roode::set_detection_max_number(number::Number *num) {
+  this->detection_max_number = num;
+  uint8_t max = static_cast<uint8_t>(num->state);
+  entry->set_threshold_percentages(entry->threshold->min_percentage.value_or(15), max);
+  exit->set_threshold_percentages(exit->threshold->min_percentage.value_or(15), max);
+  num->add_on_state_callback([this](float value) {
+    uint8_t max = static_cast<uint8_t>(value);
+    entry->set_threshold_percentages(entry->threshold->min_percentage.value_or(15), max);
+    exit->set_threshold_percentages(exit->threshold->min_percentage.value_or(15), max);
+  });
+}
+
+void Roode::set_entry_roi_height_number(number::Number *num) {
+  this->entry_roi_height_number = num;
+  entry->roi->set_height(static_cast<uint8_t>(num->state));
+  num->add_on_state_callback([this](float value) { entry->roi->set_height(static_cast<uint8_t>(value)); });
+}
+
+void Roode::set_exit_roi_height_number(number::Number *num) {
+  this->exit_roi_height_number = num;
+  exit->roi->set_height(static_cast<uint8_t>(num->state));
+  num->add_on_state_callback([this](float value) { exit->roi->set_height(static_cast<uint8_t>(value)); });
+}
+
+void Roode::set_roi_width_number(number::Number *num) {
+  this->roi_width_number = num;
+  entry->roi->set_width(static_cast<uint8_t>(num->state));
+  exit->roi->set_width(static_cast<uint8_t>(num->state));
+  num->add_on_state_callback([this](float value) {
+    entry->roi->set_width(static_cast<uint8_t>(value));
+    exit->roi->set_width(static_cast<uint8_t>(value));
+  });
+}
+
+void Roode::set_roi_height_number(number::Number *num) {
+  this->roi_height_number = num;
+  entry->roi->set_height(static_cast<uint8_t>(num->state));
+  exit->roi->set_height(static_cast<uint8_t>(num->state));
+  num->add_on_state_callback([this](float value) {
+    entry->roi->set_height(static_cast<uint8_t>(value));
+    exit->roi->set_height(static_cast<uint8_t>(value));
+  });
+}
+
+void Roode::set_entry_roi_center_number(number::Number *num) {
+  this->entry_roi_center_number = num;
+  entry->roi->set_center(static_cast<uint8_t>(num->state));
+  num->add_on_state_callback([this](float value) { entry->roi->set_center(static_cast<uint8_t>(value)); });
+}
+
+void Roode::set_exit_roi_center_number(number::Number *num) {
+  this->exit_roi_center_number = num;
+  exit->roi->set_center(static_cast<uint8_t>(num->state));
+  num->add_on_state_callback([this](float value) { exit->roi->set_center(static_cast<uint8_t>(value)); });
+}
+
+void Roode::set_calibration_offset_number(number::Number *num) {
+  this->calibration_offset_number = num;
+  distanceSensor->apply_offset(static_cast<int16_t>(num->state));
+  num->add_on_state_callback([this](float value) { distanceSensor->apply_offset(static_cast<int16_t>(value)); });
+}
+
+void Roode::set_calibration_crosstalk_number(number::Number *num) {
+  this->calibration_crosstalk_number = num;
+  distanceSensor->apply_xtalk(static_cast<uint16_t>(num->state));
+  num->add_on_state_callback([this](float value) { distanceSensor->apply_xtalk(static_cast<uint16_t>(value)); });
+}
+
+void Roode::set_ranging_select(select::Select *sel) {
+  this->ranging_select = sel;
+  auto apply = [this](const std::string &value) {
+    const RangingMode *mode = Ranging::Long;
+    if (value == "short")
+      mode = Ranging::Short;
+    else if (value == "medium")
+      mode = Ranging::Medium;
+    else if (value == "long")
+      mode = Ranging::Long;
+    else
+      mode = nullptr;
+    if (mode != nullptr)
+      distanceSensor->set_ranging_mode_override(mode);
+    else
+      distanceSensor->set_ranging_mode_override(nullptr);
+  };
+  apply(sel->state);
+  sel->add_on_state_callback(apply);
+}
+
+void Roode::set_refresh_select(select::Select *sel) {
+  this->refresh_select = sel;
+  auto apply = [this](const std::string &value) {
+    bool force = value == "polling";
+    distanceSensor->set_force_polling(force);
+  };
+  apply(sel->state);
+  sel->add_on_state_callback(apply);
 }
 
 void Roode::set_filter_mode_select(select::Select *sel) {

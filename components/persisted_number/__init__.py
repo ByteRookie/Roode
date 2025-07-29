@@ -2,7 +2,7 @@ from typing import Optional, OrderedDict
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import number
+from esphome.components import number as esphome_number
 from esphome.const import (
     CONF_ID,
     CONF_NAME,
@@ -10,11 +10,11 @@ from esphome.const import (
     CONF_DISABLED_BY_DEFAULT,
 )
 
-PersistedNumber = number.number_ns.class_(
-    "PersistedNumber", number.Number, cg.Component
+PersistedNumber = esphome_number.number_ns.class_(
+    "PersistedNumber", esphome_number.Number, cg.Component
 )
 
-PERSISTED_NUMBER_SCHEMA = number.number_schema(PersistedNumber).extend(
+PERSISTED_NUMBER_SCHEMA = esphome_number.number_schema(PersistedNumber).extend(
     {
         cv.GenerateID(): cv.declare_id(PersistedNumber),
         cv.Optional(CONF_RESTORE_VALUE, default=True): cv.boolean,
@@ -37,7 +37,7 @@ async def new_persisted_number(
         CONF_DISABLED_BY_DEFAULT: config.get(CONF_DISABLED_BY_DEFAULT, False),
     }
     config = cv.Schema(PERSISTED_NUMBER_SCHEMA, extra=cv.ALLOW_EXTRA)(config)
-    var = await number.new_number(
+    var = await esphome_number.new_number(
         config, min_value=min_value, max_value=max_value, step=step
     )
     from esphome.core import CORE

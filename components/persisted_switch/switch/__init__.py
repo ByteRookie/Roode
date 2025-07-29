@@ -1,10 +1,10 @@
-from esphome.components import switch
+from esphome.components import switch as esphome_switch
 
 from .. import new_persisted_switch
 
 AUTO_LOAD = ["persisted_switch"]
 
-CONFIG_SCHEMA = switch.switch_schema(switch.Switch)
+CONFIG_SCHEMA = esphome_switch.switch_schema(esphome_switch.Switch)
 
 
 async def to_code(config):

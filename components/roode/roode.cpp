@@ -302,8 +302,7 @@ void Roode::loop() {
   } else {
     invalid_read_count_ = 0;
   }
-  if (invalid_read_count_ > invalid_distance_limit_ &&
-      (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
+  if (invalid_read_count_ > invalid_distance_limit_ && (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
     ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
     restart_sensor();
   }
@@ -529,6 +528,7 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   // thresholds and ROI values immediately after a fail-safe recalibration
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
+  publish_config_numbers();
   publish_feature_list();
 }
 
@@ -635,6 +635,7 @@ void Roode::calibrate_zones() {
   publish_sensor_configuration(entry, exit, true);
   App.feed_wdt();
   publish_sensor_configuration(entry, exit, false);
+  publish_config_numbers();
 
   calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max,
                           static_cast<uint32_t>(time(nullptr))};
@@ -698,6 +699,33 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
   }
 }
 
+void Roode::publish_config_numbers() {
+  if (entry_roi_height_number != nullptr)
+    entry_roi_height_number->publish_state(entry->roi->height);
+  if (exit_roi_height_number != nullptr)
+    exit_roi_height_number->publish_state(exit->roi->height);
+  if (roi_width_number != nullptr)
+    roi_width_number->publish_state(entry->roi->width);
+  if (roi_height_number != nullptr)
+    roi_height_number->publish_state(entry->roi->height);
+  if (entry_roi_center_number != nullptr)
+    entry_roi_center_number->publish_state(entry->roi->center);
+  if (exit_roi_center_number != nullptr)
+    exit_roi_center_number->publish_state(exit->roi->center);
+  if (detection_min_number != nullptr)
+    detection_min_number->publish_state(entry->threshold->min_percentage.value_or(15));
+  if (detection_max_number != nullptr)
+    detection_max_number->publish_state(entry->threshold->max_percentage.value_or(80));
+  if (entry_threshold_min_number != nullptr)
+    entry_threshold_min_number->publish_state(entry->threshold->min_percentage.value_or(15));
+  if (entry_threshold_max_number != nullptr)
+    entry_threshold_max_number->publish_state(entry->threshold->max_percentage.value_or(80));
+  if (exit_threshold_min_number != nullptr)
+    exit_threshold_min_number->publish_state(exit->threshold->min_percentage.value_or(15));
+  if (exit_threshold_max_number != nullptr)
+    exit_threshold_max_number->publish_state(exit->threshold->max_percentage.value_or(80));
+}
+
 void Roode::publish_feature_list() {
   auto fmt_bytes = [](uint32_t bytes) {
     char buf[16];
@@ -754,7 +782,6 @@ void Roode::publish_feature_list() {
   log_event(std::string("features_enabled: ") + feature_list);
 }
 
-
 void Roode::update_status_text(const std::string &status) {
   if (status_text_sensor != nullptr && status != last_status_text_) {
     status_text_sensor->publish_state(status);
@@ -771,17 +798,13 @@ void Roode::restart_sensor() {
 void Roode::set_invalid_distance_limit_number(number::Number *num) {
   this->invalid_distance_limit_number = num;
   this->invalid_distance_limit_ = static_cast<uint8_t>(num->state);
-  num->add_on_state_callback([this](float value) {
-    this->invalid_distance_limit_ = static_cast<uint8_t>(value);
-  });
+  num->add_on_state_callback([this](float value) { this->invalid_distance_limit_ = static_cast<uint8_t>(value); });
 }
 
 void Roode::set_restart_timeout_number(number::Number *num) {
   this->restart_timeout_number = num;
   this->restart_timeout_ms_ = static_cast<uint32_t>(num->state) * 1000;
-  num->add_on_state_callback([this](float value) {
-    this->restart_timeout_ms_ = static_cast<uint32_t>(value) * 1000;
-  });
+  num->add_on_state_callback([this](float value) { this->restart_timeout_ms_ = static_cast<uint32_t>(value) * 1000; });
 }
 
 void Roode::set_log_fallback_switch(switch_::Switch *sw) {
@@ -990,8 +1013,7 @@ void Roode::sensor_task(void *param) {
   for (;;) {
     self->use_sensor_task_ = true;
     uint32_t now = millis();
-    if (self->last_loop_update_ts_ != 0 &&
-        (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
+    if (self->last_loop_update_ts_ != 0 && (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
         (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
       ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", self->restart_timeout_ms_ / 1000);
       self->restart_sensor();

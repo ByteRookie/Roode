@@ -263,6 +263,7 @@ class Roode : public PollingComponent {
   void publish_feature_list();
   const RangingMode *determine_ranging_mode(uint16_t average_entry_zone_distance, uint16_t average_exit_zone_distance);
   void publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax);
+  void publish_config_numbers();
   void updateCounter(int delta);
   Orientation orientation_{Parallel};
   uint8_t samples{2};

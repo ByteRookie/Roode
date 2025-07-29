@@ -2,11 +2,9 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import sensor
 from esphome.const import (
-    ICON_ARROW_EXPAND_VERTICAL,
     ICON_NEW_BOX,
     ICON_RULER,
     STATE_CLASS_MEASUREMENT,
-    UNIT_EMPTY,
     ENTITY_CATEGORY_DIAGNOSTIC,
 )
 from . import Roode, CONF_ROODE_ID

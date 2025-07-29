@@ -443,8 +443,9 @@ calibration:6:01PM
 
 Add any of the input numbers, selects or switches from the table above under the
 `roode` platform to expose them in Home Assistant. Each entity retains its value
-across reboots. The block below lists every available option; remove any you do
-not need.
+across reboots and updates Roode immediately when changed. Updated values are pushed back
+to Home Assistant after calibration so both sides stay in sync. The block below lists every
+available option; remove any you do not need.
 
 ```yaml
 number:

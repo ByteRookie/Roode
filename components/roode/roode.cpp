@@ -700,18 +700,6 @@ void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
 }
 
 void Roode::publish_config_numbers() {
-  if (entry_roi_height_number != nullptr)
-    entry_roi_height_number->publish_state(entry->roi->height);
-  if (exit_roi_height_number != nullptr)
-    exit_roi_height_number->publish_state(exit->roi->height);
-  if (roi_width_number != nullptr)
-    roi_width_number->publish_state(entry->roi->width);
-  if (roi_height_number != nullptr)
-    roi_height_number->publish_state(entry->roi->height);
-  if (entry_roi_center_number != nullptr)
-    entry_roi_center_number->publish_state(entry->roi->center);
-  if (exit_roi_center_number != nullptr)
-    exit_roi_center_number->publish_state(exit->roi->center);
   if (detection_min_number != nullptr)
     detection_min_number->publish_state(entry->threshold->min_percentage.value_or(15));
   if (detection_max_number != nullptr)
@@ -895,49 +883,6 @@ void Roode::set_exit_threshold_max_number(number::Number *num) {
   });
 }
 
-void Roode::set_entry_roi_height_number(number::Number *num) {
-  this->entry_roi_height_number = num;
-  entry->roi->set_height(static_cast<uint8_t>(num->state));
-  num->add_on_state_callback([this](float value) { entry->roi->set_height(static_cast<uint8_t>(value)); });
-}
-
-void Roode::set_exit_roi_height_number(number::Number *num) {
-  this->exit_roi_height_number = num;
-  exit->roi->set_height(static_cast<uint8_t>(num->state));
-  num->add_on_state_callback([this](float value) { exit->roi->set_height(static_cast<uint8_t>(value)); });
-}
-
-void Roode::set_roi_width_number(number::Number *num) {
-  this->roi_width_number = num;
-  entry->roi->set_width(static_cast<uint8_t>(num->state));
-  exit->roi->set_width(static_cast<uint8_t>(num->state));
-  num->add_on_state_callback([this](float value) {
-    entry->roi->set_width(static_cast<uint8_t>(value));
-    exit->roi->set_width(static_cast<uint8_t>(value));
-  });
-}
-
-void Roode::set_roi_height_number(number::Number *num) {
-  this->roi_height_number = num;
-  entry->roi->set_height(static_cast<uint8_t>(num->state));
-  exit->roi->set_height(static_cast<uint8_t>(num->state));
-  num->add_on_state_callback([this](float value) {
-    entry->roi->set_height(static_cast<uint8_t>(value));
-    exit->roi->set_height(static_cast<uint8_t>(value));
-  });
-}
-
-void Roode::set_entry_roi_center_number(number::Number *num) {
-  this->entry_roi_center_number = num;
-  entry->roi->set_center(static_cast<uint8_t>(num->state));
-  num->add_on_state_callback([this](float value) { entry->roi->set_center(static_cast<uint8_t>(value)); });
-}
-
-void Roode::set_exit_roi_center_number(number::Number *num) {
-  this->exit_roi_center_number = num;
-  exit->roi->set_center(static_cast<uint8_t>(num->state));
-  num->add_on_state_callback([this](float value) { exit->roi->set_center(static_cast<uint8_t>(value)); });
-}
 
 void Roode::set_calibration_offset_number(number::Number *num) {
   this->calibration_offset_number = num;

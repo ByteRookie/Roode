@@ -138,12 +138,6 @@ class Roode : public PollingComponent {
   void set_entry_threshold_max_number(number::Number *num);
   void set_exit_threshold_min_number(number::Number *num);
   void set_exit_threshold_max_number(number::Number *num);
-  void set_entry_roi_height_number(number::Number *num);
-  void set_exit_roi_height_number(number::Number *num);
-  void set_roi_width_number(number::Number *num);
-  void set_roi_height_number(number::Number *num);
-  void set_entry_roi_center_number(number::Number *num);
-  void set_exit_roi_center_number(number::Number *num);
   void set_calibration_offset_number(number::Number *num);
   void set_calibration_crosstalk_number(number::Number *num);
   void set_ranging_select(select::Select *sel);
@@ -182,12 +176,6 @@ class Roode : public PollingComponent {
   number::Number *entry_threshold_max_number{nullptr};
   number::Number *exit_threshold_min_number{nullptr};
   number::Number *exit_threshold_max_number{nullptr};
-  number::Number *entry_roi_height_number{nullptr};
-  number::Number *exit_roi_height_number{nullptr};
-  number::Number *roi_width_number{nullptr};
-  number::Number *roi_height_number{nullptr};
-  number::Number *entry_roi_center_number{nullptr};
-  number::Number *exit_roi_center_number{nullptr};
   number::Number *calibration_offset_number{nullptr};
   number::Number *calibration_crosstalk_number{nullptr};
   switch_::Switch *log_fallback_switch{nullptr};

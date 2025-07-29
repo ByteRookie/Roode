@@ -22,12 +22,6 @@ CONF_ENTRY_THRESHOLD_MIN = "entry_threshold_min"
 CONF_ENTRY_THRESHOLD_MAX = "entry_threshold_max"
 CONF_EXIT_THRESHOLD_MIN = "exit_threshold_min"
 CONF_EXIT_THRESHOLD_MAX = "exit_threshold_max"
-CONF_ENTRY_ROI_HEIGHT = "entry_roi_height"
-CONF_EXIT_ROI_HEIGHT = "exit_roi_height"
-CONF_ROI_WIDTH = "roi_width"
-CONF_ROI_HEIGHT = "roi_height"
-CONF_ENTRY_ROI_CENTER = "entry_roi_center"
-CONF_EXIT_ROI_CENTER = "exit_roi_center"
 CONF_CALIBRATION_OFFSET = "calibration_offset"
 CONF_CALIBRATION_CROSSTALK = "calibration_crosstalk"
 
@@ -64,24 +58,6 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ENTRY_THRESHOLD_MAX): PERSISTED_NUMBER_SCHEMA,
         cv.Optional(CONF_EXIT_THRESHOLD_MIN): PERSISTED_NUMBER_SCHEMA,
         cv.Optional(CONF_EXIT_THRESHOLD_MAX): PERSISTED_NUMBER_SCHEMA,
-        cv.Optional(CONF_ENTRY_ROI_HEIGHT): PERSISTED_NUMBER_SCHEMA.extend(
-            {cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}
-        ),
-        cv.Optional(CONF_EXIT_ROI_HEIGHT): PERSISTED_NUMBER_SCHEMA.extend(
-            {cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}
-        ),
-        cv.Optional(CONF_ROI_WIDTH): PERSISTED_NUMBER_SCHEMA.extend(
-            {cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}
-        ),
-        cv.Optional(CONF_ROI_HEIGHT): PERSISTED_NUMBER_SCHEMA.extend(
-            {cv.Optional(CONF_MAX_VALUE, 16): cv.int_range(4, 16)}
-        ),
-        cv.Optional(CONF_ENTRY_ROI_CENTER): PERSISTED_NUMBER_SCHEMA.extend(
-            {cv.Optional(CONF_MAX_VALUE, 255): cv.int_range(0, 255)}
-        ),
-        cv.Optional(CONF_EXIT_ROI_CENTER): PERSISTED_NUMBER_SCHEMA.extend(
-            {cv.Optional(CONF_MAX_VALUE, 255): cv.int_range(0, 255)}
-        ),
         cv.Optional(CONF_CALIBRATION_OFFSET): PERSISTED_NUMBER_SCHEMA.extend(
             {cv.Optional(CONF_MAX_VALUE, 50): cv.int_range(-50, 50)}
         ),
@@ -169,46 +145,6 @@ async def setup_exit_threshold_max(config: OrderedDict, hub: MockObj):
     cg.add(hub.set_exit_threshold_max_number(num))
 
 
-async def setup_entry_roi_height(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(
-        config, min_value=4, max_value=16, step=1, default_value=16
-    )
-    cg.add(hub.set_entry_roi_height_number(num))
-
-
-async def setup_exit_roi_height(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(
-        config, min_value=4, max_value=16, step=1, default_value=16
-    )
-    cg.add(hub.set_exit_roi_height_number(num))
-
-
-async def setup_roi_width(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(
-        config, min_value=4, max_value=16, step=1, default_value=6
-    )
-    cg.add(hub.set_roi_width_number(num))
-
-
-async def setup_roi_height(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(
-        config, min_value=4, max_value=16, step=1, default_value=16
-    )
-    cg.add(hub.set_roi_height_number(num))
-
-
-async def setup_entry_roi_center(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(
-        config, min_value=0, max_value=255, step=1, default_value=0
-    )
-    cg.add(hub.set_entry_roi_center_number(num))
-
-
-async def setup_exit_roi_center(config: OrderedDict, hub: MockObj):
-    num = await new_persisted_number(
-        config, min_value=0, max_value=255, step=1, default_value=0
-    )
-    cg.add(hub.set_exit_roi_center_number(num))
 
 
 async def setup_calibration_offset(config: OrderedDict, hub: MockObj):
@@ -249,18 +185,6 @@ async def to_code(config: OrderedDict):
         await setup_exit_threshold_min(config[CONF_EXIT_THRESHOLD_MIN], hub)
     if CONF_EXIT_THRESHOLD_MAX in config:
         await setup_exit_threshold_max(config[CONF_EXIT_THRESHOLD_MAX], hub)
-    if CONF_ENTRY_ROI_HEIGHT in config:
-        await setup_entry_roi_height(config[CONF_ENTRY_ROI_HEIGHT], hub)
-    if CONF_EXIT_ROI_HEIGHT in config:
-        await setup_exit_roi_height(config[CONF_EXIT_ROI_HEIGHT], hub)
-    if CONF_ROI_WIDTH in config:
-        await setup_roi_width(config[CONF_ROI_WIDTH], hub)
-    if CONF_ROI_HEIGHT in config:
-        await setup_roi_height(config[CONF_ROI_HEIGHT], hub)
-    if CONF_ENTRY_ROI_CENTER in config:
-        await setup_entry_roi_center(config[CONF_ENTRY_ROI_CENTER], hub)
-    if CONF_EXIT_ROI_CENTER in config:
-        await setup_exit_roi_center(config[CONF_EXIT_ROI_CENTER], hub)
     if CONF_CALIBRATION_OFFSET in config:
         await setup_calibration_offset(config[CONF_CALIBRATION_OFFSET], hub)
     if CONF_CALIBRATION_CROSSTALK in config:

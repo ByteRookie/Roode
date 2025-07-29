@@ -315,11 +315,8 @@ reflections cause false triggers.
 | `input_boolean.roode_force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | – | – |
 | `input_number.roode_invalid_distance_limit` | Optional | `10` | Consecutive suspect readings before restart | Sporadic zero/4 m values | Increase if noise triggers resets | – | – |
 | `input_number.roode_restart_timeout` | Optional | `30` | Cooldown and timeout before restart | Slow updates or many resets | Shorten for faster recovery | – | – |
-| `input_number.roode_entry_roi_height` & `input_number.roode_exit_roi_height` | Optional | `16` | ROI height for entry and exit zones | Mounting constraints require smaller area | Reduce or enlarge to fit doorway | – | – |
-| `input_number.roode_entry_roi_center` & `input_number.roode_exit_roi_center` | Optional | auto | Override ROI center location | Offset doorway from sensor center | Tune until zones cover the walkway | – | – |
 | `input_number.roode_entry_threshold_min` & `input_number.roode_entry_threshold_max` | Optional | `0` / `85` | Entry zone detection thresholds | Different lighting or reflections | Raise or lower independently | – | – |
 | `input_number.roode_exit_threshold_min` & `input_number.roode_exit_threshold_max` | Optional | `0` / `85` | Exit zone detection thresholds | Different lighting or reflections | Raise or lower independently | – | – |
-| `input_number.roode_roi_height` & `input_number.roode_roi_width` | Optional | `16` / `6` | ROI size when zones not split | Use when not defining entry/exit zones | Adjust to match hallway width | – | – |
 | `input_boolean.roode_zones_invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | – | – |
 | `input_select.roode_refresh_mode` | Optional | `interrupt` | Choose interrupt or polling mode | Debugging | Force polling if interrupts unreliable | – | – |
 | `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
@@ -473,18 +470,6 @@ number:
       name: Exit Min Threshold
     exit_threshold_max:
       name: Exit Max Threshold
-    entry_roi_height:
-      name: Entry ROI Height
-    entry_roi_center:
-      name: Entry ROI Center
-    exit_roi_height:
-      name: Exit ROI Height
-    exit_roi_center:
-      name: Exit ROI Center
-    roi_height:
-      name: ROI Height
-    roi_width:
-      name: ROI Width
     calibration_offset:
       name: Calibration Offset
     calibration_crosstalk:

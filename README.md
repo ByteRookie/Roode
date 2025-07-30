@@ -182,21 +182,6 @@ roode:
     # min: 50mm
     # max: 234cm
 
-  # Persist calibration data so thresholds survive restarts
-  calibration_persistence: true
-
-  # Jitter reduction options
-  filter_mode: median  # min, median or percentile10
-  # Increase the window to 7 or 9 for heavy noise, drop to 3 for faster response
-  filter_window: 5     # number of samples used by the filter
-  # Log interrupt fallback events and XSHUT recoveries
-  log_fallback_events: true
-  # Disable dual core tasking if needed
-  force_single_core: false
-  # Restart if readings are 0 or >4000mm too many times
-  invalid_distance_limit: 10
-  # Minimum time between automatic sensor restarts
-  restart_timeout: 30s
   # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
 
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
@@ -249,7 +234,8 @@ Roode prefers the interrupt pin for efficient updates. When `interrupt` is defin
 On ESP32 targets Roode tries to run the sensor loop on the second CPU core so
 Wi‑Fi and other ESPHome tasks stay responsive.  If the task fails to start or
 when running on an ESP8266 the code automatically falls back to a single‑core
-loop.  You can force single‑core mode with `force_single_core: true`.
+loop.  You can force single‑core mode with the
+`input_boolean.roode_force_single_core` entity.
 
 ### Sampling and Filtering
 
@@ -317,19 +303,25 @@ reflections cause false triggers.
 | `vl53l1x.timeout` | Optional | `2s` | How long to wait for a measurement | Long ranges may need more time | Increase in 500&nbsp;ms steps until errors stop | `timeout: 2s` | `timeout: 3s` |
 | `vl53l1x.pins.interrupt` | Optional | none | GPIO for data ready signal | Efficient updates | Use if you can spare a pin | *(not set)* | `interrupt: GPIO32` |
 | `vl53l1x.calibration.ranging` | Optional | `auto` | Measurement range preset | Known distance extremes | Pick the shortest range that works | `ranging: auto` | `ranging: long` |
-| `vl53l1x.calibration.offset` | Optional | none | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration | *(not set)* | `offset: 20mm` |
-| `vl53l1x.calibration.crosstalk` | Optional | none | Photon count correction | Strong reflections | Only adjust with ST's calibration output | *(not set)* | `crosstalk: 100000cps` |
-| `roode.sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Try 3–5 for noisy areas; above 5 adds lag | `sampling: 2` | `sampling: 5` |
+| `input_number.roode_calibration_offset` | Optional | `0` | Distance offset correction | Sensor mounted behind glass | Set the measured mm offset after calibration | – | – |
+| `input_number.roode_calibration_crosstalk` | Optional | `0` | Photon count correction | Strong reflections | Only adjust with ST's calibration output | – | – |
+| `input_number.roode_sampling` | Optional | `2` | Number of readings averaged | Smoother or faster response | Try 3–5 for noisy areas; above 5 adds lag | – | – |
 | `roode.orientation` | Optional | `parallel` | Sensor pad orientation | Sensor rotated 90° | Set to `perpendicular` | `orientation: parallel` | `orientation: perpendicular` |
 | `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Change by 2–4 units or use `auto` to learn | `roi: { height: 16, width: 6 }` | `roi: auto` |
-| `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% (or ~50 mm) each time | `detection_thresholds: { min: 5%, max: 85% }` | `detection_thresholds: { min: 50mm, max: 234cm }` |
-| `roode.calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning | `calibration_persistence: false` | `calibration_persistence: true` |
-| `roode.filter_mode` & `roode.filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows | `filter_mode: min`<br>`filter_window: 5` | `filter_mode: percentile10`<br>`filter_window: 9` |
-| `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | `log_fallback_events: false` | `log_fallback_events: true` |
-| `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: false` | `force_single_core: true` |
-| `roode.invalid_distance_limit` | Optional | `10` | Consecutive suspect readings before restart | Sporadic zero/4 m values | Increase if noise triggers resets | `invalid_distance_limit: 10` | `invalid_distance_limit: 20` |
-| `roode.restart_timeout` | Optional | `30s` | Cooldown and timeout before restart | Slow updates or many resets | Shorten for faster recovery | `restart_timeout: 30s` | `restart_timeout: 15s` |
-| `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
+| `input_number.roode_detection_min_threshold` & `input_number.roode_detection_max_threshold` | Optional | `0` / `85` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% each time | – | – |
+| `input_boolean.roode_calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning | – | – |
+| `input_select.roode_filter_mode` & `input_number.roode_filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows | – | – |
+| `input_boolean.roode_log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | – | – |
+| `input_boolean.roode_force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | – | – |
+| `input_number.roode_invalid_distance_limit` | Optional | `10` | Consecutive suspect readings before restart | Sporadic zero/4 m values | Increase if noise triggers resets | – | – |
+| `input_number.roode_restart_timeout` | Optional | `30` | Cooldown and timeout before restart | Slow updates or many resets | Shorten for faster recovery | – | – |
+| `input_number.roode_entry_roi_height` & `input_number.roode_exit_roi_height` | Optional | `16` | ROI height for entry and exit zones | Mounting constraints require smaller area | Reduce or enlarge to fit doorway | – | – |
+| `input_number.roode_entry_roi_center` & `input_number.roode_exit_roi_center` | Optional | auto | Override ROI center location | Offset doorway from sensor center | Tune until zones cover the walkway | – | – |
+| `input_number.roode_entry_threshold_min` & `input_number.roode_entry_threshold_max` | Optional | `0` / `85` | Entry zone detection thresholds | Different lighting or reflections | Raise or lower independently | – | – |
+| `input_number.roode_exit_threshold_min` & `input_number.roode_exit_threshold_max` | Optional | `0` / `85` | Exit zone detection thresholds | Different lighting or reflections | Raise or lower independently | – | – |
+| `input_number.roode_roi_height` & `input_number.roode_roi_width` | Optional | `16` / `6` | ROI size when zones not split | Use when not defining entry/exit zones | Adjust to match hallway width | – | – |
+| `input_boolean.roode_zones_invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | – | – |
+| `input_select.roode_refresh_mode` | Optional | `interrupt` | Choose interrupt or polling mode | Debugging | Force polling if interrupts unreliable | – | – |
 | `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
 
 
@@ -445,6 +437,76 @@ ram:309KB
 flash:16MB
 calibration_value:1399
 calibration:6:01PM
+```
+
+#### UI-controlled settings
+
+Add any of the input numbers, selects or switches from the table above under the
+`roode` platform to expose them in Home Assistant. Each entity retains its value
+across reboots and updates Roode immediately when changed. Updated values are pushed back
+to Home Assistant after calibration so both sides stay in sync. The block below lists every
+available option; remove any you do not need. When created for the first time each
+entity will use Roode's built-in default value. These defaults are hardcoded in
+firmware so the device always boots with sensible numbers even before Home Assistant
+has saved a value.
+
+```yaml
+number:
+  - platform: roode
+    invalid_distance_limit:
+      name: Invalid Distance Limit
+    detection_threshold_min:
+      name: Detection Min
+    detection_threshold_max:
+      name: Detection Max
+    restart_timeout:
+      name: Restart Timeout
+    sampling:
+      name: Sampling Size
+    filter_window:
+      name: Filter Window
+    entry_threshold_min:
+      name: Entry Min Threshold
+    entry_threshold_max:
+      name: Entry Max Threshold
+    exit_threshold_min:
+      name: Exit Min Threshold
+    exit_threshold_max:
+      name: Exit Max Threshold
+    entry_roi_height:
+      name: Entry ROI Height
+    entry_roi_center:
+      name: Entry ROI Center
+    exit_roi_height:
+      name: Exit ROI Height
+    exit_roi_center:
+      name: Exit ROI Center
+    roi_height:
+      name: ROI Height
+    roi_width:
+      name: ROI Width
+    calibration_offset:
+      name: Calibration Offset
+    calibration_crosstalk:
+      name: Calibration Crosstalk
+select:
+  - platform: roode
+    calibration_ranging:
+      name: Ranging Mode
+    filter_mode:
+      name: Filter Mode
+    refresh:
+      name: Refresh Mode
+switch:
+  - platform: roode
+    log_fallback_events:
+      name: Log Fallback Events
+    force_single_core:
+      name: Force Single Core
+    calibration_persistence:
+      name: Calibration Persistence
+    zones_invert:
+      name: Invert Zones
 ```
 
 #### Sensor Reference
@@ -607,20 +669,21 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Feature text sensor | Reports enabled and fallback features for diagnostics |
 | Manual adjustment counter | Tracks user corrections to the people count |
 | Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
-| Polling timeout recovery | Restarts the sensor if no data arrives for `restart_timeout` |
+| Polling timeout recovery | Restarts the sensor if no data arrives for `input_number.roode_restart_timeout` |
 | Consecutive failure counter | Soft-resets the sensor after 10 read errors |
 | Consecutive invalid distance recovery | Restarts the sensor after too many suspect readings |
-| Recovery cooldown | Prevents another restart for `restart_timeout` |
+| Recovery cooldown | Prevents another restart for `input_number.roode_restart_timeout` |
 | Sensor status reporting | Text sensor shows `ok`, `timeout`, `reinitializing`, `error` or `offline` |
 | Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
 | Colored logs | Normal info in green, details in yellow, failures in red |
 
 ## Logging and Diagnostics
 
-Roode prints key events to the ESPHome logger. Set `log_fallback_events: true`
-in the `roode:` section to include interrupt fallbacks and XSHUT recovery
-details. Event logs cover power cycles of the sensor, automatic changes between
-interrupt and polling mode, and manual adjustments to the people count.
+Roode prints key events to the ESPHome logger. Enable the
+`input_boolean.roode_log_fallback_events` entity to include interrupt
+fallbacks and XSHUT recovery details. Event logs cover power cycles of the
+sensor, automatic changes between interrupt and polling mode, and manual
+adjustments to the people count.
 
 ### Feature text sensor
 
@@ -641,7 +704,7 @@ Optional sensors provide insight into Roode's operation:
   and a text-sensor `sensor_status` exposes the same status string.
 - ROI size and threshold sensors allow live tuning of each zone.
 - `manual_adjustment_count` records people-count corrections.
-- The sensor automatically restarts if polling stops for the configured `restart_timeout`
+- The sensor automatically restarts if polling stops for the configured `input_number.roode_restart_timeout`
   or after 10 consecutive read errors. All restart triggers share this cooldown.
 
 See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable

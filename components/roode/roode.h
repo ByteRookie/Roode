@@ -6,6 +6,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/components/select/select.h"
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
@@ -129,6 +130,31 @@ class Roode : public PollingComponent {
   }
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
+  void set_invalid_distance_limit_number(number::Number *num);
+  void set_restart_timeout_number(number::Number *num);
+  void set_detection_min_number(number::Number *num);
+  void set_detection_max_number(number::Number *num);
+  void set_entry_threshold_min_number(number::Number *num);
+  void set_entry_threshold_max_number(number::Number *num);
+  void set_exit_threshold_min_number(number::Number *num);
+  void set_exit_threshold_max_number(number::Number *num);
+  void set_entry_roi_height_number(number::Number *num);
+  void set_exit_roi_height_number(number::Number *num);
+  void set_roi_width_number(number::Number *num);
+  void set_roi_height_number(number::Number *num);
+  void set_entry_roi_center_number(number::Number *num);
+  void set_exit_roi_center_number(number::Number *num);
+  void set_calibration_offset_number(number::Number *num);
+  void set_calibration_crosstalk_number(number::Number *num);
+  void set_ranging_select(select::Select *sel);
+  void set_refresh_select(select::Select *sel);
+  void set_log_fallback_switch(switch_::Switch *sw);
+  void set_force_single_core_switch(switch_::Switch *sw);
+  void set_sampling_number(number::Number *num);
+  void set_filter_window_number(number::Number *num);
+  void set_filter_mode_select(select::Select *sel);
+  void set_calibration_persistence_switch(switch_::Switch *sw);
+  void set_invert_direction_switch(switch_::Switch *sw);
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
@@ -146,6 +172,31 @@ class Roode : public PollingComponent {
   sensor::Sensor *distance_entry{nullptr};
   sensor::Sensor *distance_exit{nullptr};
   number::Number *people_counter{nullptr};
+  number::Number *invalid_distance_limit_number{nullptr};
+  number::Number *restart_timeout_number{nullptr};
+  number::Number *sampling_number{nullptr};
+  number::Number *filter_window_number{nullptr};
+  number::Number *detection_min_number{nullptr};
+  number::Number *detection_max_number{nullptr};
+  number::Number *entry_threshold_min_number{nullptr};
+  number::Number *entry_threshold_max_number{nullptr};
+  number::Number *exit_threshold_min_number{nullptr};
+  number::Number *exit_threshold_max_number{nullptr};
+  number::Number *entry_roi_height_number{nullptr};
+  number::Number *exit_roi_height_number{nullptr};
+  number::Number *roi_width_number{nullptr};
+  number::Number *roi_height_number{nullptr};
+  number::Number *entry_roi_center_number{nullptr};
+  number::Number *exit_roi_center_number{nullptr};
+  number::Number *calibration_offset_number{nullptr};
+  number::Number *calibration_crosstalk_number{nullptr};
+  switch_::Switch *log_fallback_switch{nullptr};
+  switch_::Switch *force_single_core_switch{nullptr};
+  switch_::Switch *calibration_persistence_switch{nullptr};
+  switch_::Switch *invert_direction_switch{nullptr};
+  select::Select *filter_mode_select{nullptr};
+  select::Select *ranging_select{nullptr};
+  select::Select *refresh_select{nullptr};
   sensor::Sensor *max_threshold_entry_sensor{nullptr};
   sensor::Sensor *max_threshold_exit_sensor{nullptr};
   sensor::Sensor *min_threshold_entry_sensor{nullptr};
@@ -214,6 +265,7 @@ class Roode : public PollingComponent {
   void publish_feature_list();
   const RangingMode *determine_ranging_mode(uint16_t average_entry_zone_distance, uint16_t average_exit_zone_distance);
   void publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax);
+  void publish_config_numbers();
   void updateCounter(int delta);
   Orientation orientation_{Parallel};
   uint8_t samples{2};

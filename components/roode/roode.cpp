@@ -616,6 +616,15 @@ const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_dis
 }
 
 void Roode::calibrate_zones() {
+  if (entry == nullptr || exit == nullptr || distanceSensor == nullptr) {
+    ESP_LOGE(SETUP, "Cannot calibrate zones - uninitialized pointers");
+    return;
+  }
+  if (entry->roi == nullptr || entry->threshold == nullptr || exit->roi == nullptr ||
+      exit->threshold == nullptr) {
+    ESP_LOGE(SETUP, "Cannot calibrate zones - zone configuration missing");
+    return;
+  }
   ESP_LOGI(SETUP, "Calibrating sensor zones");
 
   entry->reset_roi(orientation_ == Parallel ? 167 : 195);

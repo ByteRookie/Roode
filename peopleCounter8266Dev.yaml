@@ -1,6 +1,14 @@
 substitutions:
   devicename: roode8266dev
   friendly_name: $devicename
+  log_fallback_events: "false"
+  log_fallback_restore_mode: "RESTORE_DEFAULT_OFF"
+  force_single_core: "false"
+  force_single_core_restore_mode: "RESTORE_DEFAULT_OFF"
+  calibration_persistence: "false"
+  calibration_persistence_restore_mode: "RESTORE_DEFAULT_OFF"
+  zones_invert: "true"
+  zones_invert_restore_mode: "RESTORE_DEFAULT_ON"
 
 external_components:
   refresh: always
@@ -12,6 +20,14 @@ esphome:
   board: d1_mini
 
 wifi:
+  on_boot:
+    priority: 600
+    then:
+      - lambda: |-
+          id(roode_platform)->set_log_fallback_events(id(roode_log_fallback_events).state);
+          id(roode_platform)->set_force_single_core(id(roode_force_single_core).state);
+          id(roode_platform)->set_calibration_persistence(id(roode_calibration_persistence).state);
+          id(roode_platform)->set_invert_direction(id(roode_zones_invert).state);
   networks:
     - ssid: !secret ssid1
       password: !secret ssid1_password
@@ -67,6 +83,9 @@ roode:
   # I removed the { size: 1 } option here since it was redundant.
   # Can always add back later if we have more sampling paramaters.
   sampling: 1
+  log_fallback_events: ${log_fallback_events}
+  force_single_core: ${force_single_core}
+  calibration_persistence: ${calibration_persistence}
   # defaults for both zones
   roi:
     # height: 14
@@ -75,7 +94,7 @@ roode:
     # min: 234mm # absolute distance
     max: 85% # percent based on idle distance
   zones:
-    invert: true
+    invert: ${zones_invert}
     entry:
       roi: auto
     exit:
@@ -110,6 +129,40 @@ binary_sensor:
       name: $friendly_name presence
     sensor_xshut_state:
       name: $friendly_name xshut state
+switch:
+  - platform: template
+    name: $friendly_name log fallback events
+    id: roode_log_fallback_events
+    restore_mode: ${log_fallback_restore_mode}
+    turn_on_action:
+      - lambda: id(roode_platform)->set_log_fallback_events(true);
+    turn_off_action:
+      - lambda: id(roode_platform)->set_log_fallback_events(false);
+  - platform: template
+    name: $friendly_name force single core
+    id: roode_force_single_core
+    restore_mode: ${force_single_core_restore_mode}
+    turn_on_action:
+      - lambda: id(roode_platform)->set_force_single_core(true);
+    turn_off_action:
+      - lambda: id(roode_platform)->set_force_single_core(false);
+  - platform: template
+    name: $friendly_name calibration persistence
+    id: roode_calibration_persistence
+    restore_mode: ${calibration_persistence_restore_mode}
+    turn_on_action:
+      - lambda: id(roode_platform)->set_calibration_persistence(true);
+    turn_off_action:
+      - lambda: id(roode_platform)->set_calibration_persistence(false);
+  - platform: template
+    name: $friendly_name invert zones
+    id: roode_zones_invert
+    restore_mode: ${zones_invert_restore_mode}
+    turn_on_action:
+      - lambda: id(roode_platform)->set_invert_direction(true);
+    turn_off_action:
+      - lambda: id(roode_platform)->set_invert_direction(false);
+
 
 sensor:
   - platform: roode

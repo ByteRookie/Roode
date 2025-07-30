@@ -332,6 +332,11 @@ reflections cause false triggers.
 | `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
 | `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
 
+Roode also exposes switches for `log_fallback_events`, `force_single_core`,
+`calibration_persistence` and `zones.invert`. These switches default to the values
+configured above and keep their state across reboots so you can toggle the
+behavior from Home Assistant without editing YAML.
+
 
 ### Example Configurations
 

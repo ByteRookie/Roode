@@ -128,7 +128,12 @@ void Roode::dump_config() {
 
 void Roode::setup() {
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
+  // `register_service` is only available when API services are enabled.
+  // Guard the call so that the component can compile even when the
+  // USE_API_SERVICES compile-time flag is disabled.
+#ifdef USE_API_SERVICES
   this->register_service(&Roode::start_passive_scan, "start_passive_scan");
+#endif
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
   }

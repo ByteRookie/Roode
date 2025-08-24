@@ -1,5 +1,8 @@
 #include "roode.h"
 #include "Arduino.h"
+#ifdef CONFIG_IDF_TARGET_ESP32
+#include "esp_task_wdt.h"
+#endif
 #include <string>
 #include <optional>
 #include <vector>
@@ -298,8 +301,7 @@ void Roode::loop() {
   } else {
     invalid_read_count_ = 0;
   }
-  if (invalid_read_count_ > invalid_distance_limit_ &&
-      (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
+  if (invalid_read_count_ > invalid_distance_limit_ && (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
     ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
     restart_sensor();
   }
@@ -374,11 +376,23 @@ void Roode::path_tracking(Zone *zone) {
     if (presence_sensor != nullptr) {
       presence_sensor->publish_state(true);
     }
+    if (zone->id == 0 && entry_presence_sensor != nullptr) {
+      entry_presence_sensor->publish_state(true);
+    }
+    if (zone->id == 1 && exit_presence_sensor != nullptr) {
+      exit_presence_sensor->publish_state(true);
+    }
     if (zone_triggered_start_[zone->id] == 0) {
       zone_triggered_start_[zone->id] = millis();
     }
   }
   if (CurrentZoneStatus == NOBODY) {
+    if (zone->id == 0 && entry_presence_sensor != nullptr) {
+      entry_presence_sensor->publish_state(false);
+    }
+    if (zone->id == 1 && exit_presence_sensor != nullptr) {
+      exit_presence_sensor->publish_state(false);
+    }
     zone_triggered_start_[zone->id] = 0;
   } else if (zone_triggered_start_[zone->id] != 0 && millis() - zone_triggered_start_[zone->id] >= 10000 &&
              millis() - last_valid_crossing_ts_ >= 120000) {
@@ -750,7 +764,6 @@ void Roode::publish_feature_list() {
   log_event(std::string("features_enabled: ") + feature_list);
 }
 
-
 void Roode::update_status_text(const std::string &status) {
   if (status_text_sensor != nullptr && status != last_status_text_) {
     status_text_sensor->publish_state(status);
@@ -766,11 +779,16 @@ void Roode::restart_sensor() {
 
 void Roode::sensor_task(void *param) {
   auto *self = static_cast<Roode *>(param);
+#ifdef CONFIG_IDF_TARGET_ESP32
+  esp_task_wdt_add(nullptr);
+#endif
   for (;;) {
+#ifdef CONFIG_IDF_TARGET_ESP32
+    esp_task_wdt_reset();
+#endif
     self->use_sensor_task_ = true;
     uint32_t now = millis();
-    if (self->last_loop_update_ts_ != 0 &&
-        (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
+    if (self->last_loop_update_ts_ != 0 && (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
         (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
       ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", self->restart_timeout_ms_ / 1000);
       self->restart_sensor();

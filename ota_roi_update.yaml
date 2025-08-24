@@ -1,0 +1,26 @@
+---
+esphome:
+  name: roode32
+
+esp32:
+  board: wemos_d1_mini32
+
+wifi:
+  ssid: !secret ssid1
+  password: !secret ssid1_password
+
+api:
+
+ota:
+
+external_components:
+  - source: github://Lyr3x/Roode
+
+vl53l1x:
+  sensor_id: 1
+  calibration:
+    ranging: short
+
+roode:
+  id: roode_platform
+  roi_result: roi_result.json

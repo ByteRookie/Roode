@@ -10,6 +10,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Automatic Calibration (Home Assistant Setup)](#automatic-calibration-home-assistant-setup)
 - [Hardware Recommendations](#hardware-recommendations)
 - [Wiring](#wiring)
   - [ESP32](#esp32)
@@ -39,6 +40,34 @@ A people counter that works with any smart home system that supports ESPHome/MQT
    - [peopleCounter32.yaml](peopleCounter32.yaml)
    - [peopleCounter8266.yaml](peopleCounter8266.yaml)
 3. Flash it with `esphome run peopleCounter32.yaml` (replace with your file).
+
+## Automatic Calibration (Home Assistant Setup)
+
+Roode can now determine its own idle distance and zone thresholds. The sensor
+recalibrates itself after power‑up and periodically during operation, so no
+manual tuning is required. The steps below show how to enable the automatic
+calibration workflow in Home Assistant without any coding knowledge:
+
+1. **Flash Roode using the example YAML** from the Quick Start above.
+2. **Copy the dashboard**: place `homeassistant/roode_dashboard.yaml` in your
+   Home Assistant configuration folder and add it as a Lovelace view.
+3. **Add helpers and automation**: copy the `input_select` and automation shown
+   in [home_assistant.md](home_assistant.md) into your `configuration.yaml` so
+   Home Assistant can request a passive scan.
+4. **Install helper scripts**: copy `homeassistant/python_scripts/start_passive_scan.py`
+   and `homeassistant/python_scripts/apply_roi_result.py` into the
+   `python_scripts/` directory of Home Assistant.
+5. **Restart Home Assistant**. A new *Roode* dashboard with a *Start Scan*
+   button appears.
+6. **Run a scan**: press *Start Scan*, walk through the doorway once, and wait
+   until the dashboard shows the result.
+7. **Accept the result**: click *Accept ROI* to apply the automatically
+   calculated region of interest and thresholds. The device updates itself via
+   OTA and begins counting immediately.
+
+After each reboot, leave the monitored area empty for about 10 seconds so the
+sensor can capture a clean baseline. Roode then recalibrates itself every few
+hours to maintain accuracy.
 
 ## Hardware Recommendations
 

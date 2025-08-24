@@ -129,6 +129,10 @@ class Roode : public PollingComponent {
   }
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
+  void set_cpu_optimization_thresholds(float activate, float deactivate) {
+    cpu_opt_activate_threshold_ = activate;
+    cpu_opt_deactivate_threshold_ = deactivate;
+  }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
@@ -186,6 +190,8 @@ class Roode : public PollingComponent {
 
   bool cpu_optimizations_active_{false};
   uint16_t polling_interval_ms_{10};
+  float cpu_opt_activate_threshold_{90.0f};
+  float cpu_opt_deactivate_threshold_{50.0f};
 
   static bool log_fallback_events_;
   static Roode *instance_;

@@ -529,21 +529,27 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
 }
 
 void Roode::apply_cpu_optimizations(float cpu) {
-  if (cpu_optimizations_active_ || cpu <= 90.0f)
+  if (cpu_optimizations_active_ || cpu <= cpu_opt_activate_threshold_)
     return;
   ESP_LOGW(TAG, "CPU usage %.1f%% exceeded threshold, applying optimizations", cpu);
   polling_interval_ms_ = 30;
-  filter_window_ = 3;
-  entry->set_filter_window(3);
-  exit->set_filter_window(3);
-  filter_mode_ = FILTER_PERCENTILE10;
-  entry->set_filter_mode(FILTER_PERCENTILE10);
-  exit->set_filter_mode(FILTER_PERCENTILE10);
+
+  // Avoid extremely small windows and accuracy-reducing filters.
+  if (filter_window_ < 5) {
+    filter_window_ = 5;
+    entry->set_filter_window(5);
+    exit->set_filter_window(5);
+  }
+  if (filter_mode_ != FILTER_MEDIAN) {
+    filter_mode_ = FILTER_MEDIAN;
+    entry->set_filter_mode(FILTER_MEDIAN);
+    exit->set_filter_mode(FILTER_MEDIAN);
+  }
   cpu_optimizations_active_ = true;
 }
 
 void Roode::reset_cpu_optimizations(float cpu) {
-  if (!cpu_optimizations_active_ || cpu > 50.0f)
+  if (!cpu_optimizations_active_ || cpu > cpu_opt_deactivate_threshold_)
     return;
   ESP_LOGI(TAG, "CPU usage %.1f%% stable, reverting optimizations", cpu);
   polling_interval_ms_ = 10;

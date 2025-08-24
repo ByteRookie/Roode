@@ -37,6 +37,9 @@ CONF_LOG_FALLBACK = "log_fallback_events"
 CONF_FORCE_SINGLE_CORE = "force_single_core"
 CONF_INVALID_DISTANCE_LIMIT = "invalid_distance_limit"
 CONF_RESTART_TIMEOUT = "restart_timeout"
+CONF_CPU_OPTIMIZATION = "cpu_optimization"
+CONF_ACTIVATE = "activate"
+CONF_DEACTIVATE = "deactivate"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -95,6 +98,12 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
         cv.Optional(CONF_INVALID_DISTANCE_LIMIT, default=10): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_RESTART_TIMEOUT, default="30s"): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_CPU_OPTIMIZATION, default={}): cv.Schema(
+            {
+                cv.Optional(CONF_ACTIVATE, default=0.90): cv.percentage,
+                cv.Optional(CONF_DEACTIVATE, default=0.50): cv.percentage,
+            }
+        ),
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
                 cv.Optional(CONF_INVERT, default=False): cv.boolean,
@@ -122,6 +131,13 @@ async def to_code(config: Dict):
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
     cg.add(roode.set_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT]))
     cg.add(roode.set_restart_timeout(config[CONF_RESTART_TIMEOUT]))
+    cpu_conf = config.get(CONF_CPU_OPTIMIZATION, {})
+    cg.add(
+        roode.set_cpu_optimization_thresholds(
+            cpu_conf.get(CONF_ACTIVATE, 0.90) * 100.0,
+            cpu_conf.get(CONF_DEACTIVATE, 0.50) * 100.0,
+        )
+    )
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)

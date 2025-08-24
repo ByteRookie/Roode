@@ -1,5 +1,8 @@
 #include "roode.h"
 #include "Arduino.h"
+#ifdef CONFIG_IDF_TARGET_ESP32
+#include "esp_task_wdt.h"
+#endif
 #include <string>
 #include <optional>
 #include <vector>
@@ -766,7 +769,13 @@ void Roode::restart_sensor() {
 
 void Roode::sensor_task(void *param) {
   auto *self = static_cast<Roode *>(param);
+#ifdef CONFIG_IDF_TARGET_ESP32
+  esp_task_wdt_add(nullptr);
+#endif
   for (;;) {
+#ifdef CONFIG_IDF_TARGET_ESP32
+    esp_task_wdt_reset();
+#endif
     self->use_sensor_task_ = true;
     uint32_t now = millis();
     if (self->last_loop_update_ts_ != 0 &&

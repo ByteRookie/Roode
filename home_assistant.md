@@ -60,6 +60,29 @@ timestamped `passive_scan_YYYY-MM-DD_HH-MM/` directory with an empty
 `session.json` and dispatches an `esphome.<node>_start_passive_scan`
 command to the ESPHome node.
 
+## Calibration Dashboard
+
+Import the Lovelace view in `homeassistant/roode_dashboard.yaml` to add a
+dedicated panel for running scans and reviewing results. The view provides
+buttons to start a passive scan, accept the computed ROI or rerun the
+calibration.
+
+To expose advanced tuning options, add an `input_boolean` that acts as a
+"Show expert parameters" toggle:
+
+```
+input_boolean:
+  roode_show_expert:
+    name: Show expert parameters
+```
+
+Place `homeassistant/python_scripts/apply_roi_result.py` alongside the scan
+script. When the *Accept* button is pressed, the script copies the most
+recent `roi_result.json` into the Home Assistant configuration directory so
+it can be used for an OTA update. After a scan finishes, the panel displays
+ROI dimensions and detection thresholds; enabling *Show expert parameters*
+reveals additional tunable defaults.
+
 ## Calibration Session Data
 
 Calibration measurements are written to timestamped folders using the

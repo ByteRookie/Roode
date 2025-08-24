@@ -197,6 +197,10 @@ roode:
   invalid_distance_limit: 10
   # Minimum time between automatic sensor restarts
   restart_timeout: 30s
+  # Apply less aggressive filtering only when CPU usage is high
+  cpu_optimization:
+    activate: 90%
+    deactivate: 50%
   # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
 
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
@@ -329,6 +333,7 @@ reflections cause false triggers.
 | `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: false` | `force_single_core: true` |
 | `roode.invalid_distance_limit` | Optional | `10` | Consecutive suspect readings before restart | Sporadic zero/4 m values | Increase if noise triggers resets | `invalid_distance_limit: 10` | `invalid_distance_limit: 20` |
 | `roode.restart_timeout` | Optional | `30s` | Cooldown and timeout before restart | Slow updates or many resets | Shorten for faster recovery | `restart_timeout: 30s` | `restart_timeout: 15s` |
+| `roode.cpu_optimization.activate` & `roode.cpu_optimization.deactivate` | Optional | `90%` / `50%` | CPU usage thresholds for enabling or disabling reduced filtering | High MCU load or disable with 100% | Raise `activate` or set to `100%` to turn off | `cpu_optimization: { activate: 90%, deactivate: 50% }` | `cpu_optimization: { activate: 95%, deactivate: 60% }` |
 | `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
 | `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
 

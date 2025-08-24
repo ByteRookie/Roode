@@ -185,8 +185,7 @@ void Roode::setup() {
   } else {
     calibrate_zones();
   }
-  last_calibration_ts_ =
-      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  last_calibration_ts_ = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
 #ifdef CONFIG_IDF_TARGET_ESP32
   if (!force_single_core_) {
     log_event("use_dual_core");
@@ -300,8 +299,7 @@ void Roode::loop() {
   } else {
     invalid_read_count_ = 0;
   }
-  if (invalid_read_count_ > invalid_distance_limit_ &&
-      (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
+  if (invalid_read_count_ > invalid_distance_limit_ && (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
     ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
     restart_sensor();
   }
@@ -320,8 +318,7 @@ void Roode::loop() {
   loop_count_++;
   update_metrics();
   uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
-  if (auto_calibration_interval_sec_ > 0 &&
-      now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
+  if (auto_calibration_interval_sec_ > 0 && now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
     run_zone_calibration(0);
     run_zone_calibration(1);
   }
@@ -511,6 +508,8 @@ void Roode::updateCounter(int delta) {
 }
 void Roode::recalibration() { calibrate_zones(); }
 
+void Roode::start_passive_scan() { ESP_LOGI(TAG, "Passive scan start command received"); }
+
 void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;
@@ -534,8 +533,7 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   // thresholds and ROI values immediately after a fail-safe recalibration
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
-  last_calibration_ts_ =
-      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  last_calibration_ts_ = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
 }
 
@@ -659,8 +657,7 @@ void Roode::calibrate_zones() {
     calibration_prefs_[1].save(&calibration_data_[1]);
   }
   ESP_LOGI(SETUP, "Finished calibrating sensor zones");
-  last_calibration_ts_ =
-      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  last_calibration_ts_ = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
 }
 
@@ -769,7 +766,6 @@ void Roode::publish_feature_list() {
   log_event(std::string("features_enabled: ") + feature_list);
 }
 
-
 void Roode::update_status_text(const std::string &status) {
   if (status_text_sensor != nullptr && status != last_status_text_) {
     status_text_sensor->publish_state(status);
@@ -799,8 +795,7 @@ void Roode::sensor_task(void *param) {
   for (;;) {
     self->use_sensor_task_ = true;
     uint32_t now = millis();
-    if (self->last_loop_update_ts_ != 0 &&
-        (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
+    if (self->last_loop_update_ts_ != 0 && (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
         (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
       ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", self->restart_timeout_ms_ / 1000);
       self->restart_sensor();

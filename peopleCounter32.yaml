@@ -28,13 +28,16 @@ wifi:
 
 captive_portal:
 
-api:
-  password: !secret api_password
-  reboot_timeout: 60min
-  services:
-    - service: recalibrate
-      then:
-        - lambda: "id(roode_platform)->recalibration();"
+  api:
+    password: !secret api_password
+    reboot_timeout: 60min
+    services:
+      - service: recalibrate
+        then:
+          - lambda: "id(roode_platform)->recalibration();"
+      - service: start_passive_scan
+        then:
+          - lambda: "id(roode_platform)->start_passive_scan();"
 
 ota:
   password: !secret ota_password

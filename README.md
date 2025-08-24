@@ -643,7 +643,8 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 Roode prints key events to the ESPHome logger. Set `log_fallback_events: true`
 in the `roode:` section to include interrupt fallbacks and XSHUT recovery
 details. Event logs cover power cycles of the sensor, automatic changes between
-interrupt and polling mode, and manual adjustments to the people count.
+interrupt and polling mode, and manual adjustments to the people count. Debug
+level messages were removed to keep output concise in production builds.
 
 ### Feature text sensor
 

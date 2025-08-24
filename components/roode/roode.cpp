@@ -312,9 +312,6 @@ void Roode::loop() {
     path_tracking(this->current_zone);
   handle_sensor_status();
   this->current_zone = this->current_zone == this->entry ? this->exit : this->entry;
-  // ESP_LOGI("Experimental", "Entry zone: %d, exit zone: %d",
-  // entry->getDistance(Roode::distanceSensor, Roode::sensor_status),
-  // exit->getDistance(Roode::distanceSensor, Roode::sensor_status)); unsigned
   unsigned long end = micros();
   unsigned long delta = end - start;
   loop_time_sum_ += delta;
@@ -371,9 +368,6 @@ void Roode::path_tracking(Zone *zone) {
     state_ = STATE_IDLE;
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
-
-  ESP_LOGV(TAG, "Zone %d distance %u (min=%u max=%u)", zone->id, zone->getMinDistance(), zone->threshold->min,
-           zone->threshold->max);
 
   // PathTrack algorithm
   if (zone->getMinDistance() < zone->threshold->max && zone->getMinDistance() > zone->threshold->min) {
@@ -443,14 +437,12 @@ void Roode::path_tracking(Zone *zone) {
 
   // if an event has occured
   if (AnEventHasOccured) {
-    ESP_LOGD(TAG, "Event has occured, AllZonesCurrentStatus: %d", AllZonesCurrentStatus);
     if (PathTrackFillingSize < 4) {
       PathTrackFillingSize++;
     }
 
     // if nobody anywhere lets check if an exit or entry has happened
     if ((LeftPreviousStatus == NOBODY) && (RightPreviousStatus == NOBODY)) {
-      ESP_LOGD(TAG, "Nobody anywhere, AllZonesCurrentStatus: %d", AllZonesCurrentStatus);
       // check exit or entry only if PathTrackFillingSize is 4 (for example 0 1
       // 3 2) and last event is 0 (nobobdy anywhere)
       if (PathTrackFillingSize == 4) {

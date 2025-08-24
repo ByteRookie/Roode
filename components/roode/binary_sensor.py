@@ -11,7 +11,7 @@ from . import Roode, CONF_ROODE_ID
 
 DEPENDENCIES = ["roode"]
 
-CONF_PRESENCE = "presence_sensor"
+CONF_PRESENCE = "presence"
 CONF_XSHUT_STATE = "sensor_xshut_state"
 TYPES = [CONF_PRESENCE, CONF_XSHUT_STATE]
 

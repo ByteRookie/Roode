@@ -231,6 +231,8 @@ class Roode : public PollingComponent {
   uint32_t restart_timeout_ms_{30000};
   uint8_t invalid_distance_limit_{10};
   uint8_t invalid_read_count_{0};
+  uint8_t restart_attempt_count_{0};
+  uint8_t max_restart_attempts_{3};
   static void sensor_task(void *param);
   bool use_sensor_task_{false};
   void restart_sensor();

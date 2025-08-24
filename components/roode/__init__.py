@@ -107,7 +107,7 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional(CONF_DEACTIVATE, default=0.50): cv.percentage,
             }
         ),
-        cv.Optional(CONF_ROI_RESULT): cv.file,
+        cv.Optional(CONF_ROI_RESULT): cv.file_,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
                 cv.Optional(CONF_INVERT, default=False): cv.boolean,

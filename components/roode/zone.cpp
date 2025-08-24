@@ -1,5 +1,7 @@
 #include "zone.h"
+#include "configuration.h"
 #include <algorithm>
+#include <Arduino.h>
 
 namespace esphome {
 namespace roode {
@@ -77,6 +79,7 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   std::vector<int> zone_distances;
   zone_distances.reserve(number_attempts);
   int sum = 0;
+  int delay_ms = configuration != nullptr ? configuration->getTimingBudget() : 0;
   for (int i = 0; i < number_attempts; i++) {
     this->readDistance(distanceSensor);
     if (sensor_status != VL53L1_ERROR_NONE) {
@@ -85,6 +88,8 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
     }
     zone_distances.push_back(this->getDistance());
     sum += zone_distances.back();
+    if (delay_ms > 0)
+      delay(delay_ms);
   };
   if (zone_distances.empty()) {
     threshold->idle = 0;
@@ -107,6 +112,15 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
 }
 
 void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Orientation orientation) {
+  if (configuration != nullptr) {
+    Zone cfg = configuration->getZoneConfiguration(id);
+    if (cfg.roi->width)
+      this->roi_override->width = cfg.roi->width;
+    if (cfg.roi->height)
+      this->roi_override->height = cfg.roi->height;
+    if (cfg.roi->center)
+      this->roi_override->center = cfg.roi->center;
+  }
   // the value of the average distance is used for computing the optimal size of the ROI and consequently also the
   // center of the two zones
   int function_of_the_distance = 16 * (1 - (0.15 * 2) / (0.34 * (min(entry_threshold, exit_threshold) / 1000)));

@@ -16,6 +16,7 @@ static const char *const TAG = "Zone";
 static const char *const CALIBRATION = "Zone calibration";
 namespace esphome {
 namespace roode {
+class Configuration;
 enum FilterMode { FILTER_MIN, FILTER_MEDIAN, FILTER_PERCENTILE10 };
 struct Threshold {
   /** Automatically determined idling distance (average of several measurements) */
@@ -32,7 +33,7 @@ struct Threshold {
 
 class Zone {
  public:
-  explicit Zone(uint8_t id) : id{id} {};
+  explicit Zone(uint8_t id, Configuration *config) : id{id}, configuration(config) {};
   ~Zone();
   void dump_config() const;
   VL53L1_Error readDistance(TofSensor *distanceSensor);
@@ -46,6 +47,7 @@ class Zone {
   ROI *roi = new ROI();
   ROI *roi_override = new ROI();
   Threshold *threshold = new Threshold();
+  Configuration *configuration;
   void set_filter_mode(FilterMode mode) { filter_mode_ = mode; }
   void set_filter_window(uint8_t window) {
     max_samples = std::min<uint8_t>(window, MAX_BUFFER_SIZE);

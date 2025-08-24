@@ -19,6 +19,7 @@ using TofSensor = esphome::vl53l1x::VL53L1X;
 
 namespace esphome {
 namespace roode {
+class Configuration;
 #define NOBODY 0
 #define SOMEONE 1
 #define VERSION "1.7.0"
@@ -67,7 +68,7 @@ class Roode : public PollingComponent {
   float get_setup_priority() const override { return setup_priority::PROCESSOR; };
 
   TofSensor *get_tof_sensor() { return this->distanceSensor; }
-  void set_tof_sensor(TofSensor *sensor) { this->distanceSensor = sensor; }
+  void set_tof_sensor(TofSensor *sensor);
   void set_invert_direction(bool dir) { invert_direction_ = dir; }
   void set_orientation(Orientation val) { orientation_ = val; }
   void set_sampling_size(uint8_t size) {
@@ -136,12 +137,13 @@ class Roode : public PollingComponent {
   void apply_cpu_optimizations(float cpu);
   void reset_cpu_optimizations(float cpu);
   void update_metrics();
-  Zone *entry = new Zone(0);
-  Zone *exit = new Zone(1);
+  Zone *entry{nullptr};
+  Zone *exit{nullptr};
   static void log_event(const std::string &msg);
 
  protected:
   TofSensor *distanceSensor;
+  Configuration *configuration_{nullptr};
   Zone *current_zone = entry;
   sensor::Sensor *distance_entry{nullptr};
   sensor::Sensor *distance_exit{nullptr};

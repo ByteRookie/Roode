@@ -7,7 +7,7 @@ static const char *const TAG = "Configuration";
 
 Zone Configuration::getZoneConfiguration(uint8_t zone) {
   // Create a zone object with default settings.
-  Zone cfg(zone);
+  Zone cfg(zone, this);
   return cfg;
 }
 

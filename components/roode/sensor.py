@@ -30,6 +30,9 @@ CONF_RAM_FREE = "ram_free"
 CONF_FLASH_FREE = "flash_free"
 CONF_MANUAL_ADJUST = "manual_adjustment_count"
 CONF_INTERRUPT_STATUS = "interrupt_status"
+CONF_VARIANCE_CV_MASK = "variance_cv_mask"
+CONF_TRIAL_BUMP_CV = "trial_bump_cv"
+CONF_SCAN_TIME_CAP_SECONDS = "scan_time_cap_seconds"
 
 CONFIG_SCHEMA = sensor.sensor_schema().extend(
     {
@@ -146,6 +149,27 @@ CONFIG_SCHEMA = sensor.sensor_schema().extend(
             accuracy_decimals=0,
             entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
+        cv.Optional(CONF_VARIANCE_CV_MASK): sensor.sensor_schema(
+            icon="mdi:chart-box",
+            unit_of_measurement="%",
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_TRIAL_BUMP_CV): sensor.sensor_schema(
+            icon="mdi:chart-line",
+            unit_of_measurement="%",
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_SCAN_TIME_CAP_SECONDS): sensor.sensor_schema(
+            icon="mdi:timer",
+            unit_of_measurement="s",
+            accuracy_decimals=1,
+            state_class=STATE_CLASS_MEASUREMENT,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
         cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
     }
 )
@@ -204,3 +228,12 @@ async def to_code(config):
     if CONF_MANUAL_ADJUST in config:
         count = await sensor.new_sensor(config[CONF_MANUAL_ADJUST])
         cg.add(var.set_manual_adjustment_sensor(count))
+    if CONF_VARIANCE_CV_MASK in config:
+        sens = await sensor.new_sensor(config[CONF_VARIANCE_CV_MASK])
+        cg.add(var.set_variance_cv_mask_sensor(sens))
+    if CONF_TRIAL_BUMP_CV in config:
+        sens = await sensor.new_sensor(config[CONF_TRIAL_BUMP_CV])
+        cg.add(var.set_trial_bump_cv_sensor(sens))
+    if CONF_SCAN_TIME_CAP_SECONDS in config:
+        sens = await sensor.new_sensor(config[CONF_SCAN_TIME_CAP_SECONDS])
+        cg.add(var.set_scan_time_cap_seconds_sensor(sens))

@@ -4,6 +4,7 @@
 #include <optional>
 #include <vector>
 #include <algorithm>
+#include <cmath>
 #include <ctime>
 #include <sstream>
 
@@ -791,6 +792,34 @@ void Roode::start_passive_scan() {
       for (const char *mode : modes) {
         std::vector<int> mcps(grid * grid, 0);
         std::vector<int> distance(grid * grid, 0);
+        float mean_mcps = 0.0f;
+        for (int v : mcps)
+          mean_mcps += v;
+        mean_mcps /= mcps.size();
+        float var_mcps = 0.0f;
+        for (int v : mcps) {
+          float diff = v - mean_mcps;
+          var_mcps += diff * diff;
+        }
+        var_mcps /= mcps.size();
+        float cv_mask = mean_mcps != 0.0f ? (sqrtf(var_mcps) / mean_mcps) * 100.0f : 0.0f;
+        if (variance_cv_mask_sensor != nullptr)
+          variance_cv_mask_sensor->publish_state(cv_mask);
+
+        float mean_dist = 0.0f;
+        for (int v : distance)
+          mean_dist += v;
+        mean_dist /= distance.size();
+        float var_dist = 0.0f;
+        for (int v : distance) {
+          float diff = v - mean_dist;
+          var_dist += diff * diff;
+        }
+        var_dist /= distance.size();
+        float cv_trial = mean_dist != 0.0f ? (sqrtf(var_dist) / mean_dist) * 100.0f : 0.0f;
+        if (trial_bump_cv_sensor != nullptr)
+          trial_bump_cv_sensor->publish_state(cv_trial);
+
         std::stringstream mcps_ss;
         mcps_ss << '[';
         for (size_t i = 0; i < mcps.size(); ++i) {
@@ -823,6 +852,9 @@ void Roode::start_passive_scan() {
     }
   }
   publish_scan_record("scan_complete");
+  float elapsed = (millis() - scan_start_ts_) / 1000.0f;
+  if (scan_time_cap_seconds_sensor != nullptr)
+    scan_time_cap_seconds_sensor->publish_state(elapsed);
 }
 
 void Roode::restart_sensor() {

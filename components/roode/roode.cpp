@@ -185,6 +185,8 @@ void Roode::setup() {
   } else {
     calibrate_zones();
   }
+  last_calibration_ts_ =
+      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
 #ifdef CONFIG_IDF_TARGET_ESP32
   if (!force_single_core_) {
     log_event("use_dual_core");
@@ -317,6 +319,12 @@ void Roode::loop() {
   loop_time_sum_ += delta;
   loop_count_++;
   update_metrics();
+  uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
+  if (auto_calibration_interval_sec_ > 0 &&
+      now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
+    run_zone_calibration(0);
+    run_zone_calibration(1);
+  }
   delay(polling_interval_ms_);
 }
 
@@ -382,6 +390,7 @@ void Roode::path_tracking(Zone *zone) {
     zone_triggered_start_[zone->id] = 0;
   } else if (zone_triggered_start_[zone->id] != 0 && millis() - zone_triggered_start_[zone->id] >= 10000 &&
              millis() - last_valid_crossing_ts_ >= 120000) {
+    ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone->id);
     run_zone_calibration(zone->id);
     fail_safe_triggered_ = true;
     zone_triggered_start_[zone->id] = 0;
@@ -503,7 +512,7 @@ void Roode::updateCounter(int delta) {
 void Roode::recalibration() { calibrate_zones(); }
 
 void Roode::run_zone_calibration(uint8_t zone_id) {
-  ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone_id);
+  ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;
   z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
   z->calibrateThreshold(distanceSensor, 50);
@@ -525,6 +534,8 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   // thresholds and ROI values immediately after a fail-safe recalibration
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
+  last_calibration_ts_ =
+      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
 }
 
@@ -642,6 +653,8 @@ void Roode::calibrate_zones() {
     calibration_prefs_[1].save(&calibration_data_[1]);
   }
   ESP_LOGI(SETUP, "Finished calibrating sensor zones");
+  last_calibration_ts_ =
+      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
 }
 

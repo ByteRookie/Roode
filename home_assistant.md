@@ -23,3 +23,32 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
     data:
       newCount: "{{ states('input_number.set_people32') | int }}"
 ```
+
+## Calibration Session Data
+
+Calibration measurements are written to timestamped folders using the
+pattern `calibration_YYYY-MM-DD_HH-MM/`.  Each session directory
+initially contains a `session.json` file holding the raw records defined
+in `components/roode/schema.py`.  After post-analysis, an additional
+`roi_result.json` file may be stored in the same directory.
+
+Example layout:
+
+```
+calibration_2024-04-23_14-30/
+├── session.json
+└── roi_result.json
+```
+
+Within `session.json` every entry uses the following fields:
+
+- `type` – record type identifier
+- `grid` – ROI grid or positional reference
+- `trial` – sequential trial number
+- `ranging` – raw ranging value in millimetres
+- `timestamp` – ISO 8601 timestamp when recorded
+- `data` – arbitrary metadata
+
+Timestamps use a `YYYY-MM-DD_HH-MM` prefix for the directory and ISO 8601
+format within the JSON entries.  Using this naming convention allows
+other components to discover and share session data reliably.

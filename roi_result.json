@@ -1,0 +1,18 @@
+{
+  "grid": 8,
+  "mode": "short",
+  "roi": {
+    "width": 6,
+    "height": 16,
+    "center": 195
+  },
+  "zones": {
+    "entry": {"center": 167},
+    "exit": {"center": 231}
+  },
+  "thresholds": {
+    "min": 0.10,
+    "max": 0.85
+  },
+  "recommended_trials": 25
+}

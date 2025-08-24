@@ -56,7 +56,12 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
       min_distance = tmp[0];
       break;
   }
-
+  if (distance_sensor != nullptr) {
+    distance_sensor->publish_state(min_distance);
+  }
+  if (occupancy_sensor != nullptr) {
+    occupancy_sensor->publish_state(min_distance < threshold->max && min_distance > threshold->min);
+  }
   return sensor_status;
 }
 

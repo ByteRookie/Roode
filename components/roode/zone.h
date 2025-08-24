@@ -6,6 +6,8 @@
 #include "esphome/core/application.h"
 #include "esphome/core/log.h"
 #include "esphome/core/optional.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/components/sensor/sensor.h"
 #include "../vl53l1x/vl53l1x.h"
 #include "orientation.h"
 
@@ -54,6 +56,8 @@ class Zone {
     samples.fill(0);
   }
   void set_max_samples(uint8_t max) { set_filter_window(max); };
+  void set_occupancy_sensor(binary_sensor::BinarySensor *sens) { occupancy_sensor = sens; }
+  void set_distance_sensor(sensor::Sensor *sens) { distance_sensor = sens; }
 
  protected:
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
@@ -66,6 +70,8 @@ class Zone {
   uint8_t sample_count_{0};
   uint8_t max_samples{2};
   FilterMode filter_mode_{FILTER_MIN};
+  binary_sensor::BinarySensor *occupancy_sensor{nullptr};
+  sensor::Sensor *distance_sensor{nullptr};
 };
 }  // namespace roode
 }  // namespace esphome

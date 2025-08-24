@@ -8,6 +8,7 @@
 #include "esphome/core/component.h"
 #include "esphome/core/gpio.h"
 #include "esphome/core/log.h"
+#include "esphome/components/sensor/sensor.h"
 #include "ranging.h"
 #include "roi.h"
 
@@ -52,6 +53,7 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   void set_offset(int16_t val) { this->offset = val; }
   void set_xtalk(uint16_t val) { this->xtalk = val; }
   void set_timeout(uint16_t val) { this->timeout = val; }
+  void set_error_sensor(sensor::Sensor *sensor) { error_sensor_ = sensor; }
 
   bool is_interrupt_enabled() const { return interrupt_active_ && interrupt_pin.has_value(); }
 
@@ -59,14 +61,14 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   VL53L1X_ULD sensor;
   optional<GPIOPin *> xshut_pin{};
   optional<InternalGPIOPin *> interrupt_pin{};
-  const RangingMode * ranging_mode{};
+  const RangingMode *ranging_mode{};
   /** Mode from user config, which can be get/set independently of current mode */
   optional<const RangingMode *> ranging_mode_override{};
   optional<int16_t> offset{};
   optional<uint16_t> xtalk{};
   uint16_t timeout{};
- ROI *last_roi{};
- int recovery_count_{0};
+  ROI *last_roi{};
+  int recovery_count_{0};
   uint8_t sensor_id_{0};
   uint8_t desired_address_{0x29};
   static std::vector<VL53L1X *> sensors;
@@ -82,6 +84,8 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   bool check_features();
   bool validate_interrupt();
 
+  void publish_error(VL53L1_Error error);
+
   void soft_reset();
   void record_failure();
 
@@ -89,8 +93,8 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   uint8_t interrupt_miss_count_{0};
   uint32_t last_interrupt_retry_{0};
   uint8_t consecutive_failures_{0};
+  sensor::Sensor *error_sensor_{nullptr};
 };
 
 }  // namespace vl53l1x
 }  // namespace esphome
-

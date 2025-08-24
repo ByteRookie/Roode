@@ -9,10 +9,18 @@ from esphome.const import (
     UNIT_EMPTY,
     ENTITY_CATEGORY_DIAGNOSTIC,
 )
-from . import Roode, CONF_ROODE_ID
+from . import (
+    Roode,
+    CONF_ROODE_ID,
+    CONF_ZONES,
+    CONF_ENTRY_ZONE,
+    CONF_EXIT_ZONE,
+    NullableSchema,
+)
 
 DEPENDENCIES = ["roode"]
 
+CONF_DISTANCE = "distance"
 CONF_DISTANCE_ENTRY = "distance_entry"
 CONF_DISTANCE_EXIT = "distance_exit"
 CONF_MAX_THRESHOLD_ENTRY = "max_threshold_entry"
@@ -31,6 +39,16 @@ CONF_FLASH_FREE = "flash_free"
 CONF_MANUAL_ADJUST = "manual_adjustment_count"
 CONF_INTERRUPT_STATUS = "interrupt_status"
 
+ZONE_SCHEMA = NullableSchema(
+    {cv.Optional(CONF_DISTANCE): sensor.sensor_schema(
+        icon=ICON_RULER,
+        unit_of_measurement="mm",
+        accuracy_decimals=0,
+        state_class=STATE_CLASS_MEASUREMENT,
+        entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+    )}
+)
+
 CONFIG_SCHEMA = sensor.sensor_schema().extend(
     {
         cv.Optional(CONF_DISTANCE_ENTRY): sensor.sensor_schema(
@@ -46,6 +64,12 @@ CONFIG_SCHEMA = sensor.sensor_schema().extend(
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
             entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional(CONF_ZONES, default={}): NullableSchema(
+            {
+                cv.Optional(CONF_ENTRY_ZONE, default={}): ZONE_SCHEMA,
+                cv.Optional(CONF_EXIT_ZONE, default={}): ZONE_SCHEMA,
+            }
         ),
         cv.Optional(CONF_MAX_THRESHOLD_ENTRY): sensor.sensor_schema(
             icon="mdi:map-marker-distance",
@@ -153,6 +177,15 @@ CONFIG_SCHEMA = sensor.sensor_schema().extend(
 
 async def to_code(config):
     var = await cg.get_variable(config[CONF_ROODE_ID])
+    zones = config.get(CONF_ZONES, {})
+    entry_zone = zones.get(CONF_ENTRY_ZONE, {})
+    exit_zone = zones.get(CONF_EXIT_ZONE, {})
+    if CONF_DISTANCE in entry_zone:
+        distance = await sensor.new_sensor(entry_zone[CONF_DISTANCE])
+        cg.add(var.set_distance_entry(distance))
+    if CONF_DISTANCE in exit_zone:
+        distance = await sensor.new_sensor(exit_zone[CONF_DISTANCE])
+        cg.add(var.set_distance_exit(distance))
     if CONF_DISTANCE_ENTRY in config:
         distance = await sensor.new_sensor(config[CONF_DISTANCE_ENTRY])
         cg.add(var.set_distance_entry(distance))

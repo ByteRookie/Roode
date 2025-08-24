@@ -49,7 +49,6 @@ A people counter that works with any smart home system that supports ESPHome/MQT
   - Black PCB chinese sensor
   - Pimoroni
 - 1A Power Supply **Do not use an USB port of your computer!**
-- Enclosure (see models in [STL/](STL))
   Pins:
   SDA_PIN 4 (ESP8266) or 21 (ESP32)
   SCL_PIN 5 (ESP8266) or 22 (ESP32)
@@ -364,22 +363,32 @@ This allows the current people count to be adjusted easily via Home Assistant.
 ```yaml
 binary_sensor:
   - platform: roode
-    presence_sensor:
+    presence:
       name: $friendly_name presence
     sensor_xshut_state:
       name: $friendly_name xshut state
+    zones:
+      entry:
+        presence:
+          name: $friendly_name entry occupied
+      exit:
+        presence:
+          name: $friendly_name exit occupied
 
 sensor:
   - platform: roode
     id: hallway
-    distance_entry:
-      name: $friendly_name distance zone 0
-      filters:
-        - delta: 100.0
-    distance_exit:
-      name: $friendly_name distance zone 1
-      filters:
-        - delta: 100.0
+    zones:
+      entry:
+        distance:
+          name: $friendly_name Entry Distance
+          filters:
+            - delta: 100.0
+      exit:
+        distance:
+          name: $friendly_name Exit Distance
+          filters:
+            - delta: 100.0
     max_threshold_entry:
       name: $friendly_name max zone 0
     max_threshold_exit:
@@ -410,6 +419,10 @@ sensor:
       name: $friendly_name interrupt status
     manual_adjustment_count:
       name: $friendly_name manual adjusts
+
+  - platform: vl53l1x
+    error:
+      name: Sensor Error
 
 text_sensor:
   - platform: roode

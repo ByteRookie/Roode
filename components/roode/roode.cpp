@@ -128,7 +128,7 @@ void Roode::dump_config() {
 
 void Roode::setup() {
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
-  this->register_service(&Roode::start_passive_scan, "start_passive_scan");
+  register_service(&Roode::start_passive_scan, "start_passive_scan");
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
   }
@@ -502,9 +502,6 @@ void Roode::updateCounter(int delta) {
   call.perform();
 }
 void Roode::recalibration() { calibrate_zones(); }
-
-void Roode::start_passive_scan() { ESP_LOGI(TAG, "Passive scan start command received"); }
-
 void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;

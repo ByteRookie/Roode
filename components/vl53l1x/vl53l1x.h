@@ -52,7 +52,6 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   void set_offset(int16_t val) { this->offset = val; }
   void set_xtalk(uint16_t val) { this->xtalk = val; }
   void set_timeout(uint16_t val) { this->timeout = val; }
-  void set_interrupt_enabled(bool enabled) { this->interrupt_active_ = enabled; }
 
   bool is_interrupt_enabled() const { return interrupt_active_ && interrupt_pin.has_value(); }
 

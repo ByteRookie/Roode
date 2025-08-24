@@ -52,3 +52,17 @@ Within `session.json` every entry uses the following fields:
 Timestamps use a `YYYY-MM-DD_HH-MM` prefix for the directory and ISO 8601
 format within the JSON entries.  Using this naming convention allows
 other components to discover and share session data reliably.
+
+### Collecting Calibration Sessions
+
+A helper script `session_recorder.py` listens for the device's WebSocket
+messages and stores them in `session.json`:
+
+```bash
+python session_recorder.py ws://device.local/session
+```
+
+Each JSON payload from the device is appended as a line to the session file.
+When a message with `type` set to `scan_complete` is received, the script
+closes the file and optionally runs a follow-up analysis command supplied via
+`--analysis`.

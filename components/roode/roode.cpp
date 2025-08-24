@@ -765,9 +765,20 @@ void Roode::update_status_text(const std::string &status) {
 }
 
 void Roode::restart_sensor() {
+  uint32_t now = millis();
+  if (now - last_sensor_restart_ts_ > restart_timeout_ms_)
+    restart_attempt_count_ = 0;
+  restart_attempt_count_++;
+  ESP_LOGW(TAG, "sensor_restart_attempt_%u", restart_attempt_count_);
+  log_event(std::string("sensor_restart_attempt_") + std::to_string(restart_attempt_count_));
   distanceSensor->restart();
-  last_sensor_restart_ts_ = millis();
+  last_sensor_restart_ts_ = now;
   invalid_read_count_ = 0;
+  if (restart_attempt_count_ >= max_restart_attempts_) {
+    ESP_LOGE(TAG, "sensor_restart_escalating_reset");
+    log_event("sensor_restart_escalating_reset");
+    ESP.restart();
+  }
 }
 
 void Roode::sensor_task(void *param) {

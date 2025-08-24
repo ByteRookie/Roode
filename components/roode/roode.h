@@ -113,6 +113,9 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
   void set_sensor_status_text_sensor(text_sensor::TextSensor *sensor_) { status_text_sensor = sensor_; }
   void set_manual_adjustment_sensor(sensor::Sensor *sens) { manual_adjustment_sensor = sens; }
+  void set_variance_cv_mask_sensor(sensor::Sensor *sens) { variance_cv_mask_sensor = sens; }
+  void set_trial_bump_cv_sensor(sensor::Sensor *sens) { trial_bump_cv_sensor = sens; }
+  void set_scan_time_cap_seconds_sensor(sensor::Sensor *sens) { scan_time_cap_seconds_sensor = sens; }
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
@@ -174,6 +177,9 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   text_sensor::TextSensor *status_text_sensor{nullptr};
   sensor::Sensor *manual_adjustment_sensor{nullptr};
   sensor::Sensor *interrupt_status_sensor{nullptr};
+  sensor::Sensor *variance_cv_mask_sensor{nullptr};
+  sensor::Sensor *trial_bump_cv_sensor{nullptr};
+  sensor::Sensor *scan_time_cap_seconds_sensor{nullptr};
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;

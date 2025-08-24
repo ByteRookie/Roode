@@ -32,6 +32,9 @@ api:
     - service: recalibrate
       then:
         - lambda: "id(roode_platform)->recalibration();"
+    - service: start_passive_scan
+      then:
+        - lambda: "id(roode_platform)->start_passive_scan();"
 
 ota:
   password: !secret ota_password

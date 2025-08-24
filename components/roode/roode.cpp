@@ -510,6 +510,8 @@ void Roode::updateCounter(int delta) {
 }
 void Roode::recalibration() { calibrate_zones(); }
 
+void Roode::start_passive_scan() { ESP_LOGI(TAG, "Passive scan start command received"); }
+
 void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;

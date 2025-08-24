@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.1
+- Remove debug logging and cleanup unused code
+
 ## 1.6.0
 - Auto restart sensors via XSHUT with multiplexing support
 - Startup pin validation with built‑in pull-ups

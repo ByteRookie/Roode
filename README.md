@@ -364,7 +364,7 @@ This allows the current people count to be adjusted easily via Home Assistant.
 ```yaml
 binary_sensor:
   - platform: roode
-    presence_sensor:
+    presence:
       name: $friendly_name presence
     sensor_xshut_state:
       name: $friendly_name xshut state
@@ -452,7 +452,7 @@ calibration:6:01PM
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | `people_counter` | number | Adjustable tally of detected people |
-| `presence_sensor` | binary_sensor | True while movement is detected |
+| `presence` | binary_sensor | True while movement is detected |
 | `sensor_xshut_state` | binary_sensor | Current level of the XSHUT power pin |
 | `distance_entry` | sensor | Measured distance in the entry zone |
 | `distance_exit` | sensor | Measured distance in the exit zone |

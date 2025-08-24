@@ -128,7 +128,7 @@ void Roode::dump_config() {
 
 void Roode::setup() {
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
-  register_service(&Roode::start_passive_scan, "start_passive_scan");
+  this->register_service(&Roode::start_passive_scan, "start_passive_scan");
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
   }

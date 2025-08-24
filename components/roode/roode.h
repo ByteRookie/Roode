@@ -139,7 +139,6 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
-  void start_passive_scan();
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
   void set_exit_threshold_percentages(uint8_t min, uint8_t max) { exit->set_threshold_percentages(min, max); }
   void apply_cpu_optimizations(float cpu);

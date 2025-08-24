@@ -9,6 +9,7 @@
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
+#include "esphome/components/api/custom_api_device.h"
 #include "../vl53l1x/vl53l1x.h"
 #include "esphome/core/preferences.h"
 #include "orientation.h"
@@ -55,7 +56,7 @@ static int time_budget_in_ms_medium_long = 50;
 static int time_budget_in_ms_long = 100;
 static int time_budget_in_ms_max = 200;  // max range: 4m
 
-class Roode : public PollingComponent {
+class Roode : public PollingComponent, public api::CustomAPIDevice {
  public:
   Roode() { instance_ = this; }
   void setup() override;
@@ -140,6 +141,7 @@ class Roode : public PollingComponent {
   void apply_cpu_optimizations(float cpu);
   void reset_cpu_optimizations(float cpu);
   void update_metrics();
+  void start_passive_scan();
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
   static void log_event(const std::string &msg);
@@ -198,6 +200,10 @@ class Roode : public PollingComponent {
   static bool log_fallback_events_;
   static Roode *instance_;
   int manual_adjustment_count_{0};
+  uint32_t scan_start_ts_{0};
+  uint32_t scan_record_count_{0};
+
+  void publish_scan_record(const std::string &payload);
   float expected_counter_{0};
   bool force_single_core_{false};
   TaskHandle_t sensor_task_handle_{nullptr};

@@ -15,10 +15,12 @@ A people counter that works with any smart home system that supports ESPHome/MQT
   - [ESP32](#esp32)
   - [ESP8266](#esp8266)
 - [Configuration](#configuration)
+  - [Minimal Configuration](#minimal-configuration)
   - [Platform Setup](#platform-setup)
   - [Interrupt vs Polling](#interrupt-vs-polling)
   - [Single vs Dual Core](#single-vs-dual-core)
   - [Sampling and Filtering](#sampling-and-filtering)
+  - [Default Values and Safe Tuning Ranges](#default-values-and-safe-tuning-ranges)
 - [Configuration Reference](#configuration-reference)
   - [Example Configurations](#example-configurations)
   - [Sensors](#sensors)
@@ -26,6 +28,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 - [Algorithm](#algorithm)
 - [Features](#features)
 - [Logging and Diagnostics](#logging-and-diagnostics)
+- [Calibration Workflow](#calibration-workflow)
 - [FAQ/Troubleshoot](#faqtroubleshoot)
 - [License](#license)
 
@@ -89,11 +92,9 @@ Ps=0 (when connected to GND): In the IIC mode, the user can operate the chip by 
 
 ## Configuration
 
-### Platform Setup
+### Minimal Configuration
 
-Roode is provided as an external_component which means it is easy to set up in any ESPHome sensor configuration file.
-
-Other than base ESPHome configuration the only config that's needed for Roode is
+Add the following to any ESPHome node to enable Roode with sensible defaults:
 
 ```yaml
 external_components:
@@ -103,7 +104,13 @@ vl53l1x:
 roode:
 ```
 
-This uses the recommended default configuration.
+- `external_components` fetches Roode from GitHub on each build.
+- `vl53l1x` activates the VL53L1X distance sensor with its default settings.
+- `roode` starts the people-counting logic using the recommended defaults.
+
+### Platform Setup
+
+Roode is provided as an external_component which means it is easy to set up in any ESPHome sensor configuration file. The minimal setup above works out of the box. The following sections describe optional configuration for advanced use.
 
 However, we offer a lot of flexibility. Here's the full configuration spelled out.
 
@@ -311,6 +318,17 @@ reflections cause false triggers.
 | `3` | General smoothing | Slightly slower response |
 | `5+` | Suppress false triggers | Laggy detection |
 | `1` | Maximum responsiveness | No noise rejection |
+
+### Default Values and Safe Tuning Ranges
+
+- **ROI** – default `{ height: 16, width: 6 }`. Change each dimension by 2–4 units if the doorway is unusually narrow or wide.
+- **detection_thresholds** – default `min: 0%`, `max: 85%`. Raise `min` in ~5 % (≈50 mm) steps to ignore door swings. Adjust `max` between 70 % and 90 % when traffic is very close or far.
+- **sampling** – default `2`. Values `1–5` balance responsiveness against noise.
+- **filter_window** – default `3`. Windows of `5–9` suppress spikes but slow detection.
+- **restart_timeout** – default `30s`. A range of `15s–60s` is generally safe.
+- **invalid_distance_limit** – default `10`. Tune between `5` and `20` depending on noise level.
+
+Tweak one parameter at a time and verify performance before making further adjustments.
 
 ### Configuration Reference
 
@@ -652,6 +670,17 @@ Optional sensors provide insight into Roode's operation:
 See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
 these sensors.
 
+
+## Calibration Workflow
+
+1. In Home Assistant expose an `input_select` like `roode_action` with a `start_passive_scan` option.
+2. An automation calls the `python_script.start_passive_scan` helper, sending `esphome.<node>_start_passive_scan` to the device.
+3. Run `session_recorder.py` to log WebSocket output into a timestamped `calibration_*/session.json` directory.
+4. After the scan, process the session folder with `roi_analysis.py` to produce an `roi_result.json` file.
+5. Use `apply_roi_result.py` to copy the result into Home Assistant so a build like `ota_roi_update.yaml` can include it.
+6. Compile and upload the new firmware; Roode applies the updated ROI automatically.
+
+This flow makes it possible to trigger calibration from Home Assistant and roll out optimized settings without manual flashing.
 
 ## FAQ/Troubleshoot
 

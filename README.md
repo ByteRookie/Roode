@@ -196,6 +196,8 @@ roode:
   invalid_distance_limit: 10
   # Minimum time between automatic sensor restarts
   restart_timeout: 30s
+  # Number of readings taken when calibrating each zone
+  calibration_attempts: 20
   # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
 
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
@@ -328,6 +330,7 @@ reflections cause false triggers.
 | `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: false` | `force_single_core: true` |
 | `roode.invalid_distance_limit` | Optional | `10` | Consecutive suspect readings before restart | Sporadic zero/4 m values | Increase if noise triggers resets | `invalid_distance_limit: 10` | `invalid_distance_limit: 20` |
 | `roode.restart_timeout` | Optional | `30s` | Cooldown and timeout before restart | Slow updates or many resets | Shorten for faster recovery | `restart_timeout: 30s` | `restart_timeout: 15s` |
+| `roode.calibration_attempts` | Optional | `20` | Samples per zone during calibration | Faster or more precise calibration | Lower for quick boot, raise if calibration is noisy | `calibration_attempts: 20` | `calibration_attempts: 40` |
 | `roode.zones.invert` | Optional | `false` | Swap entry and exit zones | Counts appear reversed | Set true then recalibrate | `zones: { invert: false }` | `zones: { invert: true }` |
 | `roode.zones.entry/exit` | Optional | none | Per-zone ROI and thresholds | Uneven hallway or obstacles | Tweak each zone separately as needed | *(not set)* | `zones:`<br>`  exit:`<br>`    roi:`<br>`      height: 8` |
 

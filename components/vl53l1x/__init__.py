@@ -32,6 +32,7 @@ CONF_RANGING_MODE = "ranging"
 CONF_XSHUT = "xshut"
 CONF_XTALK = "crosstalk"
 CONF_SENSOR_ID = "sensor_id"
+CONF_VL53L1X_ID = "vl53l1x_id"
 
 Ranging = vl53l1x_ns.namespace("Ranging")
 RANGING_MODES = {

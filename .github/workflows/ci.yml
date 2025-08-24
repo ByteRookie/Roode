@@ -18,9 +18,9 @@ jobs:
     name: Validate ${{ matrix.esp }} config
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@master
+        uses: actions/setup-python@v5
         with:
           python-version: "3.x"
       - name: Install ESPHome
@@ -41,9 +41,9 @@ jobs:
     name: Build ${{ matrix.esp }} firmware
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@master
+        uses: actions/setup-python@v5
         with:
           python-version: "3.x"
       - name: Install ESPHome

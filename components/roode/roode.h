@@ -107,7 +107,6 @@ class Roode : public PollingComponent {
     entry_exit_event_sensor = entry_exit_event_sensor_;
   }
   void set_xshut_state_binary_sensor(binary_sensor::BinarySensor *sens) { xshut_state_binary_sensor = sens; }
-  void set_sensor_xshut_state_binary_sensor(binary_sensor::BinarySensor *sens) { xshut_state_binary_sensor = sens; }
   void set_interrupt_status_sensor(sensor::Sensor *sens) { interrupt_status_sensor = sens; }
   void set_enabled_features_text_sensor(text_sensor::TextSensor *sensor_) { enabled_features_sensor = sensor_; }
   void set_sensor_status_text_sensor(text_sensor::TextSensor *sensor_) { status_text_sensor = sensor_; }
@@ -129,6 +128,7 @@ class Roode : public PollingComponent {
   }
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
+  void set_calibration_attempts(uint8_t attempts) { calibration_attempts_ = attempts; }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
@@ -218,7 +218,7 @@ class Roode : public PollingComponent {
   Orientation orientation_{Parallel};
   uint8_t samples{2};
   bool invert_direction_{false};
-  int number_attempts = 20;  // TO DO: make this configurable
+  uint8_t calibration_attempts_{20};
   int short_distance_threshold = 1300;
   int medium_distance_threshold = 2000;
   int medium_long_distance_threshold = 2700;

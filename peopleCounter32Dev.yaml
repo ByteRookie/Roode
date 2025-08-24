@@ -78,6 +78,8 @@ roode:
   detection_thresholds: # defaults for both zones. These also default to 0% & 85% as previously done.
     # min: 234mm # absolute distance
     max: 85% # percent based on idle distance
+  # Number of readings taken when calibrating each zone
+  calibration_attempts: 20
   zones:
     invert: true
     entry:

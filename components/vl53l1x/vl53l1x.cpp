@@ -344,6 +344,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
       roode::Roode::log_event("sensor.recovered_via_xshut");
       recovery_count_++;
     }
+    publish_error(status);
     record_failure();
     return {};
   }

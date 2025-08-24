@@ -37,6 +37,7 @@ CONF_LOG_FALLBACK = "log_fallback_events"
 CONF_FORCE_SINGLE_CORE = "force_single_core"
 CONF_INVALID_DISTANCE_LIMIT = "invalid_distance_limit"
 CONF_RESTART_TIMEOUT = "restart_timeout"
+CONF_CALIBRATION_ATTEMPTS = "calibration_attempts"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -95,6 +96,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
         cv.Optional(CONF_INVALID_DISTANCE_LIMIT, default=10): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_RESTART_TIMEOUT, default="30s"): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_CALIBRATION_ATTEMPTS, default=20): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
                 cv.Optional(CONF_INVERT, default=False): cv.boolean,
@@ -122,6 +124,7 @@ async def to_code(config: Dict):
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
     cg.add(roode.set_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT]))
     cg.add(roode.set_restart_timeout(config[CONF_RESTART_TIMEOUT]))
+    cg.add(roode.set_calibration_attempts(config[CONF_CALIBRATION_ATTEMPTS]))
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)

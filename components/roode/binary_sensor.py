@@ -55,7 +55,7 @@ async def to_code(config: Dict):
         )
     if CONF_XSHUT_STATE in config:
         cg.add(
-            roode.set_sensor_xshut_state_binary_sensor(
+            roode.set_xshut_state_binary_sensor(
                 await new_binary_sensor(config[CONF_XSHUT_STATE])
             )
         )

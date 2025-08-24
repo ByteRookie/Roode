@@ -6,7 +6,7 @@ from esphome.components.sensor import new_sensor, sensor_schema
 from esphome.const import (
     ENTITY_CATEGORY_DIAGNOSTIC,
 )
-from . import VL53L1X, CONF_VL53L1X_ID
+from .. import VL53L1X, CONF_VL53L1X_ID
 
 DEPENDENCIES = ["vl53l1x"]
 

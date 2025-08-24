@@ -99,8 +99,14 @@ class Roode : public PollingComponent {
   void set_cpu_usage_sensor(sensor::Sensor *sens) { cpu_usage_sensor = sens; }
   void set_ram_free_sensor(sensor::Sensor *sens) { ram_free_sensor = sens; }
   void set_flash_free_sensor(sensor::Sensor *sens) { flash_free_sensor = sens; }
-  void set_presence_sensor_binary_sensor(binary_sensor::BinarySensor *presence_sensor_) {
+  void set_presence_binary_sensor(binary_sensor::BinarySensor *presence_sensor_) {
     presence_sensor = presence_sensor_;
+  }
+  void set_entry_presence_binary_sensor(binary_sensor::BinarySensor *sens) {
+    entry->set_occupancy_sensor(sens);
+  }
+  void set_exit_presence_binary_sensor(binary_sensor::BinarySensor *sens) {
+    exit->set_occupancy_sensor(sens);
   }
   void set_version_text_sensor(text_sensor::TextSensor *version_sensor_) { version_sensor = version_sensor_; }
   void set_entry_exit_event_text_sensor(text_sensor::TextSensor *entry_exit_event_sensor_) {

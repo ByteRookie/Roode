@@ -19,21 +19,20 @@ from . import (
 
 DEPENDENCIES = ["roode"]
 
-CONF_OCCUPANCY = "presence"
+CONF_PRESENCE = "presence"
 CONF_XSHUT_STATE = "sensor_xshut_state"
+TYPES = [CONF_PRESENCE, CONF_XSHUT_STATE]
 
 OCCUPANCY_SCHEMA = BINARY_SENSOR_SCHEMA.extend(
-    {
-        cv.Optional(CONF_DEVICE_CLASS, default=DEVICE_CLASS_OCCUPANCY): validate_device_class,
-    }
+    {cv.Optional(CONF_DEVICE_CLASS, default=DEVICE_CLASS_OCCUPANCY): validate_device_class}
 )
 
-ZONE_SCHEMA = NullableSchema({cv.Optional(CONF_OCCUPANCY): OCCUPANCY_SCHEMA})
+ZONE_SCHEMA = NullableSchema({cv.Optional(CONF_PRESENCE): OCCUPANCY_SCHEMA})
 
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
-        cv.Optional(CONF_OCCUPANCY): OCCUPANCY_SCHEMA,
+        cv.Optional(CONF_PRESENCE): OCCUPANCY_SCHEMA,
         cv.Optional(CONF_XSHUT_STATE): BINARY_SENSOR_SCHEMA,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
@@ -45,30 +44,23 @@ CONFIG_SCHEMA = cv.Schema(
 )
 
 
+async def setup_conf(config, key, hub):
+    if key in config:
+        sens = await new_binary_sensor(config[key])
+        cg.add(getattr(hub, f"set_{key}_binary_sensor")(sens))
+
+
 async def to_code(config: Dict):
-    roode = await cg.get_variable(config[CONF_ROODE_ID])
-    if CONF_OCCUPANCY in config:
-        cg.add(
-            roode.set_presence_sensor_binary_sensor(
-                await new_binary_sensor(config[CONF_OCCUPANCY])
-            )
-        )
-    if CONF_XSHUT_STATE in config:
-        cg.add(
-            roode.set_xshut_state_binary_sensor(
-                await new_binary_sensor(config[CONF_XSHUT_STATE])
-            )
-        )
-    await to_code_zone(CONF_ENTRY_ZONE, config, roode)
-    await to_code_zone(CONF_EXIT_ZONE, config, roode)
+    hub = await cg.get_variable(config[CONF_ROODE_ID])
+    for key in TYPES:
+        await setup_conf(config, key, hub)
+    zones = config.get(CONF_ZONES, {})
+    entry = zones.get(CONF_ENTRY_ZONE, {})
+    if CONF_PRESENCE in entry:
+        sens = await new_binary_sensor(entry[CONF_PRESENCE])
+        cg.add(hub.set_entry_presence_binary_sensor(sens))
+    exit_ = zones.get(CONF_EXIT_ZONE, {})
+    if CONF_PRESENCE in exit_:
+        sens = await new_binary_sensor(exit_[CONF_PRESENCE])
+        cg.add(hub.set_exit_presence_binary_sensor(sens))
 
-
-async def to_code_zone(name: str, config: Dict, roode: cg.MockObj):
-    zone_config = config.get(CONF_ZONES, {}).get(name, {})
-    zone_var = cg.MockObj(f"{roode}->{name}", "->")
-    if CONF_OCCUPANCY in zone_config:
-        cg.add(
-            zone_var.set_occupancy_sensor(
-                await new_binary_sensor(zone_config[CONF_OCCUPANCY])
-            )
-        )

@@ -468,7 +468,7 @@ calibration:6:01PM
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | `people_counter` | number | Adjustable tally of detected people |
-| `presence_sensor` | binary_sensor | True while movement is detected |
+| `presence` | binary_sensor | True while movement is detected |
 | `sensor_xshut_state` | binary_sensor | Current level of the XSHUT power pin |
 | `distance_entry` | sensor | Measured distance in the entry zone |
 | `distance_exit` | sensor | Measured distance in the exit zone |
@@ -486,6 +486,7 @@ calibration:6:01PM
 | `flash_free` | sensor | Free flash storage percent |
 | `sensor_status` | sensor | Numeric VL53L1X status code (0=ok) |
 | `interrupt_status` | sensor | VL53L1X GPIO1 interrupt pin level |
+| `error` (vl53l1x) | sensor | Raw VL53L1X driver error code |
 | `manual_adjustment_count` | sensor | Total manual people-count corrections |
 | `version` | text_sensor | Firmware version string |
 | `entry_exit_event` | text_sensor | Last entry or exit direction |

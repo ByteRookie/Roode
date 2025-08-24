@@ -8,7 +8,8 @@ external_components:
 
 esphome:
   name: $devicename
-  platform: ESP8266
+
+esp8266:
   board: d1_mini
 
 wifi:
@@ -108,7 +109,7 @@ binary_sensor:
   - platform: status
     name: $friendly_name API Status
   - platform: roode
-    presence_sensor:
+    presence:
       name: $friendly_name presence
     sensor_xshut_state:
       name: $friendly_name xshut state

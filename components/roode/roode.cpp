@@ -1,4 +1,5 @@
 #include "roode.h"
+#include "configuration.h"
 #include "Arduino.h"
 #ifdef CONFIG_IDF_TARGET_ESP32
 #include "esp_task_wdt.h"
@@ -115,9 +116,21 @@ void Roode::log_event(const std::string &msg) {
   }
 }
 
+void Roode::set_tof_sensor(TofSensor *sensor) {
+  this->distanceSensor = sensor;
+  if (configuration_ == nullptr)
+    configuration_ = new Configuration(sensor);
+  if (entry == nullptr)
+    entry = new Zone(0, configuration_);
+  if (exit == nullptr)
+    exit = new Zone(1, configuration_);
+  current_zone = entry;
+}
+
 Roode::~Roode() {
   delete entry;
   delete exit;
+  delete configuration_;
 }
 void Roode::dump_config() {
   ESP_LOGCONFIG(TAG, "Roode:");

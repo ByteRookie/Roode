@@ -305,11 +305,9 @@ void Roode::loop() {
     restart_sensor();
   }
   unsigned long start = micros();
-  VL53L1_Error status = this->current_zone->readDistance(distanceSensor);
-  if (status == VL53L1_ERROR_NONE)
-    last_loop_update_ts_ = millis();
-  uint16_t dist = this->current_zone->getDistance();
-  if (status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
+  getZoneDistance();
+  uint16_t dist = getDistance();
+  if (sensor_status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
     invalid_read_count_++;
   } else {
     invalid_read_count_ = 0;
@@ -322,7 +320,7 @@ void Roode::loop() {
                    current_zone->getMinDistance() > current_zone->threshold->min;
   if (!cpu_optimizations_active_ || zone_trig)
     path_tracking(this->current_zone);
-  handle_sensor_status();
+  handleSensorStatus();
   this->current_zone = this->current_zone == this->entry ? this->exit : this->entry;
   // ESP_LOGI("Experimental", "Entry zone: %d, exit zone: %d",
   // entry->getDistance(Roode::distanceSensor, Roode::sensor_status),
@@ -335,7 +333,26 @@ void Roode::loop() {
   delay(polling_interval_ms_);
 }
 
-bool Roode::handle_sensor_status() {
+void Roode::getZoneDistance() {
+  VL53L1_Error status = this->current_zone->readDistance(distanceSensor);
+  if (status == VL53L1_ERROR_NONE) {
+    last_loop_update_ts_ = millis();
+  }
+  sensor_status = status;
+}
+
+uint16_t Roode::getDistance() { return this->current_zone->getDistance(); }
+
+void Roode::sendCounter(uint16_t counter) {
+  if (people_counter == nullptr)
+    return;
+  expected_counter_ = counter;
+  auto call = people_counter->make_call();
+  call.set_value(static_cast<float>(counter));
+  call.perform();
+}
+
+bool Roode::handleSensorStatus() {
   bool check_status = false;
   std::string text_state;
   if (distanceSensor->is_failed()) {
@@ -527,7 +544,10 @@ void Roode::updateCounter(int delta) {
   call.set_value(next);
   call.perform();
 }
-void Roode::recalibration() { calibrate_zones(); }
+void Roode::recalibration() {
+  run_zone_calibration(0);
+  run_zone_calibration(1);
+}
 
 void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone_id);
@@ -807,11 +827,9 @@ void Roode::sensor_task(void *param) {
       self->restart_sensor();
     }
     unsigned long start = micros();
-    VL53L1_Error status = self->current_zone->readDistance(self->distanceSensor);
-    if (status == VL53L1_ERROR_NONE)
-      self->last_loop_update_ts_ = millis();
-    uint16_t dist = self->current_zone->getDistance();
-    if (status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
+    self->getZoneDistance();
+    uint16_t dist = self->getDistance();
+    if (self->sensor_status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
       self->invalid_read_count_++;
     } else {
       self->invalid_read_count_ = 0;
@@ -825,7 +843,7 @@ void Roode::sensor_task(void *param) {
                      self->current_zone->getMinDistance() > self->current_zone->threshold->min;
     if (!self->cpu_optimizations_active_ || zone_trig)
       self->path_tracking(self->current_zone);
-    self->handle_sensor_status();
+    self->handleSensorStatus();
     self->current_zone = self->current_zone == self->entry ? self->exit : self->entry;
     unsigned long end = micros();
     unsigned long delta = end - start;

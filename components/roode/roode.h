@@ -130,6 +130,10 @@ class Roode : public PollingComponent {
   }
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
+  void getZoneDistance();
+  uint16_t getDistance();
+  void sendCounter(uint16_t counter);
+  bool handleSensorStatus();
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
@@ -211,7 +215,6 @@ class Roode : public PollingComponent {
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
   void path_tracking(Zone *zone);
-  bool handle_sensor_status();
   void update_status_text(const std::string &status);
   void calibrateDistance();
   void calibrate_zones();

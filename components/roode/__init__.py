@@ -1,4 +1,6 @@
 from typing import Dict, Union
+import json
+from pathlib import Path
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import (
@@ -40,6 +42,7 @@ CONF_RESTART_TIMEOUT = "restart_timeout"
 CONF_CPU_OPTIMIZATION = "cpu_optimization"
 CONF_ACTIVATE = "activate"
 CONF_DEACTIVATE = "deactivate"
+CONF_ROI_RESULT = "roi_result"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -104,6 +107,7 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional(CONF_DEACTIVATE, default=0.50): cv.percentage,
             }
         ),
+        cv.Optional(CONF_ROI_RESULT): cv.file,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
                 cv.Optional(CONF_INVERT, default=False): cv.boolean,
@@ -138,6 +142,16 @@ async def to_code(config: Dict):
             cpu_conf.get(CONF_DEACTIVATE, 0.50) * 100.0,
         )
     )
+    roi_file = config.get(CONF_ROI_RESULT)
+    if roi_file:
+        data = json.load(Path(roi_file).open())
+        entry_z = config[CONF_ZONES][CONF_ENTRY_ZONE]
+        exit_z = config[CONF_ZONES][CONF_EXIT_ZONE]
+        config[CONF_ROI].update(data.get("roi", {}))
+        entry_z[CONF_ROI][CONF_CENTER] = data["zones"]["entry"]["center"]
+        exit_z[CONF_ROI][CONF_CENTER] = data["zones"]["exit"]["center"]
+        config[CONF_DETECTION_THRESHOLDS].update(data.get("thresholds", {}))
+
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
     setup_zone(CONF_ENTRY_ZONE, config, roode)
     setup_zone(CONF_EXIT_ZONE, config, roode)

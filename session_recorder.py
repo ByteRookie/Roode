@@ -19,7 +19,12 @@ from typing import Iterable, Optional
 import websockets
 
 
-async def record_session(url: str, session_dir: Path, analysis_cmd: Optional[Iterable[str]]) -> None:
+async def record_session(
+    url: str,
+    session_dir: Path,
+    analysis_cmd: Optional[Iterable[str]],
+    scan_time_cap: Optional[float],
+) -> None:
     """Subscribe to ``url`` and write JSON messages to ``session_dir``.
 
     Args:
@@ -30,13 +35,30 @@ async def record_session(url: str, session_dir: Path, analysis_cmd: Optional[Ite
     session_dir.mkdir(parents=True, exist_ok=True)
     session_file = session_dir / "session.json"
 
+    start_time = datetime.now()
+    last_scan_start: Optional[datetime] = None
     async with websockets.connect(url) as ws, session_file.open("a", encoding="utf-8") as fh:
         async for message in ws:
-            fh.write(message.strip() + "\n")
             try:
                 payload = json.loads(message)
             except json.JSONDecodeError:
+                fh.write(message.strip() + "\n")
                 continue
+
+            now = datetime.now()
+            payload.setdefault("timestamp", now.isoformat())
+
+            if payload.get("type") == "passive_scan":
+                if last_scan_start:
+                    payload["scan_duration"] = (now - last_scan_start).total_seconds()
+                last_scan_start = now
+                if scan_time_cap and payload.get("grid") == 16:
+                    if (now - start_time).total_seconds() > scan_time_cap:
+                        fh.write(json.dumps(payload) + "\n")
+                        break
+
+            fh.write(json.dumps(payload) + "\n")
+
             if payload.get("type") == "scan_complete":
                 break
 
@@ -58,6 +80,12 @@ def parse_args() -> argparse.Namespace:
         nargs=argparse.REMAINDER,
         help="Command to run after scan_complete (session path appended)",
     )
+    parser.add_argument(
+        "--scan-time-cap",
+        type=float,
+        default=None,
+        help="Abort remaining 16x16 scans after given seconds",
+    )
     return parser.parse_args()
 
 
@@ -68,7 +96,7 @@ def main() -> None:
         if args.session_dir
         else Path(datetime.now().strftime("calibration_%Y-%m-%d_%H-%M"))
     )
-    asyncio.run(record_session(args.url, session_dir, args.analysis))
+    asyncio.run(record_session(args.url, session_dir, args.analysis, args.scan_time_cap))
 
 
 if __name__ == "__main__":

@@ -15,23 +15,80 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, Iterable, List, Tuple
 
 import numpy as np
 
 
+RANGING_BUDGET = {
+    "short": 15,
+    "medium": 20,
+    "long": 33,
+}
+
+
 @dataclass
 class ScanGroup:
+    """Container for trials of the same grid/mode."""
+
     grid: int
     mode: str
     trials: List[np.ndarray]
+    timestamps: List[datetime]
+    idle_trials: List[np.ndarray]
 
     def stats(self) -> Tuple[np.ndarray, np.ndarray]:
         arr = np.stack(self.trials, axis=0)
         return arr.mean(axis=0), arr.var(axis=0)
 
+
+def mcps_floor(trials: Iterable[np.ndarray]) -> float:
+    """Compute MCPS floor as max(5, 10th percentile of all readings)."""
+
+    all_vals = np.concatenate([t for t in trials])
+    return float(max(5.0, np.percentile(all_vals, 10)))
+
+
+def cv_threshold(cv_values: np.ndarray) -> float:
+    """Return median(cv) + 0.5*MAD(cv) threshold."""
+
+    med = np.nanmedian(cv_values)
+    mad = np.nanmedian(np.abs(cv_values - med))
+    return float(med + 0.5 * mad)
+
+
+def apply_history(groups: Dict[Tuple[int, str], ScanGroup], session_dir: Path, half_life: float) -> Dict[Tuple[int, str], ScanGroup]:
+    """Merge historical sessions weighted by exponential decay."""
+
+    hist_file = session_dir / "history.json"
+    if not hist_file.exists():
+        return groups
+    try:
+        data = json.load(hist_file.open("r", encoding="utf-8"))
+    except Exception:
+        return groups
+    now = datetime.now()
+    for entry in data.get("sessions", []):
+        try:
+            ts = datetime.fromisoformat(entry["timestamp"])
+        except Exception:
+            continue
+        age_h = (now - ts).total_seconds() / 3600.0
+        weight = 0.5 ** (age_h / max(half_life, 1e-6))
+        for key_str, trial_list in entry.get("groups", {}).items():
+            grid_s, mode = key_str.split("|")
+            grid = int(grid_s)
+            groups.setdefault((grid, mode), ScanGroup(grid, mode, [], [], []))
+            grp = groups[(grid, mode)]
+            for arr in trial_list:
+                grp.trials.append(np.array(arr) * weight)
+    return groups
+
 def load_session(session_dir: Path) -> Dict[Tuple[int, str], ScanGroup]:
+    """Read ``session.json`` and group trials by grid/mode."""
+
     groups: Dict[Tuple[int, str], ScanGroup] = {}
     session_file = session_dir / "session.json"
     with session_file.open("r", encoding="utf-8") as fh:
@@ -45,28 +102,43 @@ def load_session(session_dir: Path) -> Dict[Tuple[int, str], ScanGroup]:
             grid = int(payload["grid"])
             mode = payload["ranging"]
             mcps = np.array(payload["data"]["mcps"], dtype=float)
-            groups.setdefault((grid, mode), ScanGroup(grid, mode, []))
-            groups[(grid, mode)].trials.append(mcps)
+            ts = datetime.fromisoformat(payload.get("timestamp")) if "timestamp" in payload else datetime.now()
+            groups.setdefault((grid, mode), ScanGroup(grid, mode, [], [], []))
+            grp = groups[(grid, mode)]
+            grp.trials.append(mcps)
+            grp.timestamps.append(ts)
+            idle = np.array(payload["data"].get("idle_mcps", []), dtype=float)
+            if idle.size:
+                grp.idle_trials.append(idle)
     return groups
 
 
-def stable_mask(mean: np.ndarray, var: np.ndarray) -> np.ndarray:
-    """Return mask of SPADs with MCPS>=10 and coefficient of variation<=0.1."""
+def stable_mask(mean: np.ndarray, var: np.ndarray, floor: float) -> np.ndarray:
+    """Mask dim/unstable SPADs using floor and CV heuristics."""
+
     with np.errstate(divide="ignore", invalid="ignore"):
         cv = np.sqrt(var) / mean
-    mask = (mean >= 10) & (cv <= 0.1)
-    mask |= (mean >= 10) & np.isnan(cv)
+    thresh = cv_threshold(cv)
+    mask = (mean >= floor) & (cv <= thresh)
+    mask |= (mean >= floor) & np.isnan(cv)
     return mask
 
 
-def weighted_centroid(weights: np.ndarray, mask: np.ndarray, grid: int) -> Tuple[float, float]:
+def weighted_centroid(weights: np.ndarray, mask: np.ndarray, grid: int, k: float = 0.3) -> Tuple[float, float]:
+    """Centroid of top ``k`` fraction of SPADs by MCPS."""
+
     coords = np.indices((grid, grid)).reshape(2, -1).T.astype(float)
-    pts = coords[mask]
     w = weights[mask]
-    if w.sum() == 0:
+    pts = coords[mask]
+    if len(w) == 0:
         return (grid - 1) / 2, (grid - 1) / 2
-    cx = np.sum(w * (pts[:, 0] + 0.5)) / np.sum(w)
-    cy = np.sum(w * (pts[:, 1] + 0.5)) / np.sum(w)
+    k = float(np.clip(k, 0.05, 1.0))
+    top_n = max(1, int(len(w) * k))
+    idx = np.argsort(w)[-top_n:]
+    w_top = w[idx]
+    pts_top = pts[idx]
+    cx = np.sum(w_top * (pts_top[:, 0] + 0.5)) / np.sum(w_top)
+    cy = np.sum(w_top * (pts_top[:, 1] + 0.5)) / np.sum(w_top)
     return cx, cy
 
 
@@ -78,6 +150,26 @@ def mask_bounds(mask: np.ndarray, grid: int) -> Tuple[int, int, int, int]:
     min_y = int(pts[:, 1].min())
     max_y = int(pts[:, 1].max())
     return min_x, max_x, min_y, max_y
+
+
+def snr(mean: np.ndarray, var: np.ndarray) -> np.ndarray:
+    """Signal-to-noise ratio for each SPAD."""
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.divide(mean, np.sqrt(var), out=np.zeros_like(mean), where=var > 0)
+
+
+def thresholds_from_idle(idle_samples: Iterable[np.ndarray], snr_vals: np.ndarray) -> Tuple[float, float]:
+    """Determine min/max thresholds using idle percentiles and SNR heuristics."""
+
+    if not idle_samples:
+        return 0.0, 0.85
+    samples = np.concatenate([s for s in idle_samples])
+    min_th = float(np.percentile(samples, 5))
+    max_th = float(np.percentile(samples, 95))
+    if np.nanmean(snr_vals) < 1.5:
+        max_th *= 0.9
+    return min_th, max_th
 
 
 def to_physical(x: float, y: float, grid: int) -> Tuple[float, float]:
@@ -112,26 +204,41 @@ def kmeans(points: np.ndarray, weights: np.ndarray, iterations: int = 100) -> np
     return centers
 
 
+def recommended_trials(var: np.ndarray, mean: np.ndarray) -> int:
+    """Return 5 if average CV across trials >0.20 else 3."""
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        cv = np.sqrt(var) / mean
+    avg_cv = np.nanmean(cv)
+    return 5 if avg_cv > 0.20 else 3
+
+
 def analyze(groups: Dict[Tuple[int, str], ScanGroup]) -> Dict[str, object]:
+    """Apply adaptive heuristics to determine ROI, thresholds and zones."""
+
     best_key = None
-    best_mask_count = -1
-    best_total = -1.0
+    best_var = float("inf")
+    best_budget = float("inf")
     best_data = {}
 
     for key, grp in groups.items():
         mean, var = grp.stats()
-        mask = stable_mask(mean, var)
-        count = mask.sum()
-        total = mean[mask].sum()
-        if count > best_mask_count or (count == best_mask_count and total > best_total):
+        floor = mcps_floor(grp.trials)
+        mask = stable_mask(mean, var, floor)
+        snr_vals = snr(mean, var)
+        var_score = np.nanmean(var[mask])
+        budget = RANGING_BUDGET.get(grp.mode, 999)
+        if var_score < best_var or (np.isclose(var_score, best_var) and budget < best_budget):
             best_key = key
-            best_mask_count = count
-            best_total = total
+            best_var = var_score
+            best_budget = budget
             best_data = {
                 "group": grp,
                 "mean": mean,
                 "var": var,
                 "mask": mask,
+                "snr": snr_vals,
+                "floor": floor,
             }
 
     if best_key is None:
@@ -139,8 +246,11 @@ def analyze(groups: Dict[Tuple[int, str], ScanGroup]) -> Dict[str, object]:
 
     grp: ScanGroup = best_data["group"]
     mean = best_data["mean"]
+    var = best_data["var"]
     mask = best_data["mask"]
+    snr_vals = best_data["snr"]
     grid = grp.grid
+
     cx, cy = weighted_centroid(mean, mask, grid)
     phys_x, phys_y = to_physical(cx, cy, grid)
     min_x, max_x, min_y, max_y = mask_bounds(mask, grid)
@@ -153,10 +263,19 @@ def analyze(groups: Dict[Tuple[int, str], ScanGroup]) -> Dict[str, object]:
     stable_weights = mean[mask]
     phys_pts = np.array([to_physical(x + 0.5, y + 0.5, grid) for x, y in stable_pts])
     centers = kmeans(phys_pts, stable_weights)
+    weights_clusters = []
+    for c in centers:
+        dists = ((phys_pts - c) ** 2).sum(axis=1)
+        weights_clusters.append(stable_weights[dists.argmin()])
+    if max(weights_clusters) / max(1.0, min(weights_clusters)) > 4:
+        centers = kmeans(phys_pts, stable_weights, iterations=200)
     if centers[0, 1] <= centers[1, 1]:
         entry_c, exit_c = centers[0], centers[1]
     else:
         entry_c, exit_c = centers[1], centers[0]
+
+    thr_min, thr_max = thresholds_from_idle(grp.idle_trials, snr_vals)
+    trials_needed = recommended_trials(var, mean)
 
     return {
         "grid": grid,
@@ -166,15 +285,39 @@ def analyze(groups: Dict[Tuple[int, str], ScanGroup]) -> Dict[str, object]:
             "entry": {"center": center_index(*entry_c)},
             "exit": {"center": center_index(*exit_c)},
         },
+        "thresholds": {"min": thr_min, "max": thr_max},
+        "recommended_trials": trials_needed,
     }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("session_dir", type=Path, help="Path to session directory")
+    parser.add_argument("--half-life", type=float, default=24.0, help="Historical weighting half-life in hours")
     args = parser.parse_args()
     groups = load_session(args.session_dir)
+    groups = apply_history(groups, args.session_dir, args.half_life)
     result = analyze(groups)
+    out_file = args.session_dir / "roi_result.json"
+    with out_file.open("w", encoding="utf-8") as fh:
+        json.dump(result, fh, indent=2)
+    hist_file = args.session_dir / "history.json"
+    history = {"sessions": []}
+    if hist_file.exists():
+        try:
+            history = json.load(hist_file.open("r", encoding="utf-8"))
+        except Exception:
+            history = {"sessions": []}
+    history["sessions"].append(
+        {
+            "timestamp": datetime.now().isoformat(),
+            "groups": {
+                f"{g.grid}|{g.mode}": [t.tolist() for t in g.trials]
+                for g in groups.values()
+            },
+        }
+    )
+    json.dump(history, hist_file.open("w", encoding="utf-8"), indent=2)
     print(json.dumps(result, indent=2))
 
 

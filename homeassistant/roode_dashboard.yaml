@@ -1,73 +1,75 @@
 title: Roode Calibration
-path: roode-calibration
-cards:
-  - type: vertical-stack
+views:
+  - title: Calibration
+    path: roode-calibration
     cards:
-      - type: button
-        name: Start Scan
-        icon: mdi:play
-        tap_action:
-          action: call-service
-          service: python_script.start_passive_scan
-          service_data:
-            device: roode32
-      - type: entity
-        entity: sensor.roode32_scan_time_cap_seconds
-        name: Scan duration
-      - type: entities
-        title: ROI & Thresholds
-        entities:
-          - entity: sensor.roode32_roi_height_zone_0
-            name: ROI height entry
-          - entity: sensor.roode32_roi_width_zone_0
-            name: ROI width entry
-          - entity: sensor.roode32_roi_height_zone_1
-            name: ROI height exit
-          - entity: sensor.roode32_roi_width_zone_1
-            name: ROI width exit
-          - entity: sensor.roode32_min_threshold_entry
-            name: Min threshold entry
-          - entity: sensor.roode32_max_threshold_entry
-            name: Max threshold entry
-          - entity: sensor.roode32_min_threshold_exit
-            name: Min threshold exit
-          - entity: sensor.roode32_max_threshold_exit
-            name: Max threshold exit
-      - type: horizontal-stack
+      - type: vertical-stack
         cards:
           - type: button
-            name: Accept
-            icon: mdi:check
-            tap_action:
-              action: call-service
-              service: python_script.apply_roi_result
-              service_data:
-                device: roode32
-          - type: button
-            name: Rerun
-            icon: mdi:refresh
+            name: Start Scan
+            icon: mdi:play
             tap_action:
               action: call-service
               service: python_script.start_passive_scan
               service_data:
                 device: roode32
-      - type: entities
-        entities:
-          - entity: input_boolean.roode_show_expert
-            name: Show expert parameters
-      - type: conditional
-        conditions:
-          - entity: input_boolean.roode_show_expert
-            state: "on"
-        card:
-          type: entities
-          title: Expert Parameters
-          entities:
-            - entity: number.roode_entry_threshold_min
-              name: Entry min threshold
-            - entity: number.roode_entry_threshold_max
-              name: Entry max threshold
-            - entity: number.roode_exit_threshold_min
-              name: Exit min threshold
-            - entity: number.roode_exit_threshold_max
-              name: Exit max threshold
+          - type: entity
+            entity: sensor.roode32_scan_time_cap_seconds
+            name: Scan duration
+          - type: entities
+            title: ROI & Thresholds
+            entities:
+              - entity: sensor.roode32_roi_height_zone_0
+                name: ROI height entry
+              - entity: sensor.roode32_roi_width_zone_0
+                name: ROI width entry
+              - entity: sensor.roode32_roi_height_zone_1
+                name: ROI height exit
+              - entity: sensor.roode32_roi_width_zone_1
+                name: ROI width exit
+              - entity: sensor.roode32_min_threshold_entry
+                name: Min threshold entry
+              - entity: sensor.roode32_max_threshold_entry
+                name: Max threshold entry
+              - entity: sensor.roode32_min_threshold_exit
+                name: Min threshold exit
+              - entity: sensor.roode32_max_threshold_exit
+                name: Max threshold exit
+          - type: horizontal-stack
+            cards:
+              - type: button
+                name: Accept
+                icon: mdi:check
+                tap_action:
+                  action: call-service
+                  service: python_script.apply_roi_result
+                  service_data:
+                    device: roode32
+              - type: button
+                name: Rerun
+                icon: mdi:refresh
+                tap_action:
+                  action: call-service
+                  service: python_script.start_passive_scan
+                  service_data:
+                    device: roode32
+          - type: entities
+            entities:
+              - entity: input_boolean.roode_show_expert
+                name: Show expert parameters
+          - type: conditional
+            conditions:
+              - entity: input_boolean.roode_show_expert
+                state: "on"
+            card:
+              type: entities
+              title: Expert Parameters
+              entities:
+                - entity: number.roode_entry_threshold_min
+                  name: Entry min threshold
+                - entity: number.roode_entry_threshold_max
+                  name: Entry max threshold
+                - entity: number.roode_exit_threshold_min
+                  name: Exit min threshold
+                - entity: number.roode_exit_threshold_max
+                  name: Exit max threshold

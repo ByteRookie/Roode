@@ -26,36 +26,8 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
 
 ## Passive Scan Trigger
 
-Add an `input_select` to request a passive scan session and an
-automation that calls a helper script:
-
-```
-input_select:
-  roode_action:
-    name: Roode Action
-    options:
-      - idle
-      - start_passive_scan
-
-automation:
-  - alias: "Start Roode passive scan"
-    trigger:
-      platform: state
-      entity_id: input_select.roode_action
-      to: "start_passive_scan"
-    action:
-      - service: python_script.start_passive_scan
-        data:
-          device: roode32
-      - service: input_select.select_option
-        target:
-          entity_id: input_select.roode_action
-        data:
-          option: idle
-```
-
-Place `homeassistant/python_scripts/start_passive_scan.py` into your
-Home Assistant configuration. Selecting `start_passive_scan` creates a
+Roode exposes a `Start Passive Scan` button entity that requests a scan
+session directly from the device. Pressing the button creates a
 timestamped `passive_scan_YYYY-MM-DD_HH-MM/` directory with an empty
 `session.json` and dispatches an `esphome.<node>_start_passive_scan`
 command to the ESPHome node.

@@ -3,17 +3,32 @@ import json
 from pathlib import Path
 import esphome.codegen as cg
 import esphome.config_validation as cv
+from esphome.components import button
+from esphome.components.template import button as template_button
 from esphome.const import (
+    CONF_ENTITY_CATEGORY,
     CONF_HEIGHT,
+    CONF_ICON,
     CONF_ID,
     CONF_INVERT,
+    CONF_NAME,
     CONF_SENSOR,
     CONF_WIDTH,
+    ENTITY_CATEGORY_DIAGNOSTIC,
 )
+from esphome.core import ID
 from ..vl53l1x import distance_as_mm, NullableSchema, VL53L1X
 
 DEPENDENCIES = ["vl53l1x"]
-AUTO_LOAD = ["vl53l1x", "sensor", "binary_sensor", "text_sensor", "number"]
+AUTO_LOAD = [
+    "vl53l1x",
+    "sensor",
+    "binary_sensor",
+    "text_sensor",
+    "number",
+    "button",
+    "template",
+]
 MULTI_CONF = True
 
 CONF_ROODE_ID = "roode_id"
@@ -122,6 +137,23 @@ CONFIG_SCHEMA = cv.Schema(
 async def to_code(config: Dict):
     roode = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(roode, config)
+
+    button_id = ID(f"{config[CONF_ID].id}_start_passive_scan")
+    button_id.type = template_button.TemplateButton
+    btn_conf = {
+        CONF_ID: button_id,
+        CONF_NAME: "Start Passive Scan",
+        CONF_ICON: "mdi:radar",
+        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
+    }
+    start_scan_button = await button.new_button(btn_conf)
+    cg.add(
+        start_scan_button.add_on_press_callback(
+            cg.RawExpression(
+                f"std::bind(&{Roode}::start_passive_scan, {roode})"
+            )
+        )
+    )
 
     sens = await cg.get_variable(config[CONF_SENSOR])
     cg.add(roode.set_tof_sensor(sens))

@@ -10,6 +10,7 @@ from esphome.const import (
     CONF_HEIGHT,
     CONF_ICON,
     CONF_ID,
+    CONF_DISABLED_BY_DEFAULT,
     CONF_INVERT,
     CONF_NAME,
     CONF_SENSOR,
@@ -156,6 +157,7 @@ async def to_code(config: Dict):
         CONF_NAME: "Start Passive Scan",
         CONF_ICON: "mdi:radar",
         CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
+        CONF_DISABLED_BY_DEFAULT: True,
     }
     start_scan_button = await button.new_button(btn_conf)
     cg.add(

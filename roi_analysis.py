@@ -51,12 +51,20 @@ def mcps_floor(trials: Iterable[np.ndarray]) -> float:
     return float(max(5.0, np.percentile(all_vals, 10)))
 
 
-def cv_threshold(cv_values: np.ndarray) -> float:
-    """Return median(cv) + 0.5*MAD(cv) threshold."""
+def cv_threshold(cv_values: np.ndarray, mad_factor: float = 0.5) -> float:
+    """Return ``median(cv) + mad_factor*MAD(cv)`` threshold.
+
+    Parameters
+    ----------
+    cv_values:
+        Array of coefficient of variation values.
+    mad_factor:
+        Multiplier applied to the MAD. Typical range is 0.1–2.0.
+    """
 
     med = np.nanmedian(cv_values)
     mad = np.nanmedian(np.abs(cv_values - med))
-    return float(med + 0.5 * mad)
+    return float(med + mad_factor * mad)
 
 
 def apply_history(groups: Dict[Tuple[int, str], ScanGroup], session_dir: Path, half_life: float) -> Dict[Tuple[int, str], ScanGroup]:
@@ -113,13 +121,34 @@ def load_session(session_dir: Path) -> Dict[Tuple[int, str], ScanGroup]:
     return groups
 
 
-def stable_mask(mean: np.ndarray, var: np.ndarray, floor: float) -> np.ndarray:
-    """Mask dim/unstable SPADs using floor and CV heuristics."""
+def stable_mask(
+    mean: np.ndarray,
+    var: np.ndarray,
+    floor: float,
+    cv_limit: float | None = None,
+    mad_factor: float = 0.5,
+) -> np.ndarray:
+    """Mask dim/unstable SPADs using floor and CV heuristics.
+
+    Parameters
+    ----------
+    mean, var:
+        Per-SPAD mean and variance arrays.
+    floor:
+        Minimum MCPS value below which cells are masked.
+    cv_limit:
+        Explicit CV threshold. If ``None`` the threshold is determined using
+        :func:`cv_threshold` with ``mad_factor``.
+    mad_factor:
+        Multiplier for MAD when deriving ``cv_limit`` if not supplied. Typical
+        range is 0.1–2.0.
+    """
 
     with np.errstate(divide="ignore", invalid="ignore"):
         cv = np.sqrt(var) / mean
-    thresh = cv_threshold(cv)
-    mask = (mean >= floor) & (cv <= thresh)
+    if cv_limit is None:
+        cv_limit = cv_threshold(cv, mad_factor)
+    mask = (mean >= floor) & (cv <= cv_limit)
     mask |= (mean >= floor) & np.isnan(cv)
     return mask
 
@@ -213,7 +242,11 @@ def recommended_trials(var: np.ndarray, mean: np.ndarray) -> int:
     return 5 if avg_cv > 0.20 else 3
 
 
-def analyze(groups: Dict[Tuple[int, str], ScanGroup]) -> Dict[str, object]:
+def analyze(
+    groups: Dict[Tuple[int, str], ScanGroup],
+    mad_factor: float = 0.5,
+    cv_limit: float | None = None,
+) -> Dict[str, object]:
     """Apply adaptive heuristics to determine ROI, thresholds and zones."""
 
     best_key = None
@@ -224,7 +257,7 @@ def analyze(groups: Dict[Tuple[int, str], ScanGroup]) -> Dict[str, object]:
     for key, grp in groups.items():
         mean, var = grp.stats()
         floor = mcps_floor(grp.trials)
-        mask = stable_mask(mean, var, floor)
+        mask = stable_mask(mean, var, floor, cv_limit=cv_limit, mad_factor=mad_factor)
         snr_vals = snr(mean, var)
         var_score = np.nanmean(var[mask])
         budget = RANGING_BUDGET.get(grp.mode, 999)
@@ -294,10 +327,36 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("session_dir", type=Path, help="Path to session directory")
     parser.add_argument("--half-life", type=float, default=24.0, help="Historical weighting half-life in hours")
+    parser.add_argument(
+        "--mad-factor",
+        type=float,
+        default=None,
+        help="Multiplier for MAD when deriving CV threshold (0.1-2.0)",
+    )
+    parser.add_argument(
+        "--cv-mask",
+        type=float,
+        default=None,
+        help="Explicit CV threshold (0-1); overrides MAD-based threshold",
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Optional JSON file with analysis parameters",
+    )
     args = parser.parse_args()
+    cfg = {}
+    if args.config:
+        try:
+            cfg = json.load(args.config.open("r", encoding="utf-8"))
+        except Exception:
+            cfg = {}
+    mad_factor = args.mad_factor if args.mad_factor is not None else cfg.get("mad_factor", 0.5)
+    cv_mask = args.cv_mask if args.cv_mask is not None else cfg.get("cv_mask")
     groups = load_session(args.session_dir)
     groups = apply_history(groups, args.session_dir, args.half_life)
-    result = analyze(groups)
+    result = analyze(groups, mad_factor=mad_factor, cv_limit=cv_mask)
     out_file = args.session_dir / "roi_result.json"
     with out_file.open("w", encoding="utf-8") as fh:
         json.dump(result, fh, indent=2)

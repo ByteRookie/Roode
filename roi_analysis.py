@@ -127,18 +127,15 @@ def load_session(session_dir: Path) -> Dict[Tuple[int, str], ScanGroup]:
 def stable_mask(
     mean: np.ndarray,
     var: np.ndarray,
-    floor: float,
     cv_limit: float | None = None,
     mad_factor: float = 0.5,
 ) -> np.ndarray:
-    """Mask dim/unstable SPADs using floor and CV heuristics.
+    """Mask dim/unstable SPADs using median-based brightness and CV heuristics.
 
     Parameters
     ----------
     mean, var:
         Per-SPAD mean and variance arrays.
-    floor:
-        Minimum MCPS value below which cells are masked.
     cv_limit:
         Explicit CV threshold. If ``None`` the threshold is determined using
         :func:`cv_threshold` with ``mad_factor``.
@@ -151,8 +148,12 @@ def stable_mask(
         cv = np.sqrt(var) / mean
     if cv_limit is None:
         cv_limit = cv_threshold(cv, mad_factor)
-    mask = (mean >= floor) & (cv <= cv_limit)
-    mask |= (mean >= floor) & np.isnan(cv)
+
+    med = np.median(mean)
+    mad = np.median(np.abs(mean - med))
+    bright = mean >= med + 0.5 * mad
+    mask = bright & (cv <= cv_limit)
+    mask |= bright & np.isnan(cv)
     return mask
 
 
@@ -314,7 +315,7 @@ def analyze(
     for key, grp in groups.items():
         mean, var = grp.stats()
         floor = mcps_floor(grp.trials)
-        mask = stable_mask(mean, var, floor, cv_limit=cv_limit, mad_factor=mad_factor)
+        mask = stable_mask(mean, var, cv_limit=cv_limit, mad_factor=mad_factor)
         var_score = np.nanmean(var[mask])
         budget = RANGING_BUDGET.get(grp.mode, 999)
         if var_score < best_var or (np.isclose(var_score, best_var) and budget < best_budget):

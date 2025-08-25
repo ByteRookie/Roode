@@ -52,7 +52,9 @@ async def setup_conf(config, key, hub):
         conf = config[key]
         sens = cg.new_Pvariable(conf[CONF_ID])
         await text_sensor.register_text_sensor(sens, conf)
-        cg.add(sens.set_entity_category(cg.EntityCategory.DIAGNOSTIC))
+        cg.add(
+            sens.set_entity_category(cg.EntityCategory.ENTITY_CATEGORY_DIAGNOSTIC)
+        )
         cg.add(getattr(hub, f"set_{key}_text_sensor")(sens))
 
 

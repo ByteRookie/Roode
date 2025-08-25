@@ -784,8 +784,35 @@ void Roode::start_passive_scan() {
   for (int grid : grids) {
     for (int trial = 1; trial <= 3; ++trial) {
       for (const char *mode : modes) {
+        const RangingMode *ranging_mode = Ranging::Short;
+        if (strcmp(mode, "medium") == 0)
+          ranging_mode = Ranging::Medium;
+        else if (strcmp(mode, "long") == 0)
+          ranging_mode = Ranging::Long;
+        distanceSensor->set_ranging_mode(ranging_mode);
+
         std::vector<int> mcps(grid * grid, 0);
         std::vector<int> distance(grid * grid, 0);
+
+        ROI roi{4, 4, 0};
+        int spacing = 16 / grid;
+        for (int y = 0; y < grid; ++y) {
+          for (int x = 0; x < grid; ++x) {
+            uint8_t cx = static_cast<uint8_t>(x * spacing + spacing / 2);
+            uint8_t cy = static_cast<uint8_t>(y * spacing + spacing / 2);
+            roi.center = static_cast<uint8_t>((cy * 16) + cx + 1);
+
+            VL53L1_Error status;
+            auto dist = distanceSensor->read_distance(&roi, status);
+            if (dist.has_value()) {
+              auto rate = distanceSensor->read_signal_rate(status);
+              if (rate.has_value())
+                mcps[y * grid + x] = rate.value();
+              distance[y * grid + x] = dist.value();
+            }
+          }
+        }
+
         float mean_mcps = 0.0f;
         for (int v : mcps)
           mean_mcps += v;

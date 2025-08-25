@@ -28,6 +28,7 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   float get_setup_priority() const override { return setup_priority::DATA; };
 
   optional<uint16_t> read_distance(ROI *roi, VL53L1_Error &error);
+  optional<uint16_t> read_signal_rate(VL53L1_Error &error);
   void set_ranging_mode(const RangingMode *mode);
 
   optional<bool> get_xshut_state() {

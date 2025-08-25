@@ -346,6 +346,24 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   return {distance};
 }
 
+optional<uint16_t> VL53L1X::read_signal_rate(VL53L1_Error &status) {
+  if (this->is_failed()) {
+    ESP_LOGW(TAG, "Cannot read signal rate while component is failed");
+    record_failure();
+    return {};
+  }
+
+  uint16_t rate = 0;
+  status = this->sensor.GetSignalRate(&rate);
+  if (status != VL53L1_ERROR_NONE) {
+    ESP_LOGE(TAG, "Could not get signal rate, error code: %d", status);
+    record_failure();
+    return {};
+  }
+
+  return {rate};
+}
+
 bool VL53L1X::check_features() {
   ESP_LOGI(TAG, "Validating optional pins");
   bool xshut_ok = false;

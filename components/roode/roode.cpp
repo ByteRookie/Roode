@@ -786,6 +786,13 @@ void Roode::start_passive_scan() {
   constexpr int base_trials = 3;
   constexpr int max_trials = 5;
   for (int grid : grids) {
+    if (grid == 16 && scan_time_cap_seconds_ > 0) {
+      float elapsed = (millis() - scan_start_ts_) / 1000.0f;
+      if (elapsed > scan_time_cap_seconds_) {
+        publish_scan_record("scan_time_cap_reached");
+        break;
+      }
+    }
     for (const char *mode : modes) {
       const RangingMode *ranging_mode = Ranging::Short;
       if (strcmp(mode, "medium") == 0)

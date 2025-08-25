@@ -135,6 +135,7 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
   void set_trial_bump_cv(float cv) { trial_bump_cv_ = cv; }
+  void set_scan_time_cap_seconds(float sec) { scan_time_cap_seconds_ = sec; }
   void set_cpu_optimization_thresholds(float activate, float deactivate) {
     cpu_opt_activate_threshold_ = activate;
     cpu_opt_deactivate_threshold_ = deactivate;
@@ -211,6 +212,7 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   uint32_t scan_start_ts_{0};
   uint32_t scan_record_count_{0};
   float trial_bump_cv_{20.0f};
+  float scan_time_cap_seconds_{60.0f};
 
   void publish_scan_record(const std::string &payload);
   float expected_counter_{0};

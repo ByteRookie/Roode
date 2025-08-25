@@ -364,6 +364,34 @@ optional<uint16_t> VL53L1X::read_signal_rate(VL53L1_Error &status) {
   return {rate};
 }
 
+optional<float> VL53L1X::read_snr(VL53L1_Error &status) {
+  if (this->is_failed()) {
+    ESP_LOGW(TAG, "Cannot read SNR while component is failed");
+    record_failure();
+    return {};
+  }
+
+  uint16_t signal = 0;
+  status = this->sensor.GetSignalRate(&signal);
+  if (status != VL53L1_ERROR_NONE) {
+    ESP_LOGE(TAG, "Could not get signal rate for SNR, error code: %d", status);
+    record_failure();
+    return {};
+  }
+
+  uint16_t ambient = 0;
+  status = this->sensor.GetAmbientRate(&ambient);
+  if (status != VL53L1_ERROR_NONE) {
+    ESP_LOGE(TAG, "Could not get ambient rate for SNR, error code: %d", status);
+    record_failure();
+    return {};
+  }
+
+  if (ambient == 0)
+    return {static_cast<float>(signal)};
+  return {static_cast<float>(signal) / static_cast<float>(ambient)};
+}
+
 bool VL53L1X::check_features() {
   ESP_LOGI(TAG, "Validating optional pins");
   bool xshut_ok = false;

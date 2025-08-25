@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
@@ -38,6 +38,7 @@ class ScanGroup:
     trials: List[np.ndarray]
     timestamps: List[datetime]
     idle_trials: List[np.ndarray]
+    snr_trials: List[np.ndarray] = field(default_factory=list)
 
     def stats(self) -> Tuple[np.ndarray, np.ndarray]:
         arr = np.stack(self.trials, axis=0)
@@ -121,6 +122,9 @@ def load_session(session_dir: Path) -> Dict[Tuple[int, str], ScanGroup]:
             idle = np.array(payload["data"].get("idle_mcps", []), dtype=float)
             if idle.size:
                 grp.idle_trials.append(idle)
+            snr = np.array(payload["data"].get("snr", []), dtype=float)
+            if snr.size:
+                grp.snr_trials.append(snr)
     return groups
 
 
@@ -189,14 +193,18 @@ def thresholds_from_idle(
     mcps_max: float,
     min_idle_lo: float = 0.92,
     min_idle_hi: float = 0.96,
-    max_delta_ratio: float = 0.10,
+    snr_values: Iterable[np.ndarray] | None = None,
+    target_snr: float = 7.0,
 ) -> Tuple[float, float]:
-    """Return thresholds based on clamped idle median and dynamic range.
+    """Return thresholds based on clamped idle median and optional SNR data.
 
     The minimum threshold is first estimated from the 5th percentile of idle
     samples and then clamped between ``min_idle_lo`` and ``min_idle_hi`` times
-    the idle median.  The maximum threshold is the greater of the 95th
-    percentile or ``min_threshold + max_delta_ratio * (mcps_max - idle_median)``.
+    the idle median.  If SNR values are provided, the maximum threshold is the
+    lowest MCPS value whose corresponding SNR meets ``target_snr``.  When no SNR
+    data are available the maximum threshold defaults to ``0.80 * mcps_max``.
+    The result is finally clamped to ensure a minimum separation from the
+    minimum threshold.
 
     Parameters
     ----------
@@ -210,9 +218,11 @@ def thresholds_from_idle(
     min_idle_hi:
         Upper clamp factor applied to the idle median when computing the minimum
         threshold.
-    max_delta_ratio:
-        Fraction of the difference between ``mcps_max`` and the idle median that
-        guarantees a minimum separation between the min and max thresholds.
+    snr_values:
+        Optional collection of SNR readings for the same SPADs as
+        ``idle_samples``.
+    target_snr:
+        Minimum acceptable SNR when deriving ``max_th``. Defaults to ``7``.
     """
 
     if not idle_samples:
@@ -224,8 +234,22 @@ def thresholds_from_idle(
     min_th = float(np.percentile(samples, 5))
     min_th = float(np.clip(min_th, min_idle_lo * idle_median, min_idle_hi * idle_median))
 
-    max_th = float(np.percentile(samples, 95))
-    max_th = float(max(min_th + max_delta_ratio * (mcps_max - idle_median), max_th))
+    if snr_values:
+        try:
+            snr_arr = np.concatenate([s for s in snr_values])
+            mcps_arr = np.concatenate([s for s in idle_samples])
+            valid = snr_arr >= target_snr
+            if np.any(valid):
+                max_th = float(np.min(mcps_arr[valid]))
+            else:
+                max_th = 0.80 * mcps_max
+        except Exception:
+            max_th = 0.80 * mcps_max
+    else:
+        max_th = 0.80 * mcps_max
+
+    min_sep = min_th + 0.10 * (mcps_max - idle_median)
+    max_th = float(max(max_th, min_sep))
 
     return min_th, max_th
 
@@ -289,7 +313,7 @@ def analyze(
     retry_roi: bool = True,
     idle_min_lo: float = 0.92,
     idle_min_hi: float = 0.96,
-    max_delta: float = 0.10,
+    target_snr: float = 7.0,
 ) -> Dict[str, object]:
     """Apply adaptive heuristics to determine ROI, thresholds and zones.
 
@@ -301,9 +325,8 @@ def analyze(
         Existing tuning parameters for ROI selection.
     idle_min_lo, idle_min_hi:
         Clamp factors for the idle median when computing the minimum threshold.
-    max_delta:
-        Fraction of the dynamic range added to the minimum threshold when
-        deriving the maximum threshold.
+    target_snr:
+        Desired minimum SNR when determining the maximum threshold.
     """
 
     best_key = None
@@ -383,7 +406,8 @@ def analyze(
         mcps_max,
         min_idle_lo=idle_min_lo,
         min_idle_hi=idle_min_hi,
-        max_delta_ratio=max_delta,
+        snr_values=grp.snr_trials,
+        target_snr=target_snr,
     )
     trials_needed = recommended_trials(var, mean)
 
@@ -445,10 +469,10 @@ def main() -> None:
         help="Upper clamp factor for idle median (default 0.96)",
     )
     parser.add_argument(
-        "--max-delta-factor",
+        "--target-snr",
         type=float,
         default=None,
-        help="Fraction of dynamic range added to min threshold (default 0.10)",
+        help="Minimum SNR required for max threshold (default 7)",
     )
     parser.add_argument(
         "--config",
@@ -476,8 +500,8 @@ def main() -> None:
     idle_min_high = (
         args.idle_min_high if args.idle_min_high is not None else cfg.get("idle_min_high", 0.96)
     )
-    max_delta = (
-        args.max_delta_factor if args.max_delta_factor is not None else cfg.get("max_delta_factor", 0.10)
+    target_snr = (
+        args.target_snr if args.target_snr is not None else cfg.get("target_snr", 7.0)
     )
     groups = load_session(args.session_dir)
     groups = apply_history(groups, args.session_dir, args.half_life)
@@ -490,7 +514,7 @@ def main() -> None:
         retry_roi=retry_roi,
         idle_min_lo=idle_min_low,
         idle_min_hi=idle_min_high,
-        max_delta=max_delta,
+        target_snr=target_snr,
     )
     out_file = args.session_dir / "roi_result.json"
     with out_file.open("w", encoding="utf-8") as fh:

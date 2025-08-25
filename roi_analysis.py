@@ -206,26 +206,26 @@ def thresholds_from_idle(
 ) -> Tuple[float, float]:
     """Return thresholds based on clamped idle median and optional SNR data.
 
-    The minimum threshold is first estimated from the 5th percentile of idle
-    samples and then clamped between ``min_idle_lo`` and ``min_idle_hi`` times
-    the idle median.  If SNR values are provided, the maximum threshold is the
-    lowest MCPS value whose corresponding SNR meets ``target_snr``.  When no SNR
-    data are available the maximum threshold defaults to ``0.80 * mcps_max``.
-    The result is finally clamped to ensure a minimum separation from the
-    minimum threshold.
+    The minimum threshold is first estimated from the 95th percentile of idle
+    distance samples and then clamped between ``min_idle_lo`` and ``min_idle_hi``
+    times the idle distance median. If SNR values are provided, the maximum
+    threshold is the lowest MCPS value whose corresponding SNR meets
+    ``target_snr``. When no SNR data are available the maximum threshold
+    defaults to ``0.80 * mcps_max``. The result is finally clamped to ensure a
+    minimum separation from the minimum threshold.
 
     Parameters
     ----------
     idle_samples:
-        Collection of idle MCPS readings.
+        Collection of idle distance readings.
     mcps_max:
         Maximum MCPS observed during the session.
     min_idle_lo:
-        Lower clamp factor applied to the idle median when computing the minimum
-        threshold.
+        Lower clamp factor applied to the idle distance median when computing
+        the minimum threshold.
     min_idle_hi:
-        Upper clamp factor applied to the idle median when computing the minimum
-        threshold.
+        Upper clamp factor applied to the idle distance median when computing
+        the minimum threshold.
     snr_values:
         Optional collection of SNR readings for the same SPADs as
         ``idle_samples``.
@@ -239,7 +239,7 @@ def thresholds_from_idle(
     samples = np.concatenate([s for s in idle_samples])
     idle_median = float(np.median(samples))
 
-    min_th = float(np.percentile(samples, 5))
+    min_th = float(np.percentile(samples, 95))
     min_th = float(np.clip(min_th, min_idle_lo * idle_median, min_idle_hi * idle_median))
 
     if snr_values:

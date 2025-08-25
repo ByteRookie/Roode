@@ -805,6 +805,7 @@ void Roode::start_passive_scan() {
       for (int trial = 1; trial <= max_trials; ++trial) {
         std::vector<int> mcps(grid * grid, 0);
         std::vector<int> distance(grid * grid, 0);
+        std::vector<float> snr(grid * grid, 0.0f);
 
         ROI roi{4, 4, 0};
         int spacing = 16 / grid;
@@ -820,6 +821,9 @@ void Roode::start_passive_scan() {
               auto rate = distanceSensor->read_signal_rate(status);
               if (rate.has_value())
                 mcps[y * grid + x] = rate.value();
+              auto sn = distanceSensor->read_snr(status);
+              if (sn.has_value())
+                snr[y * grid + x] = sn.value();
               distance[y * grid + x] = dist.value();
             }
           }
@@ -870,6 +874,14 @@ void Roode::start_passive_scan() {
           dist_ss << distance[i];
         }
         dist_ss << ']';
+        std::stringstream snr_ss;
+        snr_ss << '[';
+        for (size_t i = 0; i < snr.size(); ++i) {
+          if (i)
+            snr_ss << ',';
+          snr_ss << snr[i];
+        }
+        snr_ss << ']';
         char ts[25];
         time_t now = time(nullptr);
         struct tm tm_time;
@@ -880,7 +892,7 @@ void Roode::start_passive_scan() {
         json << ",\"trial\":" << trial;
         json << ",\"ranging\":\"" << mode << "\"";
         json << ",\"timestamp\":\"" << ts << "\"";
-        json << ",\"data\":{\"mcps\":" << mcps_ss.str() << ",\"distance\":" << dist_ss.str() << "}}";
+        json << ",\"data\":{\"mcps\":" << mcps_ss.str() << ",\"distance\":" << dist_ss.str() << ",\"snr\":" << snr_ss.str() << "}}";
         publish_scan_record(json.str());
 
         if (trial >= base_trials) {

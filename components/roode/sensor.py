@@ -154,7 +154,9 @@ CONFIG_SCHEMA = sensor.sensor_schema().extend(
 
 async def _new_diagnostic_sensor(conf):
     sens = await sensor.new_sensor(conf)
-    cg.add(sens.set_entity_category(cg.EntityCategory.DIAGNOSTIC))
+    cg.add(
+        sens.set_entity_category(cg.EntityCategory.ENTITY_CATEGORY_DIAGNOSTIC)
+    )
     return sens
 
 

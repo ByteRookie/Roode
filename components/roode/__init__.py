@@ -157,7 +157,11 @@ async def to_code(config: Dict):
         CONF_DISABLED_BY_DEFAULT: True,
     }
     start_scan_button = await button.new_button(btn_conf)
-    cg.add(start_scan_button.set_entity_category(cg.EntityCategory.DIAGNOSTIC))
+    cg.add(
+        start_scan_button.set_entity_category(
+            cg.EntityCategory.ENTITY_CATEGORY_DIAGNOSTIC
+        )
+    )
     cg.add(
         start_scan_button.add_on_press_callback(
             cg.RawExpression(

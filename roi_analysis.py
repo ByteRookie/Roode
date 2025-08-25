@@ -156,15 +156,22 @@ def stable_mask(
     return mask
 
 
-def weighted_centroid(weights: np.ndarray, mask: np.ndarray, grid: int, k: float = 0.3) -> Tuple[float, float]:
-    """Centroid of top ``k`` fraction of SPADs by MCPS."""
+def weighted_centroid(weights: np.ndarray, mask: np.ndarray, grid: int) -> Tuple[float, float]:
+    """Centroid of top fraction of SPADs by MCPS.
+
+    The fraction ``k`` is derived from the number of unmasked SPADs ``N``
+    using ``k = max(0.15, min(0.30, (64.0 / N) * 0.05))``. This heuristically
+    scales the subset size while keeping it between 15% and 30% of available
+    cells.
+    """
 
     coords = np.indices((grid, grid)).reshape(2, -1).T.astype(float)
+    N = int(mask.sum())
+    if N == 0:
+        return (grid - 1) / 2, (grid - 1) / 2
     w = weights[mask]
     pts = coords[mask]
-    if len(w) == 0:
-        return (grid - 1) / 2, (grid - 1) / 2
-    k = float(np.clip(k, 0.05, 1.0))
+    k = max(0.15, min(0.30, (64.0 / N) * 0.05))
     top_n = max(1, int(len(w) * k))
     idx = np.argsort(w)[-top_n:]
     w_top = w[idx]

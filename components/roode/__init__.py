@@ -60,6 +60,7 @@ CONF_CPU_OPTIMIZATION = "cpu_optimization"
 CONF_ACTIVATE = "activate"
 CONF_DEACTIVATE = "deactivate"
 CONF_ROI_RESULT = "roi_result"
+CONF_SCAN_TIME_CAP_SECONDS = "scan_time_cap_seconds"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -123,6 +124,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
         cv.Optional(CONF_INVALID_DISTANCE_LIMIT, default=10): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_RESTART_TIMEOUT, default="30s"): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_SCAN_TIME_CAP_SECONDS, default=0.0): cv.All(cv.float_, cv.Range(min=0.0)),
         cv.Optional(CONF_CPU_OPTIMIZATION, default={}): cv.Schema(
             {
                 cv.Optional(CONF_ACTIVATE, default=0.90): cv.percentage,
@@ -176,6 +178,7 @@ async def to_code(config: Dict):
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
     cg.add(roode.set_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT]))
     cg.add(roode.set_restart_timeout(config[CONF_RESTART_TIMEOUT]))
+    cg.add(roode.set_scan_time_cap_seconds(config[CONF_SCAN_TIME_CAP_SECONDS]))
     cpu_conf = config.get(CONF_CPU_OPTIMIZATION, {})
     cg.add(
         roode.set_cpu_optimization_thresholds(

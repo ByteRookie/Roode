@@ -119,9 +119,7 @@ Roode::~Roode() {
   delete exit;
 }
 
-void Roode::set_auto_calibration_interval_sec(uint32_t sec) {
-  auto_calibration_interval_sec_ = sec;
-}
+void Roode::set_auto_calibration_interval_sec(uint32_t sec) { auto_calibration_interval_sec_ = sec; }
 void Roode::dump_config() {
   ESP_LOGCONFIG(TAG, "Roode:");
   ESP_LOGCONFIG(TAG, "  Sample size: %d", samples);
@@ -786,6 +784,14 @@ void Roode::start_passive_scan() {
   const std::vector<int> grids{4, 8, 16};
   const char *modes[] = {"short", "medium", "long"};
   for (int grid : grids) {
+    if (grid == 16 && scan_time_cap_seconds_ > 0) {
+      float elapsed = (millis() - scan_start_ts_) / 1000.0f;
+      if (elapsed > scan_time_cap_seconds_) {
+        ESP_LOGI(TAG, "scan_time_cap_exceeded: %.1fs", elapsed);
+        log_event("scan_time_cap_exceeded");
+        break;
+      }
+    }
     for (int trial = 1; trial <= 3; ++trial) {
       for (const char *mode : modes) {
         const RangingMode *ranging_mode = Ranging::Short;

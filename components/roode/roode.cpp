@@ -118,6 +118,10 @@ Roode::~Roode() {
   delete entry;
   delete exit;
 }
+
+void Roode::set_auto_calibration_interval_sec(uint32_t sec) {
+  auto_calibration_interval_sec_ = sec;
+}
 void Roode::dump_config() {
   ESP_LOGCONFIG(TAG, "Roode:");
   ESP_LOGCONFIG(TAG, "  Sample size: %d", samples);

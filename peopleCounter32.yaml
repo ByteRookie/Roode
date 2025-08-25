@@ -86,6 +86,7 @@ roode:
   detection_thresholds: # defaults for both zones. These also default to 0% & 85% as previously done.
     # min: 234mm # absolute distance
     max: 85% # percent based on idle distance
+  auto_calibration: { interval: 14400, persist: false }
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
   # This allows for detecting whether a crossing is an entry or exit based on which zones was crossed first.
   zones:

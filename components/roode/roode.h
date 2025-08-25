@@ -119,6 +119,7 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
+  void set_auto_calibration_interval_sec(uint32_t sec);
   void set_filter_mode(FilterMode mode) {
     filter_mode_ = mode;
     default_filter_mode_ = mode;

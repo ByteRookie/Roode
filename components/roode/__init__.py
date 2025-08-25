@@ -47,7 +47,9 @@ CONF_MIN = "min"
 CONF_ROI = "roi"
 CONF_SAMPLING = "sampling"
 CONF_ZONES = "zones"
-CONF_CALIBRATION_PERSISTENCE = "calibration_persistence"
+CONF_AUTO_CALIBRATION = "auto_calibration"
+CONF_INTERVAL = "interval"
+CONF_PERSIST = "persist"
 CONF_FILTER_MODE = "filter_mode"
 CONF_FILTER_WINDOW = "filter_window"
 CONF_LOG_FALLBACK = "log_fallback_events"
@@ -109,7 +111,12 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_SAMPLING, default=2): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_ROI, default={}): ROI_SCHEMA,
         cv.Optional(CONF_DETECTION_THRESHOLDS, default={}): THRESHOLDS_SCHEMA,
-        cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=False): cv.boolean,
+        cv.Optional(CONF_AUTO_CALIBRATION, default={}): cv.Schema(
+            {
+                cv.Optional(CONF_INTERVAL, default=4 * 60 * 60): cv.uint32_t,
+                cv.Optional(CONF_PERSIST, default=False): cv.boolean,
+            }
+        ),
         cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(FILTER_MODES, upper=False),
         cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_LOG_FALLBACK, default=False): cv.boolean,
@@ -160,7 +167,9 @@ async def to_code(config: Dict):
 
     cg.add(roode.set_orientation(config[CONF_ORIENTATION]))
     cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
-    cg.add(roode.set_calibration_persistence(config[CONF_CALIBRATION_PERSISTENCE]))
+    auto_conf = config.get(CONF_AUTO_CALIBRATION, {})
+    cg.add(roode.set_calibration_persistence(auto_conf.get(CONF_PERSIST, False)))
+    cg.add(roode.set_auto_calibration_interval_sec(auto_conf.get(CONF_INTERVAL, 4 * 60 * 60)))
     cg.add(roode.set_filter_mode(config[CONF_FILTER_MODE]))
     cg.add(roode.set_filter_window(config[CONF_FILTER_WINDOW]))
     cg.add(roode.set_log_fallback_events(config[CONF_LOG_FALLBACK]))

@@ -6,7 +6,6 @@ import esphome.config_validation as cv
 from esphome.components import button
 from esphome.components.template import button as template_button
 from esphome.const import (
-    CONF_ENTITY_CATEGORY,
     CONF_HEIGHT,
     CONF_ICON,
     CONF_ID,
@@ -15,7 +14,6 @@ from esphome.const import (
     CONF_NAME,
     CONF_SENSOR,
     CONF_WIDTH,
-    ENTITY_CATEGORY_DIAGNOSTIC,
 )
 from esphome.core import ID
 from ..vl53l1x import distance_as_mm, NullableSchema, VL53L1X
@@ -156,10 +154,10 @@ async def to_code(config: Dict):
         CONF_ID: button_id,
         CONF_NAME: "Start Passive Scan",
         CONF_ICON: "mdi:radar",
-        CONF_ENTITY_CATEGORY: ENTITY_CATEGORY_DIAGNOSTIC,
         CONF_DISABLED_BY_DEFAULT: True,
     }
     start_scan_button = await button.new_button(btn_conf)
+    cg.add(start_scan_button.set_entity_category(cg.EntityCategory.DIAGNOSTIC))
     cg.add(
         start_scan_button.add_on_press_callback(
             cg.RawExpression(

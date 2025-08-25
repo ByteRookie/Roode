@@ -2,12 +2,9 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import sensor
 from esphome.const import (
-    ICON_ARROW_EXPAND_VERTICAL,
     ICON_NEW_BOX,
     ICON_RULER,
     STATE_CLASS_MEASUREMENT,
-    UNIT_EMPTY,
-    ENTITY_CATEGORY_DIAGNOSTIC,
 )
 from . import Roode, CONF_ROODE_ID
 
@@ -41,199 +38,185 @@ CONFIG_SCHEMA = sensor.sensor_schema().extend(
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_DISTANCE_EXIT): sensor.sensor_schema(
             icon=ICON_RULER,
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_MAX_THRESHOLD_ENTRY): sensor.sensor_schema(
             icon="mdi:map-marker-distance",
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_MAX_THRESHOLD_EXIT): sensor.sensor_schema(
             icon="mdi:map-marker-distance",
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_MIN_THRESHOLD_ENTRY): sensor.sensor_schema(
             icon="mdi:map-marker-distance",
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_MIN_THRESHOLD_EXIT): sensor.sensor_schema(
             icon="mdi:map-marker-distance",
             unit_of_measurement="mm",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_ROI_HEIGHT_ENTRY): sensor.sensor_schema(
             icon="mdi:table-row-height",
             unit_of_measurement="px",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_ROI_WIDTH_ENTRY): sensor.sensor_schema(
             icon="mdi:table-column-width",
             unit_of_measurement="px",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_ROI_HEIGHT_EXIT): sensor.sensor_schema(
             icon="mdi:table-row-height",
             unit_of_measurement="px",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_ROI_WIDTH_EXIT): sensor.sensor_schema(
             icon="mdi:table-column-width",
             unit_of_measurement="px",
             accuracy_decimals=0,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(SENSOR_STATUS): sensor.sensor_schema(
             icon="mdi:check-circle",
             accuracy_decimals=0,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_LOOP_TIME): sensor.sensor_schema(
             icon="mdi:progress-clock",
             unit_of_measurement="ms",
             accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_CPU_USAGE): sensor.sensor_schema(
             icon="mdi:cpu-64-bit",
             unit_of_measurement="%",
             accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_RAM_FREE): sensor.sensor_schema(
             icon="mdi:memory",
             unit_of_measurement="%",
             accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_FLASH_FREE): sensor.sensor_schema(
             icon=ICON_NEW_BOX,
             unit_of_measurement="%",
             accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_INTERRUPT_STATUS): sensor.sensor_schema(
             icon="mdi:lightning-bolt",
             accuracy_decimals=0,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_MANUAL_ADJUST): sensor.sensor_schema(
             icon="mdi:counter",
             accuracy_decimals=0,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_VARIANCE_CV_MASK): sensor.sensor_schema(
             icon="mdi:chart-box",
             unit_of_measurement="%",
             accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_TRIAL_BUMP_CV): sensor.sensor_schema(
             icon="mdi:chart-line",
             unit_of_measurement="%",
             accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional(CONF_SCAN_TIME_CAP_SECONDS): sensor.sensor_schema(
             icon="mdi:timer",
             unit_of_measurement="s",
             accuracy_decimals=1,
             state_class=STATE_CLASS_MEASUREMENT,
-            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
     }
 )
 
 
+async def _new_diagnostic_sensor(conf):
+    sens = await sensor.new_sensor(conf)
+    cg.add(sens.set_entity_category(cg.EntityCategory.DIAGNOSTIC))
+    return sens
+
+
 async def to_code(config):
     var = await cg.get_variable(config[CONF_ROODE_ID])
     if CONF_DISTANCE_ENTRY in config:
-        distance = await sensor.new_sensor(config[CONF_DISTANCE_ENTRY])
+        distance = await _new_diagnostic_sensor(config[CONF_DISTANCE_ENTRY])
         cg.add(var.set_distance_entry(distance))
     if CONF_DISTANCE_EXIT in config:
-        distance = await sensor.new_sensor(config[CONF_DISTANCE_EXIT])
+        distance = await _new_diagnostic_sensor(config[CONF_DISTANCE_EXIT])
         cg.add(var.set_distance_exit(distance))
     if CONF_MAX_THRESHOLD_ENTRY in config:
-        count = await sensor.new_sensor(config[CONF_MAX_THRESHOLD_ENTRY])
+        count = await _new_diagnostic_sensor(config[CONF_MAX_THRESHOLD_ENTRY])
         cg.add(var.set_max_threshold_entry_sensor(count))
     if CONF_MAX_THRESHOLD_EXIT in config:
-        count = await sensor.new_sensor(config[CONF_MAX_THRESHOLD_EXIT])
+        count = await _new_diagnostic_sensor(config[CONF_MAX_THRESHOLD_EXIT])
         cg.add(var.set_max_threshold_exit_sensor(count))
     if CONF_MIN_THRESHOLD_ENTRY in config:
-        count = await sensor.new_sensor(config[CONF_MIN_THRESHOLD_ENTRY])
+        count = await _new_diagnostic_sensor(config[CONF_MIN_THRESHOLD_ENTRY])
         cg.add(var.set_min_threshold_entry_sensor(count))
     if CONF_MIN_THRESHOLD_EXIT in config:
-        count = await sensor.new_sensor(config[CONF_MIN_THRESHOLD_EXIT])
+        count = await _new_diagnostic_sensor(config[CONF_MIN_THRESHOLD_EXIT])
         cg.add(var.set_min_threshold_exit_sensor(count))
     if CONF_ROI_HEIGHT_ENTRY in config:
-        count = await sensor.new_sensor(config[CONF_ROI_HEIGHT_ENTRY])
+        count = await _new_diagnostic_sensor(config[CONF_ROI_HEIGHT_ENTRY])
         cg.add(var.set_entry_roi_height_sensor(count))
     if CONF_ROI_WIDTH_ENTRY in config:
-        count = await sensor.new_sensor(config[CONF_ROI_WIDTH_ENTRY])
+        count = await _new_diagnostic_sensor(config[CONF_ROI_WIDTH_ENTRY])
         cg.add(var.set_entry_roi_width_sensor(count))
     if CONF_ROI_HEIGHT_EXIT in config:
-        count = await sensor.new_sensor(config[CONF_ROI_HEIGHT_EXIT])
+        count = await _new_diagnostic_sensor(config[CONF_ROI_HEIGHT_EXIT])
         cg.add(var.set_exit_roi_height_sensor(count))
     if CONF_ROI_WIDTH_EXIT in config:
-        count = await sensor.new_sensor(config[CONF_ROI_WIDTH_EXIT])
+        count = await _new_diagnostic_sensor(config[CONF_ROI_WIDTH_EXIT])
         cg.add(var.set_exit_roi_width_sensor(count))
     if SENSOR_STATUS in config:
-        count = await sensor.new_sensor(config[SENSOR_STATUS])
+        count = await _new_diagnostic_sensor(config[SENSOR_STATUS])
         cg.add(var.set_sensor_status_sensor(count))
     if CONF_LOOP_TIME in config:
-        count = await sensor.new_sensor(config[CONF_LOOP_TIME])
+        count = await _new_diagnostic_sensor(config[CONF_LOOP_TIME])
         cg.add(var.set_loop_time_sensor(count))
     if CONF_CPU_USAGE in config:
-        count = await sensor.new_sensor(config[CONF_CPU_USAGE])
+        count = await _new_diagnostic_sensor(config[CONF_CPU_USAGE])
         cg.add(var.set_cpu_usage_sensor(count))
     if CONF_RAM_FREE in config:
-        count = await sensor.new_sensor(config[CONF_RAM_FREE])
+        count = await _new_diagnostic_sensor(config[CONF_RAM_FREE])
         cg.add(var.set_ram_free_sensor(count))
     if CONF_FLASH_FREE in config:
-        count = await sensor.new_sensor(config[CONF_FLASH_FREE])
+        count = await _new_diagnostic_sensor(config[CONF_FLASH_FREE])
         cg.add(var.set_flash_free_sensor(count))
     if CONF_INTERRUPT_STATUS in config:
-        count = await sensor.new_sensor(config[CONF_INTERRUPT_STATUS])
+        count = await _new_diagnostic_sensor(config[CONF_INTERRUPT_STATUS])
         cg.add(var.set_interrupt_status_sensor(count))
     if CONF_MANUAL_ADJUST in config:
-        count = await sensor.new_sensor(config[CONF_MANUAL_ADJUST])
+        count = await _new_diagnostic_sensor(config[CONF_MANUAL_ADJUST])
         cg.add(var.set_manual_adjustment_sensor(count))
     if CONF_VARIANCE_CV_MASK in config:
-        sens = await sensor.new_sensor(config[CONF_VARIANCE_CV_MASK])
+        sens = await _new_diagnostic_sensor(config[CONF_VARIANCE_CV_MASK])
         cg.add(var.set_variance_cv_mask_sensor(sens))
     if CONF_TRIAL_BUMP_CV in config:
-        sens = await sensor.new_sensor(config[CONF_TRIAL_BUMP_CV])
+        sens = await _new_diagnostic_sensor(config[CONF_TRIAL_BUMP_CV])
         cg.add(var.set_trial_bump_cv_sensor(sens))
     if CONF_SCAN_TIME_CAP_SECONDS in config:
-        sens = await sensor.new_sensor(config[CONF_SCAN_TIME_CAP_SECONDS])
+        sens = await _new_diagnostic_sensor(config[CONF_SCAN_TIME_CAP_SECONDS])
         cg.add(var.set_scan_time_cap_seconds_sensor(sens))

@@ -212,7 +212,7 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   uint32_t scan_start_ts_{0};
   uint32_t scan_record_count_{0};
   float trial_bump_cv_{20.0f};
-  float scan_time_cap_seconds_{60.0f};
+  float scan_time_cap_seconds_{90.0f};
 
   void publish_scan_record(const std::string &payload);
   float expected_counter_{0};

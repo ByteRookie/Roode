@@ -118,12 +118,18 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional(CONF_PERSIST, default=False): cv.boolean,
             }
         ),
-        cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(FILTER_MODES, upper=False),
+        cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(
+            FILTER_MODES, upper=False
+        ),
         cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_LOG_FALLBACK, default=False): cv.boolean,
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
-        cv.Optional(CONF_INVALID_DISTANCE_LIMIT, default=10): cv.All(cv.uint8_t, cv.Range(min=1)),
-        cv.Optional(CONF_RESTART_TIMEOUT, default="30s"): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_INVALID_DISTANCE_LIMIT, default=10): cv.All(
+            cv.uint8_t, cv.Range(min=1)
+        ),
+        cv.Optional(
+            CONF_RESTART_TIMEOUT, default="30s"
+        ): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_CPU_OPTIMIZATION, default={}): cv.Schema(
             {
                 cv.Optional(CONF_ACTIVATE, default=0.90): cv.percentage,
@@ -131,7 +137,9 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_TRIAL_BUMP_CV, default=0.20): cv.percentage,
-        cv.Optional(CONF_SCAN_TIME_CAP_SECONDS, default=60.0): cv.positive_float,
+        cv.Optional(CONF_SCAN_TIME_CAP_SECONDS, default=90.0): cv.All(
+            cv.positive_float, cv.Range(min=60.0, max=180.0)
+        ),
         cv.Optional(CONF_ROI_RESULT): cv.file_,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
@@ -164,9 +172,7 @@ async def to_code(config: Dict):
     )
     cg.add(
         start_scan_button.add_on_press_callback(
-            cg.RawExpression(
-                f"std::bind(&{Roode}::start_passive_scan, {roode})"
-            )
+            cg.RawExpression(f"std::bind(&{Roode}::start_passive_scan, {roode})")
         )
     )
 
@@ -177,7 +183,11 @@ async def to_code(config: Dict):
     cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
     auto_conf = config.get(CONF_AUTO_CALIBRATION, {})
     cg.add(roode.set_calibration_persistence(auto_conf.get(CONF_PERSIST, False)))
-    cg.add(roode.set_auto_calibration_interval_sec(auto_conf.get(CONF_INTERVAL, 4 * 60 * 60)))
+    cg.add(
+        roode.set_auto_calibration_interval_sec(
+            auto_conf.get(CONF_INTERVAL, 4 * 60 * 60)
+        )
+    )
     cg.add(roode.set_filter_mode(config[CONF_FILTER_MODE]))
     cg.add(roode.set_filter_window(config[CONF_FILTER_WINDOW]))
     cg.add(roode.set_log_fallback_events(config[CONF_LOG_FALLBACK]))

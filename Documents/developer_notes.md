@@ -9,4 +9,4 @@ Reports the coefficient of variation for the MCPS mask collected during a passiv
 Represents the coefficient of variation for distance measurements observed in each trial of a passive scan. It helps evaluate the stability of bump detection across trials.
 
 ### scan_time_cap_seconds
-Publishes the total elapsed time of the passive scan session in seconds, allowing monitoring of the scan duration.
+Publishes the total elapsed time of the passive scan session in seconds. Scanning stops before the 16x16 grid when this elapsed time exceeds the configured cap.

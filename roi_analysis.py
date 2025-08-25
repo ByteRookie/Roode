@@ -181,23 +181,49 @@ def mask_bounds(mask: np.ndarray, grid: int) -> Tuple[int, int, int, int]:
     return min_x, max_x, min_y, max_y
 
 
-def snr(mean: np.ndarray, var: np.ndarray) -> np.ndarray:
-    """Signal-to-noise ratio for each SPAD."""
+def thresholds_from_idle(
+    idle_samples: Iterable[np.ndarray],
+    mcps_max: float,
+    min_idle_lo: float = 0.92,
+    min_idle_hi: float = 0.96,
+    max_delta_ratio: float = 0.10,
+) -> Tuple[float, float]:
+    """Return thresholds based on clamped idle median and dynamic range.
 
-    with np.errstate(divide="ignore", invalid="ignore"):
-        return np.divide(mean, np.sqrt(var), out=np.zeros_like(mean), where=var > 0)
+    The minimum threshold is first estimated from the 5th percentile of idle
+    samples and then clamped between ``min_idle_lo`` and ``min_idle_hi`` times
+    the idle median.  The maximum threshold is the greater of the 95th
+    percentile or ``min_threshold + max_delta_ratio * (mcps_max - idle_median)``.
 
-
-def thresholds_from_idle(idle_samples: Iterable[np.ndarray], snr_vals: np.ndarray) -> Tuple[float, float]:
-    """Determine min/max thresholds using idle percentiles and SNR heuristics."""
+    Parameters
+    ----------
+    idle_samples:
+        Collection of idle MCPS readings.
+    mcps_max:
+        Maximum MCPS observed during the session.
+    min_idle_lo:
+        Lower clamp factor applied to the idle median when computing the minimum
+        threshold.
+    min_idle_hi:
+        Upper clamp factor applied to the idle median when computing the minimum
+        threshold.
+    max_delta_ratio:
+        Fraction of the difference between ``mcps_max`` and the idle median that
+        guarantees a minimum separation between the min and max thresholds.
+    """
 
     if not idle_samples:
         return 0.0, 0.85
+
     samples = np.concatenate([s for s in idle_samples])
+    idle_median = float(np.median(samples))
+
     min_th = float(np.percentile(samples, 5))
+    min_th = float(np.clip(min_th, min_idle_lo * idle_median, min_idle_hi * idle_median))
+
     max_th = float(np.percentile(samples, 95))
-    if np.nanmean(snr_vals) < 1.5:
-        max_th *= 0.9
+    max_th = float(max(min_th + max_delta_ratio * (mcps_max - idle_median), max_th))
+
     return min_th, max_th
 
 
@@ -258,8 +284,24 @@ def analyze(
     imbalance_ratio: float = 4.0,
     retry_axis: bool = True,
     retry_roi: bool = True,
+    idle_min_lo: float = 0.92,
+    idle_min_hi: float = 0.96,
+    max_delta: float = 0.10,
 ) -> Dict[str, object]:
-    """Apply adaptive heuristics to determine ROI, thresholds and zones."""
+    """Apply adaptive heuristics to determine ROI, thresholds and zones.
+
+    Parameters
+    ----------
+    groups:
+        Mapping of grid/mode combinations to collected scan data.
+    mad_factor, cv_limit, imbalance_ratio, retry_axis, retry_roi:
+        Existing tuning parameters for ROI selection.
+    idle_min_lo, idle_min_hi:
+        Clamp factors for the idle median when computing the minimum threshold.
+    max_delta:
+        Fraction of the dynamic range added to the minimum threshold when
+        deriving the maximum threshold.
+    """
 
     best_key = None
     best_var = float("inf")
@@ -270,7 +312,6 @@ def analyze(
         mean, var = grp.stats()
         floor = mcps_floor(grp.trials)
         mask = stable_mask(mean, var, floor, cv_limit=cv_limit, mad_factor=mad_factor)
-        snr_vals = snr(mean, var)
         var_score = np.nanmean(var[mask])
         budget = RANGING_BUDGET.get(grp.mode, 999)
         if var_score < best_var or (np.isclose(var_score, best_var) and budget < best_budget):
@@ -282,7 +323,6 @@ def analyze(
                 "mean": mean,
                 "var": var,
                 "mask": mask,
-                "snr": snr_vals,
                 "floor": floor,
             }
 
@@ -293,7 +333,6 @@ def analyze(
     mean = best_data["mean"]
     var = best_data["var"]
     mask = best_data["mask"]
-    snr_vals = best_data["snr"]
     grid = grp.grid
     coords = np.indices((grid, grid)).reshape(2, -1).T.astype(float)
     roi_mask = mask
@@ -335,7 +374,14 @@ def analyze(
     else:
         entry_c, exit_c = centers[1], centers[0]
 
-    thr_min, thr_max = thresholds_from_idle(grp.idle_trials, snr_vals)
+    mcps_max = float(np.nanmax(mean))
+    thr_min, thr_max = thresholds_from_idle(
+        grp.idle_trials,
+        mcps_max,
+        min_idle_lo=idle_min_lo,
+        min_idle_hi=idle_min_hi,
+        max_delta_ratio=max_delta,
+    )
     trials_needed = recommended_trials(var, mean)
 
     return {
@@ -384,6 +430,24 @@ def main() -> None:
         help="Disable retry with expanded ROI on imbalance",
     )
     parser.add_argument(
+        "--idle-min-low",
+        type=float,
+        default=None,
+        help="Lower clamp factor for idle median (default 0.92)",
+    )
+    parser.add_argument(
+        "--idle-min-high",
+        type=float,
+        default=None,
+        help="Upper clamp factor for idle median (default 0.96)",
+    )
+    parser.add_argument(
+        "--max-delta-factor",
+        type=float,
+        default=None,
+        help="Fraction of dynamic range added to min threshold (default 0.10)",
+    )
+    parser.add_argument(
         "--config",
         type=Path,
         default=None,
@@ -403,6 +467,15 @@ def main() -> None:
     )
     retry_axis = cfg.get("retry_axis", True) and not args.no_retry_axis
     retry_roi = cfg.get("retry_roi", True) and not args.no_retry_roi
+    idle_min_low = (
+        args.idle_min_low if args.idle_min_low is not None else cfg.get("idle_min_low", 0.92)
+    )
+    idle_min_high = (
+        args.idle_min_high if args.idle_min_high is not None else cfg.get("idle_min_high", 0.96)
+    )
+    max_delta = (
+        args.max_delta_factor if args.max_delta_factor is not None else cfg.get("max_delta_factor", 0.10)
+    )
     groups = load_session(args.session_dir)
     groups = apply_history(groups, args.session_dir, args.half_life)
     result = analyze(
@@ -412,6 +485,9 @@ def main() -> None:
         imbalance_ratio=imbalance_ratio,
         retry_axis=retry_axis,
         retry_roi=retry_roi,
+        idle_min_lo=idle_min_low,
+        idle_min_hi=idle_min_high,
+        max_delta=max_delta,
     )
     out_file = args.session_dir / "roi_result.json"
     with out_file.open("w", encoding="utf-8") as fh:

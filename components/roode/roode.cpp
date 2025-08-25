@@ -119,9 +119,7 @@ Roode::~Roode() {
   delete exit;
 }
 
-void Roode::set_auto_calibration_interval_sec(uint32_t sec) {
-  auto_calibration_interval_sec_ = sec;
-}
+void Roode::set_auto_calibration_interval_sec(uint32_t sec) { auto_calibration_interval_sec_ = sec; }
 void Roode::dump_config() {
   ESP_LOGCONFIG(TAG, "Roode:");
   ESP_LOGCONFIG(TAG, "  Sample size: %d", samples);
@@ -785,16 +783,19 @@ void Roode::start_passive_scan() {
   scan_record_count_ = 0;
   const std::vector<int> grids{4, 8, 16};
   const char *modes[] = {"short", "medium", "long"};
+  constexpr int base_trials = 3;
+  constexpr int max_trials = 5;
   for (int grid : grids) {
-    for (int trial = 1; trial <= 3; ++trial) {
-      for (const char *mode : modes) {
-        const RangingMode *ranging_mode = Ranging::Short;
-        if (strcmp(mode, "medium") == 0)
-          ranging_mode = Ranging::Medium;
-        else if (strcmp(mode, "long") == 0)
-          ranging_mode = Ranging::Long;
-        distanceSensor->set_ranging_mode(ranging_mode);
+    for (const char *mode : modes) {
+      const RangingMode *ranging_mode = Ranging::Short;
+      if (strcmp(mode, "medium") == 0)
+        ranging_mode = Ranging::Medium;
+      else if (strcmp(mode, "long") == 0)
+        ranging_mode = Ranging::Long;
+      distanceSensor->set_ranging_mode(ranging_mode);
 
+      std::vector<float> cv_trials;
+      for (int trial = 1; trial <= max_trials; ++trial) {
         std::vector<int> mcps(grid * grid, 0);
         std::vector<int> distance(grid * grid, 0);
 
@@ -844,6 +845,7 @@ void Roode::start_passive_scan() {
         float cv_trial = mean_dist != 0.0f ? (sqrtf(var_dist) / mean_dist) * 100.0f : 0.0f;
         if (trial_bump_cv_sensor != nullptr)
           trial_bump_cv_sensor->publish_state(cv_trial);
+        cv_trials.push_back(cv_trial);
 
         std::stringstream mcps_ss;
         mcps_ss << '[';
@@ -873,6 +875,15 @@ void Roode::start_passive_scan() {
         json << ",\"timestamp\":\"" << ts << "\"";
         json << ",\"data\":{\"mcps\":" << mcps_ss.str() << ",\"distance\":" << dist_ss.str() << "}}";
         publish_scan_record(json.str());
+
+        if (trial >= base_trials) {
+          float avg_cv = 0.0f;
+          for (float cv : cv_trials)
+            avg_cv += cv;
+          avg_cv /= cv_trials.size();
+          if (avg_cv <= trial_bump_cv_ || trial == max_trials)
+            break;
+        }
       }
     }
   }

@@ -59,6 +59,7 @@ CONF_RESTART_TIMEOUT = "restart_timeout"
 CONF_CPU_OPTIMIZATION = "cpu_optimization"
 CONF_ACTIVATE = "activate"
 CONF_DEACTIVATE = "deactivate"
+CONF_TRIAL_BUMP_CV = "trial_bump_cv"
 CONF_ROI_RESULT = "roi_result"
 
 FilterMode = roode_ns.enum("FilterMode")
@@ -129,6 +130,7 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional(CONF_DEACTIVATE, default=0.50): cv.percentage,
             }
         ),
+        cv.Optional(CONF_TRIAL_BUMP_CV, default=0.20): cv.percentage,
         cv.Optional(CONF_ROI_RESULT): cv.file_,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
@@ -176,6 +178,7 @@ async def to_code(config: Dict):
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
     cg.add(roode.set_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT]))
     cg.add(roode.set_restart_timeout(config[CONF_RESTART_TIMEOUT]))
+    cg.add(roode.set_trial_bump_cv(config[CONF_TRIAL_BUMP_CV] * 100.0))
     cpu_conf = config.get(CONF_CPU_OPTIMIZATION, {})
     cg.add(
         roode.set_cpu_optimization_thresholds(

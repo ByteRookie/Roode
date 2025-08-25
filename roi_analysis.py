@@ -435,7 +435,12 @@ def analyze(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("session_dir", type=Path, help="Path to session directory")
-    parser.add_argument("--half-life", type=float, default=24.0, help="Historical weighting half-life in hours")
+    parser.add_argument(
+        "--half-life",
+        type=float,
+        default=14.0,
+        help="Historical weighting half-life in days (default: 14)",
+    )
     parser.add_argument(
         "--mad-factor",
         type=float,
@@ -512,7 +517,7 @@ def main() -> None:
         args.target_snr if args.target_snr is not None else cfg.get("target_snr", 7.0)
     )
     groups = load_session(args.session_dir)
-    groups = apply_history(groups, args.session_dir, args.half_life)
+    groups = apply_history(groups, args.session_dir, args.half_life * 24.0)
     result = analyze(
         groups,
         mad_factor=mad_factor,

@@ -233,6 +233,15 @@ def kmeans(points: np.ndarray, weights: np.ndarray, iterations: int = 100) -> np
     return centers
 
 
+def cluster_weight_ratio(points: np.ndarray, weights: np.ndarray, centers: np.ndarray) -> float:
+    """Return ratio of total weights between the two clusters."""
+    dists = ((points[:, None, :] - centers[None, :, :]) ** 2).sum(axis=2)
+    labels = dists.argmin(axis=1)
+    totals = [weights[labels == i].sum() for i in range(2)]
+    if min(totals) <= 0:
+        return float("inf")
+    return float(max(totals) / min(totals))
+
 def recommended_trials(var: np.ndarray, mean: np.ndarray) -> int:
     """Return 5 if average CV across trials >0.20 else 3."""
 
@@ -246,6 +255,9 @@ def analyze(
     groups: Dict[Tuple[int, str], ScanGroup],
     mad_factor: float = 0.5,
     cv_limit: float | None = None,
+    imbalance_ratio: float = 4.0,
+    retry_axis: bool = True,
+    retry_roi: bool = True,
 ) -> Dict[str, object]:
     """Apply adaptive heuristics to determine ROI, thresholds and zones."""
 
@@ -283,25 +295,41 @@ def analyze(
     mask = best_data["mask"]
     snr_vals = best_data["snr"]
     grid = grp.grid
-
-    cx, cy = weighted_centroid(mean, mask, grid)
-    phys_x, phys_y = to_physical(cx, cy, grid)
-    min_x, max_x, min_y, max_y = mask_bounds(mask, grid)
-    w_px = int(round((max_x - min_x + 1) * (16 / grid)))
-    h_px = int(round((max_y - min_y + 1) * (16 / grid)))
-    roi_center = center_index(phys_x, phys_y)
-
     coords = np.indices((grid, grid)).reshape(2, -1).T.astype(float)
-    stable_pts = coords[mask]
-    stable_weights = mean[mask]
-    phys_pts = np.array([to_physical(x + 0.5, y + 0.5, grid) for x, y in stable_pts])
-    centers = kmeans(phys_pts, stable_weights)
-    weights_clusters = []
-    for c in centers:
-        dists = ((phys_pts - c) ** 2).sum(axis=1)
-        weights_clusters.append(stable_weights[dists.argmin()])
-    if max(weights_clusters) / max(1.0, min(weights_clusters)) > 4:
-        centers = kmeans(phys_pts, stable_weights, iterations=200)
+    roi_mask = mask
+    axis_done = False
+    roi_done = False
+    centers = None
+    while True:
+        cx, cy = weighted_centroid(mean, roi_mask, grid)
+        phys_x, phys_y = to_physical(cx, cy, grid)
+        min_x, max_x, min_y, max_y = mask_bounds(roi_mask, grid)
+        w_px = int(round((max_x - min_x + 1) * (16 / grid)))
+        h_px = int(round((max_y - min_y + 1) * (16 / grid)))
+        roi_center = center_index(phys_x, phys_y)
+
+        stable_pts = coords[roi_mask]
+        stable_weights = mean[roi_mask]
+        phys_pts = np.array([to_physical(x + 0.5, y + 0.5, grid) for x, y in stable_pts])
+        if len(stable_pts) < 2:
+            centers = np.array([[phys_x, phys_y], [phys_x, phys_y]])
+            break
+        centers = kmeans(phys_pts, stable_weights)
+        ratio = cluster_weight_ratio(phys_pts, stable_weights, centers)
+        if ratio <= imbalance_ratio:
+            break
+        if not axis_done and retry_axis:
+            alt = kmeans(phys_pts[:, ::-1], stable_weights)
+            alt_ratio = cluster_weight_ratio(phys_pts[:, ::-1], stable_weights, alt)
+            axis_done = True
+            if alt_ratio <= imbalance_ratio:
+                centers = alt[:, ::-1]
+                break
+        if not roi_done and retry_roi:
+            roi_mask = mean >= best_data["floor"]
+            roi_done = True
+            continue
+        break
     if centers[0, 1] <= centers[1, 1]:
         entry_c, exit_c = centers[0], centers[1]
     else:
@@ -340,6 +368,22 @@ def main() -> None:
         help="Explicit CV threshold (0-1); overrides MAD-based threshold",
     )
     parser.add_argument(
+        "--imbalance-ratio",
+        type=float,
+        default=None,
+        help="Weight ratio between clusters to trigger retries",
+    )
+    parser.add_argument(
+        "--no-retry-axis",
+        action="store_true",
+        help="Disable retry with perpendicular axis on imbalance",
+    )
+    parser.add_argument(
+        "--no-retry-roi",
+        action="store_true",
+        help="Disable retry with expanded ROI on imbalance",
+    )
+    parser.add_argument(
         "--config",
         type=Path,
         default=None,
@@ -354,9 +398,21 @@ def main() -> None:
             cfg = {}
     mad_factor = args.mad_factor if args.mad_factor is not None else cfg.get("mad_factor", 0.5)
     cv_mask = args.cv_mask if args.cv_mask is not None else cfg.get("cv_mask")
+    imbalance_ratio = (
+        args.imbalance_ratio if args.imbalance_ratio is not None else cfg.get("imbalance_ratio", 4.0)
+    )
+    retry_axis = cfg.get("retry_axis", True) and not args.no_retry_axis
+    retry_roi = cfg.get("retry_roi", True) and not args.no_retry_roi
     groups = load_session(args.session_dir)
     groups = apply_history(groups, args.session_dir, args.half_life)
-    result = analyze(groups, mad_factor=mad_factor, cv_limit=cv_mask)
+    result = analyze(
+        groups,
+        mad_factor=mad_factor,
+        cv_limit=cv_mask,
+        imbalance_ratio=imbalance_ratio,
+        retry_axis=retry_axis,
+        retry_roi=retry_roi,
+    )
     out_file = args.session_dir / "roi_result.json"
     with out_file.open("w", encoding="utf-8") as fh:
         json.dump(result, fh, indent=2)

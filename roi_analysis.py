@@ -105,6 +105,9 @@ def load_session(session_dir: Path) -> Dict[Tuple[int, str], ScanGroup]:
                 payload = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            if not isinstance(payload, dict):
+                print(f"Skipping non-dict payload: {payload!r}")
+                continue
             if payload.get("type") != "passive_scan":
                 continue
             grid = int(payload["grid"])

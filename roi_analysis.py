@@ -145,17 +145,18 @@ def stable_mask(
     mean, var:
         Per-SPAD mean and variance arrays.
     cv_limit:
-        Explicit CV threshold. If ``None`` the threshold is determined using
-        :func:`cv_threshold` with ``mad_factor``.
+        Explicit CV threshold. Defaults to ``0.25`` when ``None``.  Values
+        outside the ``0.15``–``0.35`` range raise :class:`ValueError`.
     mad_factor:
-        Multiplier for MAD when deriving ``cv_limit`` if not supplied. Typical
-        range is 0.1–2.0.
+        Deprecated; retained for backward compatibility and ignored.
     """
 
     with np.errstate(divide="ignore", invalid="ignore"):
         cv = np.sqrt(var) / mean
     if cv_limit is None:
-        cv_limit = cv_threshold(cv, mad_factor)
+        cv_limit = 0.25
+    if not 0.15 <= cv_limit <= 0.35:
+        raise ValueError("cv_limit must be between 0.15 and 0.35")
 
     med = np.median(mean)
     mad = np.median(np.abs(mean - med))
@@ -333,7 +334,12 @@ def analyze(
     ----------
     groups:
         Mapping of grid/mode combinations to collected scan data.
-    mad_factor, cv_limit, imbalance_ratio, retry_axis, retry_roi:
+    mad_factor:
+        Placeholder for backward compatibility; unused.
+    cv_limit:
+        Coefficient-of-variation threshold. Defaults to ``0.25`` and must be
+        within ``0.15``–``0.35``.
+    imbalance_ratio, retry_axis, retry_roi:
         Existing tuning parameters for ROI selection.
     idle_min_lo, idle_min_hi:
         Clamp factors for the idle median when computing the minimum threshold.
@@ -455,8 +461,8 @@ def main() -> None:
     parser.add_argument(
         "--cv-mask",
         type=float,
-        default=None,
-        help="Explicit CV threshold (0-1); overrides MAD-based threshold",
+        default=0.25,
+        help="Explicit CV threshold (0.15-0.35). Default 0.25.",
     )
     parser.add_argument(
         "--imbalance-ratio",

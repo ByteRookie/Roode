@@ -705,7 +705,7 @@ these sensors.
 1. In Home Assistant expose an `input_select` like `roode_action` with a `start_passive_scan` option.
 2. An automation calls the `python_script.start_passive_scan` helper, sending `esphome.<node>_start_passive_scan` to the device.
 3. Run `session_recorder.py` to log WebSocket output into a timestamped `calibration_*/session.json` directory.
-4. After the scan, process the session folder with `roi_analysis.py` to produce an `roi_result.json` file.  Advanced options like `--imbalance-ratio`, `--no-retry-axis`, and `--no-retry-roi` control how the script handles imbalanced zone clustering.
+4. After the scan, process the session folder with `roi_analysis.py` to produce an `roi_result.json` file.  Advanced options like `--imbalance-ratio`, `--no-retry-axis`, and `--no-retry-roi` control how the script handles imbalanced zone clustering.  Thresholds are derived from the idle median: the minimum is clamped between 92–96 % of the idle distance and the maximum is at least 10 % above the minimum.  These factors can be tuned with `--idle-min-low`, `--idle-min-high`, and `--max-delta-factor` or a configuration file.
 5. Use `apply_roi_result.py` to copy the result into Home Assistant so a build like `ota_roi_update.yaml` can include it.
 6. Compile and upload the new firmware; Roode applies the updated ROI automatically.
 

@@ -11,8 +11,8 @@
     "exit": {"center": 231}
   },
   "thresholds": {
-    "min": 0.10,
-    "max": 0.85
+    "min": 0.92,
+    "max": 1.02
   },
   "recommended_trials": 25
 }

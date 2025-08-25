@@ -154,7 +154,7 @@ async def to_code(config: Dict):
         CONF_ID: button_id,
         CONF_NAME: "Start Passive Scan",
         CONF_ICON: "mdi:radar",
-        CONF_DISABLED_BY_DEFAULT: True,
+        CONF_DISABLED_BY_DEFAULT: False,
     }
     start_scan_button = await button.new_button(btn_conf)
     cg.add(

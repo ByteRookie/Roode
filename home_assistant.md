@@ -27,7 +27,9 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
 ## Passive Scan Trigger
 
 Roode exposes a `Start Passive Scan` button entity that requests a scan
-session directly from the device. Pressing the button creates a
+session directly from the device. The button is enabled by default, so
+Home Assistant will automatically surface it in the interface. Pressing
+the button creates a
 timestamped `passive_scan_YYYY-MM-DD_HH-MM/` directory with an empty
 `session.json` and dispatches an `esphome.<node>_start_passive_scan`
 command to the ESPHome node.

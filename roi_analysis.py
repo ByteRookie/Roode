@@ -508,7 +508,8 @@ def main() -> None:
             },
         }
     )
-    json.dump(history, hist_file.open("w", encoding="utf-8"), indent=2)
+    with hist_file.open("w", encoding="utf-8") as fh:
+        json.dump(history, fh, indent=2)
     print(json.dumps(result, indent=2))
 
 

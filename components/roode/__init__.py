@@ -131,7 +131,7 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_TRIAL_BUMP_CV, default=0.20): cv.percentage,
-        cv.Optional(CONF_SCAN_TIME_CAP_SECONDS, default=60.0): cv.positive_float,
+        cv.Optional(CONF_SCAN_TIME_CAP_SECONDS, default=90.0): cv.positive_float,
         cv.Optional(CONF_ROI_RESULT): cv.file_,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {

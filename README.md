@@ -217,9 +217,8 @@ roode:
     # an example of absolute units
     # min: 50mm
     # max: 234cm
-
-  # Persist calibration data so thresholds survive restarts
-  calibration_persistence: true
+  # Automatic calibration settings (seconds)
+  auto_calibration: { interval: 14400, persist: true }
 
   # Jitter reduction options
   filter_mode: median  # min, median or percentile10
@@ -374,7 +373,7 @@ Tweak one parameter at a time and verify performance before making further adjus
 | `roode.orientation` | Optional | `parallel` | Sensor pad orientation | Sensor rotated 90° | Set to `perpendicular` | `orientation: parallel` | `orientation: perpendicular` |
 | `roode.roi` | Optional | `h16 w6` | Size of measurement window | Narrow doorway or wide hall | Change by 2–4 units or use `auto` to learn | `roi: { height: 16, width: 6 }` | `roi: auto` |
 | `roode.detection_thresholds` | Optional | `min:0% max:85%` | Distance limits for detecting people | Sensor too close or far from traffic | Raise `min` ~5% (or ~50 mm) each time | `detection_thresholds: { min: 5%, max: 85% }` | `detection_thresholds: { min: 50mm, max: 234cm }` |
-| `roode.calibration_persistence` | Optional | `false` | Save thresholds in flash | Sensor reboots often | Enable to keep tuning | `calibration_persistence: false` | `calibration_persistence: true` |
+| `roode.auto_calibration.interval` & `roode.auto_calibration.persist` | Optional | `interval: 14400, persist: false` | Auto recalibration schedule and persistence | Sensor reboots often or needs periodic tuning | Adjust interval or enable persistence | `auto_calibration: { interval: 14400, persist: false }` | `auto_calibration: { interval: 3600, persist: true }` |
 | `roode.filter_mode` & `roode.filter_window` | Optional | `min` / `5` | How samples are combined and window size | Noisy environment | Use `median`/`percentile10` with larger windows | `filter_mode: min`<br>`filter_window: 5` | `filter_mode: percentile10`<br>`filter_window: 9` |
 | `roode.log_fallback_events` | Optional | `false` | Record INT/XSHUT fallback events | Debugging unexpected counts | Enable while testing | `log_fallback_events: false` | `log_fallback_events: true` |
 | `roode.force_single_core` | Optional | `false` | Disable dual-core optimization | ESP32 issues with multi-core | Set true if crashes occur | `force_single_core: false` | `force_single_core: true` |

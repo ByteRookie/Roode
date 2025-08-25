@@ -81,10 +81,11 @@ roode:
   detection_thresholds: # defaults for both zones. These also default to 0% & 85% as previously done.
     # min: 234mm # absolute distance
     max: 85% # percent based on idle distance
+  auto_calibration: { interval: 14400, persist: false }
   zones:
     invert: true
     entry:
-      roi: auto 
+      roi: auto
     exit:
       # roi:
       #   height: 4

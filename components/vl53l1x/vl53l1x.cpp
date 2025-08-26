@@ -210,7 +210,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     return {};
   }
 
-  if (last_roi == nullptr || *roi != *last_roi) {
+  if (!last_roi_.has_value() || *roi != last_roi_.value()) {
     status = this->sensor.SetROI(roi->width, roi->height);
     if (status != VL53L1_ERROR_NONE) {
       ESP_LOGE(TAG, "Could not set ROI width/height, error code: %d", status);
@@ -223,7 +223,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
       record_failure();
       return {};
     }
-    last_roi = roi;
+    last_roi_ = *roi;
   }
 
   // Decide whether we can use the interrupt pin for this reading

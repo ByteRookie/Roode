@@ -3,6 +3,7 @@
 
 #include "VL53L1X_ULD.h"
 #include <vector>
+#include <optional>
 #include "esphome/components/i2c/i2c.h"
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
@@ -67,8 +68,8 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   optional<int16_t> offset{};
   optional<uint16_t> xtalk{};
   uint16_t timeout{};
- ROI *last_roi{};
- int recovery_count_{0};
+  std::optional<ROI> last_roi_;
+  int recovery_count_{0};
   uint8_t sensor_id_{0};
   uint8_t desired_address_{0x29};
   static std::vector<VL53L1X *> sensors;

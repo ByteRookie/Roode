@@ -69,8 +69,15 @@ def cv_threshold(cv_values: np.ndarray, mad_factor: float = 0.5) -> float:
     return float(med + mad_factor * mad)
 
 
-def apply_history(groups: Dict[Tuple[int, str], ScanGroup], session_dir: Path, half_life: float) -> Dict[Tuple[int, str], ScanGroup]:
-    """Merge historical sessions weighted by exponential decay."""
+def apply_history(
+    groups: Dict[Tuple[int, str], ScanGroup],
+    session_dir: Path,
+    half_life: float,
+) -> Dict[Tuple[int, str], ScanGroup]:
+    """Merge historical sessions weighted by exponential decay.
+
+    ``half_life`` is specified in hours.
+    """
 
     hist_file = session_dir / "history.json"
     if not hist_file.exists():
@@ -443,8 +450,8 @@ def main() -> None:
     parser.add_argument(
         "--half-life",
         type=float,
-        default=14.0,
-        help="Historical weighting half-life in days (default: 14)",
+        default=336.0,
+        help="Historical weighting half-life in hours (default: 14 days)",
     )
     parser.add_argument(
         "--mad-factor",
@@ -522,7 +529,7 @@ def main() -> None:
         args.target_snr if args.target_snr is not None else cfg.get("target_snr", 7.0)
     )
     groups = load_session(args.session_dir)
-    groups = apply_history(groups, args.session_dir, args.half_life * 24.0)
+    groups = apply_history(groups, args.session_dir, args.half_life)
     result = analyze(
         groups,
         mad_factor=mad_factor,

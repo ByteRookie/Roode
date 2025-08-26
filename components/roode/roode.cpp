@@ -528,6 +528,8 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
     calibration_prefs_[zone_id].save(&calibration_data_[zone_id]);
   }
 
+  App.feed_wdt();
+
   // Publish the updated calibration data so Home Assistant sees the new
   // thresholds and ROI values immediately after a fail-safe recalibration
   publish_sensor_configuration(entry, exit, true);

@@ -326,8 +326,20 @@ void Roode::loop() {
   update_metrics();
   uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
   if (auto_calibration_interval_sec_ > 0 && now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
-    run_zone_calibration(0);
-    run_zone_calibration(1);
+    bool area_clear = false;
+    if (presence_sensor != nullptr) {
+      area_clear = !presence_sensor->state;
+    } else {
+      bool entry_present = entry->getMinDistance() < entry->threshold->max && entry->getMinDistance() > entry->threshold->min;
+      bool exit_present = exit->getMinDistance() < exit->threshold->max && exit->getMinDistance() > exit->threshold->min;
+      area_clear = !entry_present && !exit_present;
+    }
+    if (area_clear) {
+      run_zone_calibration(0);
+      run_zone_calibration(1);
+    } else {
+      ESP_LOGD(CALIBRATION, "Auto calibration skipped, presence detected");
+    }
   }
   delay(polling_interval_ms_);
 }

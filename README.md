@@ -57,8 +57,8 @@ calibration workflow in Home Assistant without any coding knowledge:
 4. **Install helper scripts**: copy `homeassistant/python_scripts/start_passive_scan.py`
    and `homeassistant/python_scripts/apply_roi_result.py` into the
    `python_scripts/` directory of Home Assistant.
-5. **Restart Home Assistant**. A new *Roode* dashboard with a *Start Scan*
-   button appears.
+5. **Restart Home Assistant**. A new *Roode* dashboard with *Start Scan* and
+   *Recalibrate* buttons appears.
 6. **Run a scan**: press *Start Scan*, walk through the doorway once, and wait
    until the dashboard shows the result.
 7. **Accept the result**: click *Accept ROI* to apply the automatically
@@ -649,6 +649,7 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
 | Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
 | Persistent calibration | Calibration data can persist in flash across reboots |
+| Manual recalibration button | Exposes a `Recalibrate` button for on-demand calibration |
 | Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
 | Filtering options | Median/percentile filters smooth jitter with adjustable window |
 | FSM timeouts | Resets the state machine when a transition stalls |

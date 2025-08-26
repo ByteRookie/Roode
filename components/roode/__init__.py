@@ -181,6 +181,26 @@ async def to_code(config: Dict):
         )
     )
 
+    button_id = ID(f"{config[CONF_ID].id}_recalibrate")
+    button_id.type = template_button.TemplateButton
+    btn_conf = {
+        CONF_ID: button_id,
+        CONF_NAME: "Recalibrate",
+        CONF_ICON: "mdi:restart",
+        CONF_DISABLED_BY_DEFAULT: False,
+    }
+    recalibration_button = await button.new_button(btn_conf)
+    cg.add(
+        recalibration_button.set_entity_category(
+            cg.EntityCategory.ENTITY_CATEGORY_CONFIG
+        )
+    )
+    cg.add(
+        recalibration_button.add_on_press_callback(
+            cg.RawExpression(f"std::bind(&{Roode}::recalibration, {roode})")
+        )
+    )
+
     sens = await cg.get_variable(config[CONF_SENSOR])
     cg.add(roode.set_tof_sensor(sens))
 

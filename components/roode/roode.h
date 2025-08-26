@@ -187,13 +187,13 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
     uint16_t baseline_mm;
     uint16_t threshold_min_mm;
     uint16_t threshold_max_mm;
-    uint32_t last_calibrated_ts;
+    uint32_t last_calibrated_sec;  // monotonic seconds since boot
   };
   CalibrationPrefs calibration_data_[2];
   ESPPreferenceObject calibration_prefs_[2];
   bool calibration_persistence_{false};
   bool fail_safe_triggered_{false};
-  uint32_t last_calibration_ts_{0};
+  uint32_t last_calibration_sec_{0};  // monotonic seconds since boot
   uint32_t auto_calibration_interval_sec_{4 * 60 * 60};
 
   FilterMode filter_mode_{FILTER_MIN};

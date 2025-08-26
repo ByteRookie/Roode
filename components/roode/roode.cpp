@@ -195,7 +195,7 @@ void Roode::setup() {
   } else {
     calibrate_zones();
   }
-  last_calibration_ts_ = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  last_calibration_sec_ = std::max(calibration_data_[0].last_calibrated_sec, calibration_data_[1].last_calibrated_sec);
 #ifdef CONFIG_IDF_TARGET_ESP32
   if (!force_single_core_) {
     log_event("use_dual_core");
@@ -324,8 +324,8 @@ void Roode::loop() {
   loop_time_sum_ += delta;
   loop_count_++;
   update_metrics();
-  uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
-  if (auto_calibration_interval_sec_ > 0 && now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
+  uint32_t now_sec = static_cast<uint32_t>(millis() / 1000);
+  if (auto_calibration_interval_sec_ > 0 && now_sec - last_calibration_sec_ >= auto_calibration_interval_sec_) {
     run_zone_calibration(0);
     run_zone_calibration(1);
   }
@@ -523,7 +523,7 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   calibration_data_[zone_id].baseline_mm = z->threshold->idle;
   calibration_data_[zone_id].threshold_min_mm = z->threshold->min;
   calibration_data_[zone_id].threshold_max_mm = z->threshold->max;
-  calibration_data_[zone_id].last_calibrated_ts = static_cast<uint32_t>(time(nullptr));
+  calibration_data_[zone_id].last_calibrated_sec = static_cast<uint32_t>(millis() / 1000);
   if (calibration_persistence_) {
     calibration_prefs_[zone_id].save(&calibration_data_[zone_id]);
   }
@@ -532,7 +532,7 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   // thresholds and ROI values immediately after a fail-safe recalibration
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
-  last_calibration_ts_ = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  last_calibration_sec_ = std::max(calibration_data_[0].last_calibrated_sec, calibration_data_[1].last_calibrated_sec);
   publish_feature_list();
 }
 
@@ -647,16 +647,16 @@ void Roode::calibrate_zones() {
   publish_sensor_configuration(entry, exit, false);
 
   calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max,
-                          static_cast<uint32_t>(time(nullptr))};
+                          static_cast<uint32_t>(millis() / 1000)};
   calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max,
-                          static_cast<uint32_t>(time(nullptr))};
+                          static_cast<uint32_t>(millis() / 1000)};
 
   if (calibration_persistence_) {
     calibration_prefs_[0].save(&calibration_data_[0]);
     calibration_prefs_[1].save(&calibration_data_[1]);
   }
   ESP_LOGI(SETUP, "Finished calibrating sensor zones");
-  last_calibration_ts_ = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  last_calibration_sec_ = std::max(calibration_data_[0].last_calibrated_sec, calibration_data_[1].last_calibrated_sec);
   publish_feature_list();
 }
 
@@ -721,18 +721,14 @@ void Roode::publish_feature_list() {
     return std::string(buf);
   };
 
-  auto fmt_time = [](uint32_t epoch) {
-    if (epoch == 0)
+  auto fmt_time = [](uint32_t sec) {
+    if (sec == 0)
       return std::string("unknown");
-    time_t t = epoch;
-    struct tm tm_time;
-    if (!localtime_r(&t, &tm_time))
-      return std::string("unknown");
-    char buf[8];
-    int hour = tm_time.tm_hour % 12;
-    if (hour == 0)
-      hour = 12;
-    snprintf(buf, sizeof(buf), "%d:%02d%cM", hour, tm_time.tm_min, tm_time.tm_hour >= 12 ? 'P' : 'A');
+    uint32_t elapsed = millis() / 1000 - sec;
+    uint32_t hour = elapsed / 3600;
+    uint32_t minute = (elapsed % 3600) / 60;
+    char buf[12];
+    snprintf(buf, sizeof(buf), "%uh%02um", hour, minute);
     return std::string(buf);
   };
 
@@ -751,8 +747,8 @@ void Roode::publish_feature_list() {
   features.push_back({"ram", fmt_bytes(ESP.getHeapSize())});
   features.push_back({"flash", fmt_bytes(ESP.getFlashChipSize())});
   features.push_back({"calibration_value", std::to_string(entry->threshold->idle)});
-  uint32_t last_cal_epoch = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
-  features.push_back({"calibration", fmt_time(last_cal_epoch)});
+  uint32_t last_cal_sec = std::max(calibration_data_[0].last_calibrated_sec, calibration_data_[1].last_calibrated_sec);
+  features.push_back({"calibration", fmt_time(last_cal_sec)});
 
   std::string feature_list;
   for (size_t i = 0; i < features.size(); ++i) {
@@ -892,7 +888,8 @@ void Roode::start_passive_scan() {
         json << ",\"trial\":" << trial;
         json << ",\"ranging\":\"" << mode << "\"";
         json << ",\"timestamp\":\"" << ts << "\"";
-        json << ",\"data\":{\"mcps\":" << mcps_ss.str() << ",\"distance\":" << dist_ss.str() << ",\"snr\":" << snr_ss.str() << "}}";
+        json << ",\"data\":{\"mcps\":" << mcps_ss.str() << ",\"distance\":" << dist_ss.str()
+             << ",\"snr\":" << snr_ss.str() << "}}";
         publish_scan_record(json.str());
 
         if (trial >= base_trials) {

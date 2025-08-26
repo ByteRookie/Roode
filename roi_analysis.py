@@ -37,7 +37,8 @@ class ScanGroup:
     mode: str
     trials: List[np.ndarray]
     timestamps: List[datetime]
-    idle_trials: List[np.ndarray]
+    idle_dists: List[np.ndarray]
+    idle_mcps: List[np.ndarray] = field(default_factory=list)
     snr_trials: List[np.ndarray] = field(default_factory=list)
 
     def stats(self) -> Tuple[np.ndarray, np.ndarray]:
@@ -89,7 +90,7 @@ def apply_history(groups: Dict[Tuple[int, str], ScanGroup], session_dir: Path, h
         for key_str, trial_list in entry.get("groups", {}).items():
             grid_s, mode = key_str.split("|")
             grid = int(grid_s)
-            groups.setdefault((grid, mode), ScanGroup(grid, mode, [], [], []))
+            groups.setdefault((grid, mode), ScanGroup(grid, mode, [], [], [], []))
             grp = groups[(grid, mode)]
             for arr in trial_list:
                 grp.trials.append(np.array(arr) * weight)
@@ -115,13 +116,16 @@ def load_session(session_dir: Path) -> Dict[Tuple[int, str], ScanGroup]:
             mode = payload["ranging"]
             mcps = np.array(payload["data"]["mcps"], dtype=float)
             ts = datetime.fromisoformat(payload.get("timestamp")) if "timestamp" in payload else datetime.now()
-            groups.setdefault((grid, mode), ScanGroup(grid, mode, [], [], []))
+            groups.setdefault((grid, mode), ScanGroup(grid, mode, [], [], [], []))
             grp = groups[(grid, mode)]
             grp.trials.append(mcps)
             grp.timestamps.append(ts)
-            idle = np.array(payload["data"].get("idle_mcps", []), dtype=float)
-            if idle.size:
-                grp.idle_trials.append(idle)
+            idle_dist = np.array(payload["data"].get("idle_distance", []), dtype=float)
+            if idle_dist.size:
+                grp.idle_dists.append(idle_dist)
+            idle_mcps = np.array(payload["data"].get("idle_mcps", []), dtype=float)
+            if idle_mcps.size:
+                grp.idle_mcps.append(idle_mcps)
             snr = np.array(payload["data"].get("snr", []), dtype=float)
             if snr.size:
                 grp.snr_trials.append(snr)
@@ -141,17 +145,18 @@ def stable_mask(
     mean, var:
         Per-SPAD mean and variance arrays.
     cv_limit:
-        Explicit CV threshold. If ``None`` the threshold is determined using
-        :func:`cv_threshold` with ``mad_factor``.
+        Explicit CV threshold. Defaults to ``0.25`` when ``None``.  Values
+        outside the ``0.15``–``0.35`` range raise :class:`ValueError`.
     mad_factor:
-        Multiplier for MAD when deriving ``cv_limit`` if not supplied. Typical
-        range is 0.1–2.0.
+        Deprecated; retained for backward compatibility and ignored.
     """
 
     with np.errstate(divide="ignore", invalid="ignore"):
         cv = np.sqrt(var) / mean
     if cv_limit is None:
-        cv_limit = cv_threshold(cv, mad_factor)
+        cv_limit = 0.25
+    if not 0.15 <= cv_limit <= 0.35:
+        raise ValueError("cv_limit must be between 0.15 and 0.35")
 
     med = np.median(mean)
     mad = np.median(np.abs(mean - med))
@@ -197,27 +202,28 @@ def mask_bounds(mask: np.ndarray, grid: int) -> Tuple[int, int, int, int]:
 
 
 def thresholds_from_idle(
-    idle_samples: Iterable[np.ndarray],
+    idle_distances: Iterable[np.ndarray],
     mcps_max: float,
     min_idle_lo: float = 0.92,
     min_idle_hi: float = 0.96,
+    idle_mcps: Iterable[np.ndarray] | None = None,
     snr_values: Iterable[np.ndarray] | None = None,
     target_snr: float = 7.0,
 ) -> Tuple[float, float]:
-    """Return thresholds based on clamped idle median and optional SNR data.
+    """Return threshold percentages from idle distance and optional SNR data.
 
-    The minimum threshold is first estimated from the 5th percentile of idle
-    samples and then clamped between ``min_idle_lo`` and ``min_idle_hi`` times
-    the idle median.  If SNR values are provided, the maximum threshold is the
-    lowest MCPS value whose corresponding SNR meets ``target_snr``.  When no SNR
-    data are available the maximum threshold defaults to ``0.80 * mcps_max``.
-    The result is finally clamped to ensure a minimum separation from the
-    minimum threshold.
+    The minimum threshold is estimated from the 95th percentile of idle
+    distance samples and then clamped between ``min_idle_lo`` and
+    ``min_idle_hi`` times the idle median distance.  If MCPS and SNR readings
+    are provided the maximum threshold is derived from the lowest MCPS value
+    whose corresponding SNR meets ``target_snr``.  Without SNR data the
+    maximum defaults to ``0.80 * mcps_max``.  The result is finally clamped so
+    the maximum stays at least ``10%`` above the minimum threshold.
 
     Parameters
     ----------
-    idle_samples:
-        Collection of idle MCPS readings.
+    idle_distances:
+        Collection of idle distance readings.
     mcps_max:
         Maximum MCPS observed during the session.
     min_idle_lo:
@@ -226,38 +232,37 @@ def thresholds_from_idle(
     min_idle_hi:
         Upper clamp factor applied to the idle median when computing the minimum
         threshold.
+    idle_mcps:
+        Optional collection of idle MCPS readings for SNR evaluation.
     snr_values:
-        Optional collection of SNR readings for the same SPADs as
-        ``idle_samples``.
+        Optional collection of SNR readings aligned with ``idle_mcps``.
     target_snr:
         Minimum acceptable SNR when deriving ``max_th``. Defaults to ``7``.
     """
 
-    if not idle_samples:
+    if not idle_distances:
         return 0.0, 0.85
 
-    samples = np.concatenate([s for s in idle_samples])
-    idle_median = float(np.median(samples))
+    dist_arr = np.concatenate([s for s in idle_distances])
+    idle_median = float(np.median(dist_arr))
 
-    min_th = float(np.percentile(samples, 5))
-    min_th = float(np.clip(min_th, min_idle_lo * idle_median, min_idle_hi * idle_median))
+    min_candidate = float(np.percentile(dist_arr, 95))
+    min_th = float(np.clip(min_candidate / idle_median, min_idle_lo, min_idle_hi))
 
-    if snr_values:
+    max_th = min_th + 0.10
+    if idle_mcps and snr_values:
         try:
             snr_arr = np.concatenate([s for s in snr_values])
-            mcps_arr = np.concatenate([s for s in idle_samples])
+            mcps_arr = np.concatenate([s for s in idle_mcps])
+            mcps_median = float(np.median(mcps_arr))
             valid = snr_arr >= target_snr
             if np.any(valid):
-                max_th = float(np.min(mcps_arr[valid]))
+                max_mcps = float(np.min(mcps_arr[valid]))
             else:
-                max_th = 0.80 * mcps_max
+                max_mcps = 0.80 * mcps_max
+            max_th = float(max(max_mcps / mcps_median, max_th))
         except Exception:
-            max_th = 0.80 * mcps_max
-    else:
-        max_th = 0.80 * mcps_max
-
-    min_sep = min_th + 0.10 * (mcps_max - idle_median)
-    max_th = float(max(max_th, min_sep))
+            max_th = float(max(0.80 * mcps_max, max_th))
 
     return min_th, max_th
 
@@ -329,7 +334,12 @@ def analyze(
     ----------
     groups:
         Mapping of grid/mode combinations to collected scan data.
-    mad_factor, cv_limit, imbalance_ratio, retry_axis, retry_roi:
+    mad_factor:
+        Placeholder for backward compatibility; unused.
+    cv_limit:
+        Coefficient-of-variation threshold. Defaults to ``0.25`` and must be
+        within ``0.15``–``0.35``.
+    imbalance_ratio, retry_axis, retry_roi:
         Existing tuning parameters for ROI selection.
     idle_min_lo, idle_min_hi:
         Clamp factors for the idle median when computing the minimum threshold.
@@ -410,10 +420,11 @@ def analyze(
 
     mcps_max = float(np.nanmax(mean))
     thr_min, thr_max = thresholds_from_idle(
-        grp.idle_trials,
+        grp.idle_dists,
         mcps_max,
         min_idle_lo=idle_min_lo,
         min_idle_hi=idle_min_hi,
+        idle_mcps=grp.idle_mcps,
         snr_values=grp.snr_trials,
         target_snr=target_snr,
     )
@@ -435,7 +446,12 @@ def analyze(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("session_dir", type=Path, help="Path to session directory")
-    parser.add_argument("--half-life", type=float, default=24.0, help="Historical weighting half-life in hours")
+    parser.add_argument(
+        "--half-life",
+        type=float,
+        default=14.0,
+        help="Historical weighting half-life in days (default: 14)",
+    )
     parser.add_argument(
         "--mad-factor",
         type=float,
@@ -445,8 +461,8 @@ def main() -> None:
     parser.add_argument(
         "--cv-mask",
         type=float,
-        default=None,
-        help="Explicit CV threshold (0-1); overrides MAD-based threshold",
+        default=0.25,
+        help="Explicit CV threshold (0.15-0.35). Default 0.25.",
     )
     parser.add_argument(
         "--imbalance-ratio",
@@ -512,7 +528,7 @@ def main() -> None:
         args.target_snr if args.target_snr is not None else cfg.get("target_snr", 7.0)
     )
     groups = load_session(args.session_dir)
-    groups = apply_history(groups, args.session_dir, args.half_life)
+    groups = apply_history(groups, args.session_dir, args.half_life * 24.0)
     result = analyze(
         groups,
         mad_factor=mad_factor,

@@ -1,11 +1,8 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import binary_sensor
-import esphome.final_validate as fv
 from esphome.const import (
     CONF_ID,
-    CONF_DEVICE_CLASS,
-    DEVICE_CLASS_OCCUPANCY,
 )
 from . import Roode, CONF_ROODE_ID
 
@@ -33,22 +30,8 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
     }
+
 )
-
-
-# def validate_can_use_presence(value):
-#     main = fv.full_config.get()["roode"][0]
-#     presence_sensor = main.get(CONF_USE_PRESENCE)
-#     print(presence_sensor)
-#     if presence_sensor == False:
-#         raise cv.Invalid("Presence sensor is not enabled")
-#     else:
-#         return presence_sensor
-
-
-# FINAL_VALIDATE_SCHEMA = cv.Schema(
-#     {cv.Optional(CONF_PRESENCE): validate_can_use_presence}, extra=cv.ALLOW_EXTRA
-# )
 
 
 async def setup_conf(config, key, hub):

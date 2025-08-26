@@ -482,6 +482,11 @@ calibration:6:01PM
 | `enabled_features` | text_sensor | List of active runtime features |
 
 
+Presence sensors are enabled simply by defining the `presence_sensor` option in
+the YAML configuration. There is no separate toggle or final validation step
+required for this sensor.
+
+
 ### Threshold distance
 
 A crossing is detected when the measured distance for a zone falls between its

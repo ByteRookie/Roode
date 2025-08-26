@@ -94,11 +94,6 @@ button:
   - platform: restart
     name: $friendly_name Restart
     entity_category: config
-  - platform: template
-    name: $friendly_name Recalibrate
-    on_press:
-      - lambda: id(roode_platform)->recalibration();
-    entity_category: config
 
 number:
   - platform: roode

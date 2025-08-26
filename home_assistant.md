@@ -1,6 +1,5 @@
-To make all functions of Roode work with home assistant you need to set up a few entities and automations. 
-Roode has endpoints to set the count value, reset the counter to 0 and to recalibrate. Unfortunately its not possible to expose buttons via ESPHome that do just that.
-
+To make all functions of Roode work with home assistant you need to set up a few entities and automations.
+Roode now exposes button entities to start a passive scan or force a recalibration, so no manual template buttons are required.
 ```
 # This automation script runs when the counter has changed.
 # It sets the value slider on the GUI. This slides also had its own automation when the value is changed.
@@ -26,13 +25,14 @@ Roode has endpoints to set the count value, reset the counter to 0 and to recali
 
 ## Passive Scan Trigger
 
-Roode exposes a `Start Passive Scan` button entity that requests a scan
-session directly from the device. The button is enabled by default, so
-Home Assistant will automatically surface it in the interface. Pressing
-the button creates a
+Roode exposes `Start Passive Scan` and `Recalibrate` button entities that
+request a scan session or rerun the calibration directly from the device.
+Both buttons are enabled by default, so Home Assistant will automatically
+surface them in the interface. Pressing the scan button creates a
 timestamped `passive_scan_YYYY-MM-DD_HH-MM/` directory with an empty
 `session.json` and dispatches an `esphome.<node>_start_passive_scan`
-command to the ESPHome node.
+command to the ESPHome node. The `Recalibrate` button immediately invokes
+the device's calibration routine.
 
 ## Calibration Dashboard
 

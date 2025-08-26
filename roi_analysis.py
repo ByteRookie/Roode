@@ -252,9 +252,13 @@ def thresholds_from_idle(
 
     dist_arr = np.concatenate([s for s in idle_distances])
     idle_median = float(np.median(dist_arr))
-
+    # Estimate the minimum threshold from the 95th percentile of idle distance
+    # samples and clamp it to a safe range relative to the idle median.
     min_candidate = float(np.percentile(dist_arr, 95))
-    min_th = float(np.clip(min_candidate / idle_median, min_idle_lo, min_idle_hi))
+    min_candidate = float(
+        np.clip(min_candidate, min_idle_lo * idle_median, min_idle_hi * idle_median)
+    )
+    min_th = min_candidate / idle_median
 
     max_th = min_th + 0.10
     if idle_mcps and snr_values:

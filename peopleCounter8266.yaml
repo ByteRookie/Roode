@@ -11,6 +11,10 @@ external_components:
 
 esphome:
   name: $devicename
+  on_boot:
+    priority: 600
+    then:
+      - lambda: 'id(management_portal_base).deinit();'
   platform: ESP8266
   board: d1_mini
 
@@ -40,7 +44,11 @@ ota:
   password: !secret ota_password
 
 web_server:
+  id: management_portal_server
+  web_server_base_id: management_portal_base
   port: 80
+  js_include: comingsoon.js
+  js_url: ""
   auth:
     username: admin
     password: !secret web_password
@@ -88,6 +96,15 @@ roode:
   # This allows for detecting whether a crossing is an entry or exit based on which zones was crossed first.
   zones:
     invert: true
+
+switch:
+  - platform: template
+    id: management_portal_switch
+    name: $friendly_name Management Portal
+    turn_on_action:
+      - lambda: 'id(management_portal_base).init();'
+    turn_off_action:
+      - lambda: 'id(management_portal_base).deinit();'
 
 button:
   - platform: restart

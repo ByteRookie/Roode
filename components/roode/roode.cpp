@@ -5,6 +5,8 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <utility>
 #include <ctime>
 #include <sstream>
 #include <cstring>
@@ -254,6 +256,7 @@ void Roode::register_server_endpoints() {
       exit_thr["max"] = recommended_settings_->exit_threshold_max;
       doc["samples"] = recommended_settings_->samples;
       doc["firmware"] = recommended_settings_->firmware.c_str();
+      doc["ranging_mode"] = recommended_settings_->ranging_mode.c_str();
     } else {
       JsonObject entry_cfg = doc.createNestedObject("entry");
       JsonObject entry_roi = entry_cfg.createNestedObject("roi");
@@ -273,6 +276,9 @@ void Roode::register_server_endpoints() {
       exit_thr["max"] = exit->threshold->max;
       doc["samples"] = samples;
       doc["firmware"] = VERSION;
+      auto mode = this->distanceSensor->get_ranging_mode_override();
+      if (mode.has_value())
+        doc["ranging_mode"] = mode.value()->name;
     }
     std::string out;
     serializeJson(doc, out);
@@ -295,6 +301,12 @@ void Roode::register_server_endpoints() {
       samples = recommended_settings_->samples;
       entry->set_max_samples(samples);
       exit->set_max_samples(samples);
+      const RangingMode *mode = Ranging::Short;
+      if (recommended_settings_->ranging_mode == "medium")
+        mode = Ranging::Medium;
+      else if (recommended_settings_->ranging_mode == "long")
+        mode = Ranging::Long;
+      distanceSensor->set_ranging_mode(mode);
       applied = true;
       recommended_settings_.reset();
     }
@@ -1097,6 +1109,13 @@ void Roode::start_passive_scan() {
   scan_total_steps_ = grids.size() * (sizeof(modes) / sizeof(modes[0])) * max_trials;
   scan_progress_ = 0.0f;
   recommended_settings_.reset();
+  struct ScanGroup {
+    int grid;
+    std::string mode;
+    std::vector<std::vector<int>> mcps_trials;
+    std::vector<std::vector<int>> distance_trials;
+  };
+  std::vector<ScanGroup> groups;
   for (int grid : grids) {
     if (scan_cancel_requested) {
       publish_scan_record("scan_cancel");
@@ -1122,7 +1141,7 @@ void Roode::start_passive_scan() {
       else if (strcmp(mode, "long") == 0)
         ranging_mode = Ranging::Long;
       distanceSensor->set_ranging_mode(ranging_mode);
-
+      ScanGroup group{grid, mode, {}, {}};
       std::vector<float> cv_trials;
       for (int trial = 1; trial <= max_trials; ++trial) {
         if (scan_cancel_requested) {
@@ -1201,6 +1220,8 @@ void Roode::start_passive_scan() {
           dist_ss << distance[i];
         }
         dist_ss << ']';
+        group.mcps_trials.push_back(mcps);
+        group.distance_trials.push_back(distance);
         std::stringstream snr_ss;
         snr_ss << '[';
         for (size_t i = 0; i < snr.size(); ++i) {
@@ -1235,15 +1256,261 @@ void Roode::start_passive_scan() {
             break;
         }
       }
+      groups.push_back(std::move(group));
     }
   }
+  // Analyze collected data to determine recommended settings
+  bool rec_valid = false;
+  const ScanGroup *best_group = nullptr;
+  std::vector<float> best_mean;
+  std::vector<float> best_var;
+  std::vector<bool> best_mask;
+  int best_grid = 0;
+  std::string best_mode;
+  float best_var_score = std::numeric_limits<float>::infinity();
+  uint16_t best_budget = std::numeric_limits<uint16_t>::max();
+
+  for (const auto &g : groups) {
+    size_t trials = g.mcps_trials.size();
+    if (trials == 0)
+      continue;
+    int cells = g.grid * g.grid;
+    std::vector<float> mean(cells, 0.0f);
+    std::vector<float> var(cells, 0.0f);
+    for (const auto &t : g.mcps_trials) {
+      for (int i = 0; i < cells; ++i)
+        mean[i] += t[i];
+    }
+    for (int i = 0; i < cells; ++i)
+      mean[i] /= static_cast<float>(trials);
+    for (const auto &t : g.mcps_trials) {
+      for (int i = 0; i < cells; ++i) {
+        float diff = t[i] - mean[i];
+        var[i] += diff * diff;
+      }
+    }
+    for (int i = 0; i < cells; ++i)
+      var[i] /= static_cast<float>(trials);
+    std::vector<float> mean_copy = mean;
+    std::nth_element(mean_copy.begin(), mean_copy.begin() + mean_copy.size() / 2, mean_copy.end());
+    float med = mean_copy[mean_copy.size() / 2];
+    std::vector<float> dev(cells);
+    for (int i = 0; i < cells; ++i)
+      dev[i] = fabsf(mean[i] - med);
+    std::nth_element(dev.begin(), dev.begin() + dev.size() / 2, dev.end());
+    float mad = dev[dev.size() / 2];
+    std::vector<bool> mask(cells, false);
+    float var_sum = 0.0f;
+    int mask_count = 0;
+    for (int i = 0; i < cells; ++i) {
+      bool bright = mean[i] >= med + 0.5f * mad;
+      float cv = mean[i] > 0.0f ? sqrtf(var[i]) / mean[i] : std::numeric_limits<float>::infinity();
+      if (bright && cv <= 0.25f) {
+        mask[i] = true;
+        var_sum += var[i];
+        mask_count++;
+      }
+    }
+    if (mask_count == 0)
+      continue;
+    float var_score = var_sum / static_cast<float>(mask_count);
+    uint16_t budget = 15;
+    if (g.mode == "medium")
+      budget = 20;
+    else if (g.mode == "long")
+      budget = 33;
+    if (var_score < best_var_score || (fabsf(var_score - best_var_score) < 1e-3f && budget < best_budget)) {
+      best_var_score = var_score;
+      best_budget = budget;
+      best_group = &g;
+      best_mean = mean;
+      best_var = var;
+      best_mask = mask;
+      best_grid = g.grid;
+      best_mode = g.mode;
+    }
+  }
+
+  if (best_group != nullptr) {
+    float scale = 16.0f / static_cast<float>(best_grid);
+    int cells = best_grid * best_grid;
+    int min_x = best_grid, max_x = -1, min_y = best_grid, max_y = -1;
+    std::vector<std::pair<float, int>> weighted;
+    for (int y = 0; y < best_grid; ++y) {
+      for (int x = 0; x < best_grid; ++x) {
+        int idx = y * best_grid + x;
+        if (best_mask[idx]) {
+          if (x < min_x)
+            min_x = x;
+          if (x > max_x)
+            max_x = x;
+          if (y < min_y)
+            min_y = y;
+          if (y > max_y)
+            max_y = y;
+          weighted.emplace_back(best_mean[idx], idx);
+        }
+      }
+    }
+    if (max_x < min_x) {
+      min_x = 0;
+      max_x = best_grid - 1;
+      min_y = 0;
+      max_y = best_grid - 1;
+    }
+    int roi_w = std::max(4, std::min(16, static_cast<int>(roundf((max_x - min_x + 1) * scale))));
+    int roi_h = std::max(4, std::min(16, static_cast<int>(roundf((max_y - min_y + 1) * scale))));
+
+    float cx = (best_grid - 1) / 2.0f;
+    float cy = (best_grid - 1) / 2.0f;
+    size_t N = weighted.size();
+    if (N > 0) {
+      std::sort(weighted.begin(), weighted.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+      float k = std::max(0.15f, std::min(0.30f, (64.0f / static_cast<float>(N)) * 0.05f));
+      int top_n = std::max(1, static_cast<int>(floorf(N * k)));
+      float sumw = 0.0f, sumx = 0.0f, sumy = 0.0f;
+      for (size_t i = N - top_n; i < N; ++i) {
+        int idx = weighted[i].second;
+        float w = weighted[i].first;
+        int x = idx % best_grid;
+        int y = idx / best_grid;
+        sumw += w;
+        sumx += w * (x + 0.5f);
+        sumy += w * (y + 0.5f);
+      }
+      if (sumw > 0.0f) {
+        cx = sumx / sumw;
+        cy = sumy / sumw;
+      }
+    }
+    float phys_x = cx * scale;
+    float phys_y = cy * scale;
+
+    struct Pt {
+      float x;
+      float y;
+    };
+    std::vector<Pt> pts;
+    std::vector<float> weights;
+    for (int y = 0; y < best_grid; ++y) {
+      for (int x = 0; x < best_grid; ++x) {
+        int idx = y * best_grid + x;
+        if (best_mask[idx]) {
+          pts.push_back(Pt{(x + 0.5f) * scale, (y + 0.5f) * scale});
+          weights.push_back(best_mean[idx]);
+        }
+      }
+    }
+    Pt centers[2];
+    if (pts.size() < 2) {
+      centers[0] = Pt{phys_x, phys_y};
+      centers[1] = Pt{phys_x, phys_y};
+    } else {
+      centers[0] = pts[0];
+      centers[1] = pts[1];
+      for (int iter = 0; iter < 100; ++iter) {
+        float sx[2] = {0.0f, 0.0f};
+        float sy[2] = {0.0f, 0.0f};
+        float sw[2] = {0.0f, 0.0f};
+        for (size_t i = 0; i < pts.size(); ++i) {
+          float d0 = (pts[i].x - centers[0].x) * (pts[i].x - centers[0].x) +
+                     (pts[i].y - centers[0].y) * (pts[i].y - centers[0].y);
+          float d1 = (pts[i].x - centers[1].x) * (pts[i].x - centers[1].x) +
+                     (pts[i].y - centers[1].y) * (pts[i].y - centers[1].y);
+          int lbl = d0 <= d1 ? 0 : 1;
+          sx[lbl] += pts[i].x * weights[i];
+          sy[lbl] += pts[i].y * weights[i];
+          sw[lbl] += weights[i];
+        }
+        Pt newc[2] = {centers[0], centers[1]};
+        for (int i = 0; i < 2; ++i) {
+          if (sw[i] > 0.0f) {
+            newc[i].x = sx[i] / sw[i];
+            newc[i].y = sy[i] / sw[i];
+          }
+        }
+        if (fabsf(newc[0].x - centers[0].x) < 0.01f && fabsf(newc[0].y - centers[0].y) < 0.01f &&
+            fabsf(newc[1].x - centers[1].x) < 0.01f && fabsf(newc[1].y - centers[1].y) < 0.01f) {
+          centers[0] = newc[0];
+          centers[1] = newc[1];
+          break;
+        }
+        centers[0] = newc[0];
+        centers[1] = newc[1];
+      }
+    }
+    Pt entry_c = centers[0];
+    Pt exit_c = centers[1];
+    if (centers[0].y > centers[1].y) {
+      entry_c = centers[1];
+      exit_c = centers[0];
+    }
+    uint8_t entry_center = static_cast<uint8_t>(roundf(entry_c.y) * 16 + roundf(entry_c.x) + 1);
+    uint8_t exit_center = static_cast<uint8_t>(roundf(exit_c.y) * 16 + roundf(exit_c.x) + 1);
+
+    std::vector<uint16_t> all_dist;
+    for (const auto &d : best_group->distance_trials)
+      all_dist.insert(all_dist.end(), d.begin(), d.end());
+    uint16_t thr_min = 0;
+    uint16_t thr_max = 0;
+    if (!all_dist.empty()) {
+      auto dist_copy = all_dist;
+      auto mid = dist_copy.begin() + dist_copy.size() / 2;
+      std::nth_element(dist_copy.begin(), mid, dist_copy.end());
+      float median = *mid;
+      size_t idx95 = static_cast<size_t>(roundf(0.95f * (dist_copy.size() - 1)));
+      std::nth_element(dist_copy.begin(), dist_copy.begin() + idx95, dist_copy.end());
+      float p95 = dist_copy[idx95];
+      float min_per = p95 / median;
+      if (min_per < 0.92f)
+        min_per = 0.92f;
+      if (min_per > 0.96f)
+        min_per = 0.96f;
+      float max_per = std::max(min_per + 0.10f, 0.80f);
+      thr_min = static_cast<uint16_t>(median * min_per);
+      thr_max = static_cast<uint16_t>(median * max_per);
+    }
+
+    float avg_cv = 0.0f;
+    int cv_count = 0;
+    for (int i = 0; i < cells; ++i) {
+      if (best_mean[i] > 0.0f) {
+        float cv = sqrtf(best_var[i]) / best_mean[i];
+        if (!std::isnan(cv)) {
+          avg_cv += cv;
+          cv_count++;
+        }
+      }
+    }
+    uint8_t rec_samples = 3;
+    if (cv_count > 0) {
+      avg_cv /= cv_count;
+      rec_samples = avg_cv > 0.20f ? 5 : 3;
+    }
+
+    ROI entry_roi{static_cast<uint8_t>(roi_w), static_cast<uint8_t>(roi_h), entry_center};
+    ROI exit_roi{static_cast<uint8_t>(roi_w), static_cast<uint8_t>(roi_h), exit_center};
+    RecommendedSettings rs{entry_roi, exit_roi, thr_min, thr_max, thr_min, thr_max, rec_samples, VERSION, best_mode};
+    recommended_settings_ = rs;
+    rec_valid = true;
+  }
+
+  if (!rec_valid) {
+    recommended_settings_ = RecommendedSettings{*entry->roi,
+                                                *exit->roi,
+                                                entry->threshold->min,
+                                                entry->threshold->max,
+                                                exit->threshold->min,
+                                                exit->threshold->max,
+                                                samples,
+                                                VERSION,
+                                                ""};
+  }
+
   publish_scan_record("scan_complete");
   float elapsed = (millis() - scan_start_ts_) / 1000.0f;
   if (scan_time_cap_seconds_sensor != nullptr)
     scan_time_cap_seconds_sensor->publish_state(elapsed);
-  recommended_settings_ = RecommendedSettings{
-      *entry->roi, *exit->roi, entry->threshold->min, entry->threshold->max, exit->threshold->min, exit->threshold->max,
-      samples,     VERSION};
   scan_progress_ = 1.0f;
   save_current_scan_session();
   scan_running = false;

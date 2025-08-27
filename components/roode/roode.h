@@ -67,6 +67,7 @@ struct RecommendedSettings {
   uint16_t exit_threshold_max;
   uint8_t samples;
   std::string firmware;
+  std::string ranging_mode;
 };
 
 class Roode : public PollingComponent, public api::CustomAPIDevice {

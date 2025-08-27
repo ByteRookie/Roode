@@ -23,6 +23,65 @@ Roode now exposes button entities to start a passive scan or force a recalibrati
       newCount: "{{ states('input_number.set_people32') | int }}"
 ```
 
+## Portal Switch and REST API
+
+Roode ships with an optional web portal that serves a small HTML page and a
+REST API for configuration and calibration tasks. The web server is disabled
+on boot to save memory; enable it only when needed.
+
+### Enabling the portal
+
+The example firmware defines a `portal_switch` template switch. Turning this
+switch on starts the web server and registers the portal; turning it off stops
+both the server and the portal logic:
+
+```yaml
+globals:
+  - id: portal_on
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+
+switch:
+  - platform: template
+    id: portal_switch
+    name: Portal
+    lambda: |-
+      return id(portal_on);
+    turn_on_action:
+      - lambda: |-
+          id(portal_on) = true;
+          id(roode_platform).start_portal();
+      - web_server.start:
+    turn_off_action:
+      - lambda: |-
+          id(portal_on) = false;
+          id(roode_platform).stop_portal();
+      - web_server.stop:
+```
+
+If the ESPHome `api:` component is enabled, this `Portal` switch is exposed to
+Home Assistant and can be toggled from the UI or via automations.
+
+### Endpoints
+
+When the portal is active the device serves:
+
+- `/portal` or `/` – simple HTML configuration page.
+- `/api/settings/current` – current firmware and ROI settings.
+- `/api/scan/start` *(POST)* – start a passive scan.
+- `/api/scan/status` – progress of the active scan.
+- `/api/scan/cancel` *(POST)* – cancel the running scan.
+- `/api/roi/preview` – preview recommended ROI/threshold values.
+- `/api/roi/apply` *(POST)* – apply the recommended settings.
+- `/api/scan/sessions` – list stored calibration sessions.
+- `/api/scan/session/<id>` – retrieve a specific session.
+- `/api/scan/delete` *(POST)* – delete all stored sessions.
+- `/api/export/all` – export all session data as JSON.
+
+Leave the `portal_switch` off during normal operation to keep resource usage
+low. The portal and endpoints are only loaded while the switch is on.
+
 ## Passive Scan Trigger
 
 Roode exposes `Start Passive Scan` and `Recalibrate` button entities that

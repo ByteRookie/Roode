@@ -168,6 +168,7 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
 
   void start_portal();
   void stop_portal();
+  bool apply_recommended_settings();
 
  protected:
   TofSensor *distanceSensor;

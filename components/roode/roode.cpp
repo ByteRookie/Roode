@@ -421,6 +421,9 @@ void Roode::start_portal() {
   if (web_server_base::global_web_server_base != nullptr) {
     web_server_base::global_web_server_base->init();
     register_server_endpoints();
+    ESP_LOGI(TAG, "Web server routes registered");
+  } else {
+    ESP_LOGW(TAG, "Web server base not initialized, portal start deferred");
   }
 #endif
 }

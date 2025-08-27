@@ -5,43 +5,9 @@
 #include <vector>
 #include <algorithm>
 #include <ctime>
-#ifdef USE_WEBSERVER
-#include "esphome/components/web_server_base/web_server_base.h"
-#endif
 
 namespace esphome {
 namespace roode {
-#ifdef USE_WEBSERVER
-class RoodeHttpHandler : public AsyncWebHandler {
- public:
-  explicit RoodeHttpHandler(Roode *parent) : parent_(parent) {}
-  bool canHandle(AsyncWebServerRequest *request) const override { return request->url().startsWith("/roode"); }
-  void handleRequest(AsyncWebServerRequest *request) override {
-    if (request->method() == HTTP_GET) {
-      if (request->url().endsWith("/data")) {
-        parent_->handle_data_request_(request);
-      } else {
-        parent_->handle_page_request_(request);
-      }
-    } else if (request->method() == HTTP_POST) {
-      if (request->url().endsWith("/recalibrate")) {
-        parent_->recalibration();
-        request->send(200, "text/plain", "ok");
-      } else if (request->url().endsWith("/config")) {
-        parent_->handle_config_request_(request);
-      } else {
-        request->send(404);
-      }
-    } else {
-      request->send(405);
-    }
-  }
-  bool isRequestHandlerTrivial() const override { return false; }
-
- protected:
-  Roode *parent_;
-};
-#endif
 
 // When disabled, fallback diagnostics are omitted from the log to reduce noise.
 bool Roode::log_fallback_events_ = false;
@@ -228,7 +194,8 @@ void Roode::setup() {
   } else {
     calibrate_zones();
   }
-  last_calibration_ts_ = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  last_calibration_ts_ =
+      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
 #ifdef CONFIG_IDF_TARGET_ESP32
   if (!force_single_core_) {
     log_event("use_dual_core");
@@ -288,9 +255,6 @@ void Roode::setup() {
 
   publish_feature_list();
   update_status_text("ok");
-#ifdef USE_WEBSERVER
-  register_http_handlers();
-#endif
 }
 
 void Roode::update() {
@@ -345,7 +309,8 @@ void Roode::loop() {
   } else {
     invalid_read_count_ = 0;
   }
-  if (invalid_read_count_ > invalid_distance_limit_ && (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
+  if (invalid_read_count_ > invalid_distance_limit_ &&
+      (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
     ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
     restart_sensor();
   }
@@ -364,7 +329,8 @@ void Roode::loop() {
   loop_count_++;
   update_metrics();
   uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
-  if (auto_calibration_interval_sec_ > 0 && now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
+  if (auto_calibration_interval_sec_ > 0 &&
+      now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
     run_zone_calibration(0);
     run_zone_calibration(1);
   }
@@ -580,7 +546,8 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   // thresholds and ROI values immediately after a fail-safe recalibration
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
-  last_calibration_ts_ = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  last_calibration_ts_ =
+      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
 }
 
@@ -706,7 +673,8 @@ void Roode::calibrate_zones() {
     calibration_prefs_[1].save(&calibration_data_[1]);
   }
   ESP_LOGI(SETUP, "Finished calibrating sensor zones");
-  last_calibration_ts_ = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
+  last_calibration_ts_ =
+      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
 }
 
@@ -815,106 +783,13 @@ void Roode::publish_feature_list() {
   log_event(std::string("features_enabled: ") + feature_list);
 }
 
+
 void Roode::update_status_text(const std::string &status) {
   if (status_text_sensor != nullptr && status != last_status_text_) {
     status_text_sensor->publish_state(status);
     last_status_text_ = status;
   }
 }
-
-#ifdef USE_WEBSERVER
-void Roode::register_http_handlers() {
-  if (web_server_base::global_web_server_base != nullptr) {
-    web_server_base::global_web_server_base->add_handler(new RoodeHttpHandler(this));
-  }
-}
-
-void Roode::handle_page_request_(AsyncWebServerRequest *request) {
-  static const char PROGMEM ROODE_PAGE[] = R"HTML(
-<!doctype html>
-<html>
-<head><meta charset='utf-8'><title>Roode Portal</title></head>
-<body>
-<h2>Roode Calibration</h2>
-<div id='info'></div>
-<form id='config'>
-<h3>Entry Thresholds (%)</h3>
-<label>Min <input type='number' name='entry_min' id='entry_min'></label>
-<label>Max <input type='number' name='entry_max' id='entry_max'></label>
-<h3>Exit Thresholds (%)</h3>
-<label>Min <input type='number' name='exit_min' id='exit_min'></label>
-<label>Max <input type='number' name='exit_max' id='exit_max'></label>
-<h3>Entry ROI</h3>
-<label>W <input type='number' name='entry_width' id='entry_width'></label>
-<label>H <input type='number' name='entry_height' id='entry_height'></label>
-<label>C <input type='number' name='entry_center' id='entry_center'></label>
-<h3>Exit ROI</h3>
-<label>W <input type='number' name='exit_width' id='exit_width'></label>
-<label>H <input type='number' name='exit_height' id='exit_height'></label>
-<label>C <input type='number' name='exit_center' id='exit_center'></label>
-<br/>
-<button type='button' onclick='sendConfig()'>Update</button>
-</form>
-<button onclick='recalibrate()'>Recalibrate</button>
-<script>
-async function load(){
-  const r=await fetch('/roode/data');
-  const j=await r.json();
-  info.innerText='Last calibration: '+(j.last_calibration?new Date(j.last_calibration*1000).toLocaleString():'never');
-  entry_min.value=j.entry.min_pct; entry_max.value=j.entry.max_pct;
-  exit_min.value=j.exit.min_pct; exit_max.value=j.exit.max_pct;
-  entry_width.value=j.entry.roi.width; entry_height.value=j.entry.roi.height; entry_center.value=j.entry.roi.center;
-  exit_width.value=j.exit.roi.width; exit_height.value=j.exit.roi.height; exit_center.value=j.exit.roi.center;
-}
-async function recalibrate(){await fetch('/roode/recalibrate',{method:'POST'});load();}
-async function sendConfig(){const fd=new FormData(document.getElementById('config'));await fetch('/roode/config',{method:'POST',body:fd});load();}
-load();
-</script>
-</body>
-</html>)HTML";
-  request->send_P(200, "text/html", ROODE_PAGE);
-}
-
-void Roode::handle_data_request_(AsyncWebServerRequest *request) {
-  char json[256];
-  snprintf(
-      json, sizeof(json),
-      "{\"last_calibration\":%u,\"entry\":{\"min_pct\":%u,\"max_pct\":%u,\"roi\":{\"width\":%u,\"height\":%u,"
-      "\"center\":%u}},\"exit\":{\"min_pct\":%u,\"max_pct\":%u,\"roi\":{\"width\":%u,\"height\":%u,\"center\":%u}}}",
-      last_calibration_ts_, entry->threshold->min_percentage.value_or(0), entry->threshold->max_percentage.value_or(0),
-      entry->roi->width, entry->roi->height, entry->roi->center, exit->threshold->min_percentage.value_or(0),
-      exit->threshold->max_percentage.value_or(0), exit->roi->width, exit->roi->height, exit->roi->center);
-  request->send(200, "application/json", json);
-}
-
-void Roode::handle_config_request_(AsyncWebServerRequest *request) {
-  if (request->hasParam("entry_min", true) && request->hasParam("entry_max", true)) {
-    uint8_t e_min = request->getParam("entry_min", true)->value().toInt();
-    uint8_t e_max = request->getParam("entry_max", true)->value().toInt();
-    entry->set_threshold_percentages(e_min, e_max);
-  }
-  if (request->hasParam("exit_min", true) && request->hasParam("exit_max", true)) {
-    uint8_t x_min = request->getParam("exit_min", true)->value().toInt();
-    uint8_t x_max = request->getParam("exit_max", true)->value().toInt();
-    exit->set_threshold_percentages(x_min, x_max);
-  }
-  if (request->hasParam("entry_width", true))
-    entry->roi->width = request->getParam("entry_width", true)->value().toInt();
-  if (request->hasParam("entry_height", true))
-    entry->roi->height = request->getParam("entry_height", true)->value().toInt();
-  if (request->hasParam("entry_center", true))
-    entry->roi->center = request->getParam("entry_center", true)->value().toInt();
-  if (request->hasParam("exit_width", true))
-    exit->roi->width = request->getParam("exit_width", true)->value().toInt();
-  if (request->hasParam("exit_height", true))
-    exit->roi->height = request->getParam("exit_height", true)->value().toInt();
-  if (request->hasParam("exit_center", true))
-    exit->roi->center = request->getParam("exit_center", true)->value().toInt();
-  publish_sensor_configuration(entry, exit, true);
-  publish_sensor_configuration(entry, exit, false);
-  request->send(200, "text/plain", "ok");
-}
-#endif
 
 void Roode::restart_sensor() {
   uint32_t now = millis();
@@ -938,7 +813,8 @@ void Roode::sensor_task(void *param) {
   for (;;) {
     self->use_sensor_task_ = true;
     uint32_t now = millis();
-    if (self->last_loop_update_ts_ != 0 && (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
+    if (self->last_loop_update_ts_ != 0 &&
+        (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
         (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
       ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", self->restart_timeout_ms_ / 1000);
       self->restart_sensor();

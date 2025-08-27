@@ -125,6 +125,135 @@ Roode::~Roode() {
   delete exit;
 }
 
+void Roode::register_server_endpoints() {
+#ifdef USE_WEB_SERVER
+  if (portal_registered_ || web_server_base::global_web_server_base == nullptr)
+    return;
+  auto server = web_server_base::global_web_server_base->get_server();
+  portal_registered_ = true;
+
+  server->on("/api/settings/current", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    DynamicJsonDocument doc(256);
+    doc["samples"] = samples;
+    doc["filter_window"] = filter_window_;
+    doc["filter_mode"] = static_cast<int>(filter_mode_);
+    JsonObject entry_roi = doc.createNestedObject("entry_roi");
+    entry_roi["center"] = entry->roi->center;
+    entry_roi["width"] = entry->roi->width;
+    entry_roi["height"] = entry->roi->height;
+    JsonObject exit_roi = doc.createNestedObject("exit_roi");
+    exit_roi["center"] = exit->roi->center;
+    exit_roi["width"] = exit->roi->width;
+    exit_roi["height"] = exit->roi->height;
+    std::string out;
+    serializeJson(doc, out);
+    request->send(200, "application/json", out.c_str());
+  });
+
+  server->on("/api/scan/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    DynamicJsonDocument doc(64);
+    doc["running"] = scan_running;
+    std::string out;
+    serializeJson(doc, out);
+    request->send(200, "application/json", out.c_str());
+  });
+
+  server->on("/api/scan/start", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    if (!scan_running) {
+      scan_cancel_requested = false;
+      scan_running = true;
+      this->start_passive_scan();
+      scan_running = false;
+      DynamicJsonDocument doc(64);
+      doc["started"] = true;
+      std::string out;
+      serializeJson(doc, out);
+      request->send(200, "application/json", out.c_str());
+    } else {
+      DynamicJsonDocument doc(64);
+      doc["started"] = false;
+      std::string out;
+      serializeJson(doc, out);
+      request->send(200, "application/json", out.c_str());
+    }
+  });
+
+  server->on("/api/scan/cancel", HTTP_POST, [](AsyncWebServerRequest *request) {
+    scan_cancel_requested = true;
+    DynamicJsonDocument doc(64);
+    doc["cancelled"] = true;
+    std::string out;
+    serializeJson(doc, out);
+    request->send(200, "application/json", out.c_str());
+  });
+
+  server->on("/api/roi/preview", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    DynamicJsonDocument doc(256);
+    JsonObject entry_roi = doc.createNestedObject("entry_roi");
+    entry_roi["center"] = entry->roi->center;
+    entry_roi["width"] = entry->roi->width;
+    entry_roi["height"] = entry->roi->height;
+    JsonObject exit_roi = doc.createNestedObject("exit_roi");
+    exit_roi["center"] = exit->roi->center;
+    exit_roi["width"] = exit->roi->width;
+    exit_roi["height"] = exit->roi->height;
+    std::string out;
+    serializeJson(doc, out);
+    request->send(200, "application/json", out.c_str());
+  });
+
+  server->on("/api/roi/apply", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    this->recalibration();
+    DynamicJsonDocument doc(64);
+    doc["applied"] = true;
+    std::string out;
+    serializeJson(doc, out);
+    request->send(200, "application/json", out.c_str());
+  });
+
+  server->on("/api/scan/sessions", HTTP_GET, [](AsyncWebServerRequest *request) {
+    DynamicJsonDocument doc(64);
+    doc.createNestedArray("sessions");
+    std::string out;
+    serializeJson(doc, out);
+    request->send(200, "application/json", out.c_str());
+  });
+
+  server->on(UriRegex("^/api/scan/session/(.+)$"), HTTP_GET, [](AsyncWebServerRequest *request) {
+    DynamicJsonDocument doc(128);
+    doc["id"] = request->pathArg(0).c_str();
+    std::string out;
+    serializeJson(doc, out);
+    request->send(200, "application/json", out.c_str());
+  });
+
+  server->on("/api/scan/delete", HTTP_POST, [](AsyncWebServerRequest *request) {
+    DynamicJsonDocument doc(64);
+    doc["deleted"] = true;
+    std::string out;
+    serializeJson(doc, out);
+    request->send(200, "application/json", out.c_str());
+  });
+
+  server->on("/api/export/all", HTTP_GET, [](AsyncWebServerRequest *request) {
+    DynamicJsonDocument doc(64);
+    doc["export"] = "all";
+    std::string out;
+    serializeJson(doc, out);
+    request->send(200, "application/json", out.c_str());
+  });
+#endif
+}
+
+void Roode::start_portal() {
+  portal_enabled_ = true;
+#ifdef USE_WEB_SERVER
+  register_server_endpoints();
+#endif
+}
+
+void Roode::stop_portal() { portal_enabled_ = false; }
+
 void Roode::set_auto_calibration_interval_sec(uint32_t sec) { auto_calibration_interval_sec_ = sec; }
 void Roode::dump_config() {
   ESP_LOGCONFIG(TAG, "Roode:");
@@ -143,119 +272,8 @@ void Roode::setup() {
   this->register_service(&Roode::start_passive_scan, "start_passive_scan");
 #endif
 #ifdef USE_WEB_SERVER
-  if (web_server_base::global_web_server_base != nullptr) {
-    auto server = web_server_base::global_web_server_base->get_server();
-
-    server->on("/api/settings/current", HTTP_GET, [this](AsyncWebServerRequest *request) {
-      DynamicJsonDocument doc(256);
-      doc["samples"] = samples;
-      doc["filter_window"] = filter_window_;
-      doc["filter_mode"] = static_cast<int>(filter_mode_);
-      JsonObject entry_roi = doc.createNestedObject("entry_roi");
-      entry_roi["center"] = entry->roi->center;
-      entry_roi["width"] = entry->roi->width;
-      entry_roi["height"] = entry->roi->height;
-      JsonObject exit_roi = doc.createNestedObject("exit_roi");
-      exit_roi["center"] = exit->roi->center;
-      exit_roi["width"] = exit->roi->width;
-      exit_roi["height"] = exit->roi->height;
-      std::string out;
-      serializeJson(doc, out);
-      request->send(200, "application/json", out.c_str());
-    });
-
-    server->on("/api/scan/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-      DynamicJsonDocument doc(64);
-      doc["running"] = scan_running;
-      std::string out;
-      serializeJson(doc, out);
-      request->send(200, "application/json", out.c_str());
-    });
-
-    server->on("/api/scan/start", HTTP_POST, [this](AsyncWebServerRequest *request) {
-      if (!scan_running) {
-        scan_cancel_requested = false;
-        scan_running = true;
-        this->start_passive_scan();
-        scan_running = false;
-        DynamicJsonDocument doc(64);
-        doc["started"] = true;
-        std::string out;
-        serializeJson(doc, out);
-        request->send(200, "application/json", out.c_str());
-      } else {
-        DynamicJsonDocument doc(64);
-        doc["started"] = false;
-        std::string out;
-        serializeJson(doc, out);
-        request->send(200, "application/json", out.c_str());
-      }
-    });
-
-    server->on("/api/scan/cancel", HTTP_POST, [](AsyncWebServerRequest *request) {
-      scan_cancel_requested = true;
-      DynamicJsonDocument doc(64);
-      doc["cancelled"] = true;
-      std::string out;
-      serializeJson(doc, out);
-      request->send(200, "application/json", out.c_str());
-    });
-
-    server->on("/api/roi/preview", HTTP_GET, [this](AsyncWebServerRequest *request) {
-      DynamicJsonDocument doc(256);
-      JsonObject entry_roi = doc.createNestedObject("entry_roi");
-      entry_roi["center"] = entry->roi->center;
-      entry_roi["width"] = entry->roi->width;
-      entry_roi["height"] = entry->roi->height;
-      JsonObject exit_roi = doc.createNestedObject("exit_roi");
-      exit_roi["center"] = exit->roi->center;
-      exit_roi["width"] = exit->roi->width;
-      exit_roi["height"] = exit->roi->height;
-      std::string out;
-      serializeJson(doc, out);
-      request->send(200, "application/json", out.c_str());
-    });
-
-    server->on("/api/roi/apply", HTTP_POST, [this](AsyncWebServerRequest *request) {
-      this->recalibration();
-      DynamicJsonDocument doc(64);
-      doc["applied"] = true;
-      std::string out;
-      serializeJson(doc, out);
-      request->send(200, "application/json", out.c_str());
-    });
-
-    server->on("/api/scan/sessions", HTTP_GET, [](AsyncWebServerRequest *request) {
-      DynamicJsonDocument doc(64);
-      doc.createNestedArray("sessions");
-      std::string out;
-      serializeJson(doc, out);
-      request->send(200, "application/json", out.c_str());
-    });
-
-    server->on(UriRegex("^/api/scan/session/(.+)$"), HTTP_GET, [](AsyncWebServerRequest *request) {
-      DynamicJsonDocument doc(128);
-      doc["id"] = request->pathArg(0).c_str();
-      std::string out;
-      serializeJson(doc, out);
-      request->send(200, "application/json", out.c_str());
-    });
-
-    server->on("/api/scan/delete", HTTP_POST, [](AsyncWebServerRequest *request) {
-      DynamicJsonDocument doc(64);
-      doc["deleted"] = true;
-      std::string out;
-      serializeJson(doc, out);
-      request->send(200, "application/json", out.c_str());
-    });
-
-    server->on("/api/export/all", HTTP_GET, [](AsyncWebServerRequest *request) {
-      DynamicJsonDocument doc(64);
-      doc["export"] = "all";
-      std::string out;
-      serializeJson(doc, out);
-      request->send(200, "application/json", out.c_str());
-    });
+  if (portal_enabled_) {
+    register_server_endpoints();
   }
 #endif
   if (version_sensor != nullptr) {

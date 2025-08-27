@@ -152,6 +152,9 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   Zone *exit = new Zone(1);
   static void log_event(const std::string &msg);
 
+  void start_portal();
+  void stop_portal();
+
  protected:
   TofSensor *distanceSensor;
   Zone *current_zone = entry;
@@ -182,6 +185,10 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   sensor::Sensor *variance_cv_mask_sensor{nullptr};
   sensor::Sensor *trial_bump_cv_sensor{nullptr};
   sensor::Sensor *scan_time_cap_seconds_sensor{nullptr};
+
+  void register_server_endpoints();
+  bool portal_enabled_{false};
+  bool portal_registered_{false};
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;

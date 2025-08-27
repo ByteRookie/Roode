@@ -27,32 +27,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
 - [Features](#features)
-  - [Path tracking algorithm](#path-tracking-algorithm)
-  - [Auto restart via XSHUT](#auto-restart-via-xshut)
-  - [Clean shutdown](#clean-shutdown)
-  - [Startup pin test](#startup-pin-test)
-  - [Built-in pull-ups](#built-in-pull-ups)
-  - [Metrics sensors](#metrics-sensors)
-  - [Fail-safe recalibration](#fail-safe-recalibration)
-  - [Persistent calibration](#persistent-calibration)
   - [Automatic calibration (Home Assistant Setup)](#automatic-calibration-home-assistant-setup)
-  - [Manual recalibration button](#manual-recalibration-button)
-  - [Dual-core tasking](#dual-core-tasking)
-  - [Filtering options](#filtering-options)
-  - [FSM timeouts](#fsm-timeouts)
-  - [CPU optimizations](#cpu-optimizations)
-  - [Interrupt fallback](#interrupt-fallback)
-  - [XSHUT multiplexing](#xshut-multiplexing)
-  - [Feature text sensor](#feature-text-sensor)
-  - [Manual adjustment counter](#manual-adjustment-counter)
-  - [Diagnostic sensors](#diagnostic-sensors)
-  - [Polling timeout recovery](#polling-timeout-recovery)
-  - [Consecutive failure counter](#consecutive-failure-counter)
-  - [Consecutive invalid distance recovery](#consecutive-invalid-distance-recovery)
-  - [Recovery cooldown](#recovery-cooldown)
-  - [Sensor status reporting](#sensor-status-reporting)
-  - [Event logging](#event-logging)
-  - [Colored logs](#colored-logs)
 - [Web Portal & API](#web-portal--api)
 - [Logging and Diagnostics](#logging-and-diagnostics)
 - [Calibration Workflow](#calibration-workflow)
@@ -680,56 +655,32 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 
 | Feature | Description |
 | --- | --- |
-| [Path tracking algorithm](#path-tracking-algorithm) | Distinguishes entry vs exit by tracking the order of zone crossings |
-| [Auto restart via XSHUT](#auto-restart-via-xshut) | Sensor restarts automatically if a measurement times out |
-| [Clean shutdown](#clean-shutdown) | Memory and sensor power managed on reboot |
-| [Startup pin test](#startup-pin-test) | Logs and disables features if xshut or interrupt pins fail |
-| [Built-in pull-ups](#built-in-pull-ups) | XSHUT and interrupt pins use internal pull-ups, no resistors needed |
-| [Metrics sensors](#metrics-sensors) | Optional sensors report loop time, CPU usage, RAM and flash usage |
-| [Fail-safe recalibration](#fail-safe-recalibration) | Triggers recalibration if a zone stays active too long |
-| [Persistent calibration](#persistent-calibration) | Calibration data can persist in flash across reboots |
+| Path tracking algorithm | Distinguishes entry vs exit by tracking the order of zone crossings |
+| Auto restart via XSHUT | Sensor restarts automatically if a measurement times out |
+| Clean shutdown | Memory and sensor power managed on reboot |
+| Startup pin test | Logs and disables features if xshut or interrupt pins fail |
+| Built-in pull-ups | XSHUT and interrupt pins use internal pull-ups, no resistors needed |
+| Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
+| Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
+| Persistent calibration | Calibration data can persist in flash across reboots |
 | [Automatic calibration (Home Assistant Setup)](#automatic-calibration-home-assistant-setup) | Portal-guided scan sets ROI and thresholds automatically |
-| [Manual recalibration button](#manual-recalibration-button) | Exposes a `Recalibrate` button for on-demand calibration |
-| [Dual-core tasking](#dual-core-tasking) | Keeps polling responsive on ESP32 with automatic retry/fallback |
-| [Filtering options](#filtering-options) | Median/percentile filters smooth jitter with adjustable window |
-| [FSM timeouts](#fsm-timeouts) | Resets the state machine when a transition stalls |
-| [CPU optimizations](#cpu-optimizations) | Automatic optimizations when CPU usage exceeds 90% |
-| [Interrupt fallback](#interrupt-fallback) | Interrupt mode with graceful fallback to polling and logs |
-| [XSHUT multiplexing](#xshut-multiplexing) | Supports multiple sensors sharing I²C bus |
-| [Feature text sensor](#feature-text-sensor) | Reports enabled and fallback features for diagnostics |
-| [Manual adjustment counter](#manual-adjustment-counter) | Tracks user corrections to the people count |
-| [Diagnostic sensors](#diagnostic-sensors) | Report INT/XSHUT pin states and other metrics |
-| [Polling timeout recovery](#polling-timeout-recovery) | Restarts the sensor if no data arrives for `restart_timeout` |
-| [Consecutive failure counter](#consecutive-failure-counter) | Soft-resets the sensor after 10 read errors |
-| [Consecutive invalid distance recovery](#consecutive-invalid-distance-recovery) | Restarts the sensor after too many suspect readings |
-| [Recovery cooldown](#recovery-cooldown) | Prevents another restart for `restart_timeout` |
-| [Sensor status reporting](#sensor-status-reporting) | Text sensor shows `ok`, `timeout`, `reinitializing`, `error` or `offline` |
-| [Event logging](#event-logging) | Logs sensor power cycles, fallback reasons, and manual adjustments |
-| [Colored logs](#colored-logs) | Normal info in green, details in yellow, failures in red |
-
-### Path tracking algorithm
-Distinguishes entry vs exit by tracking the sequence of zone crossings.
-
-### Auto restart via XSHUT
-If a measurement times out, the sensor automatically restarts using the XSHUT pin to recover.
-
-### Clean shutdown
-On reboot Roode shuts down cleanly, managing memory and sensor power.
-
-### Startup pin test
-At startup the device verifies XSHUT and interrupt pins, logging and disabling features if they fail.
-
-### Built-in pull-ups
-Uses internal pull-ups on XSHUT and interrupt pins, so no external resistors are required.
-
-### Metrics sensors
-Optional sensors report loop time, CPU usage, RAM and flash usage.
-
-### Fail-safe recalibration
-If a zone stays active too long Roode triggers a recalibration to maintain accuracy.
-
-### Persistent calibration
-Calibration data can persist in flash across reboots so ROI thresholds survive power cycles.
+| Manual recalibration button | Exposes a `Recalibrate` button for on-demand calibration |
+| Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
+| Filtering options | Median/percentile filters smooth jitter with adjustable window |
+| FSM timeouts | Resets the state machine when a transition stalls |
+| CPU optimizations | Automatic optimizations when CPU usage exceeds 90% |
+| Interrupt fallback | Interrupt mode with graceful fallback to polling and logs |
+| XSHUT multiplexing | Supports multiple sensors sharing I²C bus |
+| Feature text sensor | Reports enabled and fallback features for diagnostics |
+| Manual adjustment counter | Tracks user corrections to the people count |
+| Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
+| Polling timeout recovery | Restarts the sensor if no data arrives for `restart_timeout` |
+| Consecutive failure counter | Soft-resets the sensor after 10 read errors |
+| Consecutive invalid distance recovery | Restarts the sensor after too many suspect readings |
+| Recovery cooldown | Prevents another restart for `restart_timeout` |
+| Sensor status reporting | Text sensor shows `ok`, `timeout`, `reinitializing`, `error` or `offline` |
+| Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
+| Colored logs | Normal info in green, details in yellow, failures in red |
 
 ### Automatic Calibration (Home Assistant Setup)
 Roode can determine its own idle distance and zone thresholds. The sensor recalibrates itself after power-up and periodically during operation, so no manual tuning is required. The steps below show how to enable the automatic calibration workflow in Home Assistant without any coding knowledge:
@@ -740,57 +691,6 @@ Roode can determine its own idle distance and zone thresholds. The sensor recali
 4. **Apply the result**: click *Accept ROI* to apply the automatically calculated region of interest and thresholds. The device updates itself via OTA and begins counting immediately.
 
 After each reboot, leave the monitored area empty for about 10 seconds so the sensor can capture a clean baseline. Roode then recalibrates itself every few hours to maintain accuracy.
-
-### Manual recalibration button
-Provides a `Recalibrate` button for on-demand recalibration, complementing automatic scans.
-
-### Dual-core tasking
-On ESP32 platforms polling runs on a separate core to keep response times fast with automatic retry and fallback.
-
-### Filtering options
-Median and percentile filters smooth jitter with adjustable window sizes.
-
-### FSM timeouts
-Resets the state machine when a transition stalls to maintain valid counts.
-
-### CPU optimizations
-Automatically optimizes workload when CPU usage exceeds 90%.
-
-### Interrupt fallback
-Uses interrupt mode with graceful fallback to polling and logs when necessary.
-
-### XSHUT multiplexing
-Supports multiple sensors sharing the I²C bus via the XSHUT pin.
-
-### Feature text sensor
-Exposes an `enabled_features` text sensor that reports active and fallback features for diagnostics.
-
-### Manual adjustment counter
-Tracks user corrections to the people count for visibility.
-
-### Diagnostic sensors
-Report INT/XSHUT pin states and other metrics to aid troubleshooting.
-
-### Polling timeout recovery
-Restarts the sensor if no data arrives within the configured `restart_timeout`.
-
-### Consecutive failure counter
-Soft-resets the sensor after 10 consecutive read errors.
-
-### Consecutive invalid distance recovery
-Restarts the sensor after too many suspect distance readings.
-
-### Recovery cooldown
-Prevents another restart for the duration of `restart_timeout` after recovery.
-
-### Sensor status reporting
-A text sensor reports the current status: `ok`, `timeout`, `reinitializing`, `error` or `offline`.
-
-### Event logging
-Logs sensor power cycles, fallback reasons and manual adjustments for debugging.
-
-### Colored logs
-Normal info appears in green, details in yellow and failures in red for readability.
 
 ## Web Portal & API
 
@@ -827,8 +727,8 @@ details. Event logs cover power cycles of the sensor, automatic changes between
 interrupt and polling mode, and manual adjustments to the people count. Debug
 level messages were removed to keep output concise in production builds.
 
-For diagnostic entities, the [Feature text sensor](#feature-text-sensor) reports
-active features, while [Diagnostic sensors](#diagnostic-sensors) expose additional
+For diagnostic entities, the feature text sensor reports
+active features, while diagnostic sensors expose additional
 metrics:
 
 - `loop_time`, `cpu_usage`, `ram_free` and `flash_free` report resource usage.
@@ -841,7 +741,7 @@ metrics:
 - `manual_adjustment_count` records people-count corrections.
 
 See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
-these sensors. For automatic recovery features, see [Polling timeout recovery](#polling-timeout-recovery), [Consecutive failure counter](#consecutive-failure-counter), and [Recovery cooldown](#recovery-cooldown).
+these sensors. For automatic recovery features, see Polling timeout recovery, Consecutive failure counter, and Recovery cooldown.
 
 
 ## Calibration Workflow

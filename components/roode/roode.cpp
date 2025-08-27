@@ -7,6 +7,8 @@
 #include <cmath>
 #include <ctime>
 #include <sstream>
+#include <cstring>
+#include <cstdlib>
 #include <ArduinoJson.h>
 #ifdef USE_WEB_SERVER
 #include "esphome/components/web_server_base/web_server_base.h"
@@ -24,6 +26,14 @@ static bool scan_cancel_requested = false;
 static std::string format_timestamp(uint32_t sec_since_boot) {
   uint32_t now_sec = millis() / 1000;
   time_t epoch = time(nullptr) - (now_sec - sec_since_boot);
+  struct tm tm_time;
+  localtime_r(&epoch, &tm_time);
+  char buf[25];
+  strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm_time);
+  return std::string(buf);
+}
+
+static std::string format_epoch(time_t epoch) {
   struct tm tm_time;
   localtime_r(&epoch, &tm_time);
   char buf[25];
@@ -289,23 +299,55 @@ void Roode::register_server_endpoints() {
     request->send(200, "application/json", out.c_str());
   });
 
-  server->on("/api/scan/sessions", HTTP_GET, [](AsyncWebServerRequest *request) {
-    DynamicJsonDocument doc(64);
-    doc.createNestedArray("sessions");
+  server->on("/api/scan/sessions", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    size_t doc_size = sessions_.size() * 128 + 128;
+    DynamicJsonDocument doc(doc_size);
+    JsonArray arr = doc.createNestedArray("sessions");
+    for (const auto &s : sessions_) {
+      JsonObject obj = arr.createNestedObject();
+      obj["id"] = s.id;
+      obj["timestamp"] = format_epoch(s.timestamp).c_str();
+      obj["trials"] = s.trials;
+      obj["duration"] = s.duration;
+      obj["size"] = s.size;
+    }
     std::string out;
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
 
-  server->on(UriRegex("^/api/scan/session/(.+)$"), HTTP_GET, [](AsyncWebServerRequest *request) {
-    DynamicJsonDocument doc(128);
-    doc["id"] = request->pathArg(0).c_str();
+  server->on(UriRegex("^/api/scan/session/(.+)$"), HTTP_GET, [this](AsyncWebServerRequest *request) {
+    uint32_t id = strtoul(request->pathArg(0).c_str(), nullptr, 10);
+    const ScanSession *found = nullptr;
+    for (const auto &s : sessions_) {
+      if (s.id == id) {
+        found = &s;
+        break;
+      }
+    }
+    size_t doc_size = found ? MAX_SESSION_DATA + 128 : 64;
+    DynamicJsonDocument doc(doc_size);
+    if (found) {
+      doc["id"] = found->id;
+      doc["timestamp"] = format_epoch(found->timestamp).c_str();
+      doc["trials"] = found->trials;
+      doc["duration"] = found->duration;
+      doc["size"] = found->size;
+      doc["data"] = found->data;
+    } else {
+      doc["error"] = "not_found";
+    }
     std::string out;
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
 
-  server->on("/api/scan/delete", HTTP_POST, [](AsyncWebServerRequest *request) {
+  server->on("/api/scan/delete", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    for (int i = 0; i < MAX_SCAN_SESSIONS; i++)
+      session_prefs_[i].erase();
+    sessions_.clear();
+    session_next_ = 0;
+    session_index_pref_.save(&session_next_);
     DynamicJsonDocument doc(64);
     doc["deleted"] = true;
     std::string out;
@@ -313,9 +355,19 @@ void Roode::register_server_endpoints() {
     request->send(200, "application/json", out.c_str());
   });
 
-  server->on("/api/export/all", HTTP_GET, [](AsyncWebServerRequest *request) {
-    DynamicJsonDocument doc(64);
-    doc["export"] = "all";
+  server->on("/api/export/all", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    size_t doc_size = sessions_.size() * (MAX_SESSION_DATA + 128) + 128;
+    DynamicJsonDocument doc(doc_size);
+    JsonArray arr = doc.createNestedArray("sessions");
+    for (const auto &s : sessions_) {
+      JsonObject obj = arr.createNestedObject();
+      obj["id"] = s.id;
+      obj["timestamp"] = format_epoch(s.timestamp).c_str();
+      obj["trials"] = s.trials;
+      obj["duration"] = s.duration;
+      obj["size"] = s.size;
+      obj["data"] = s.data;
+    }
     std::string out;
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
@@ -343,6 +395,16 @@ void Roode::dump_config() {
 
 void Roode::setup() {
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
+  session_index_pref_ = global_preferences->make_preference<uint8_t>(0xBF);
+  session_index_pref_.load(&session_next_);
+  for (uint8_t i = 0; i < MAX_SCAN_SESSIONS; i++) {
+    session_prefs_[i] = global_preferences->make_preference<ScanSession>(0xB0 + i);
+    ScanSession s;
+    if (session_prefs_[i].load(&s))
+      sessions_.push_back(s);
+  }
+  if (session_next_ >= MAX_SCAN_SESSIONS)
+    session_next_ = sessions_.size() % MAX_SCAN_SESSIONS;
   // `register_service` is only available when API services are enabled.
   // Guard the call so that the component can compile even when the
   // USE_API_SERVICES compile-time flag is disabled.
@@ -993,11 +1055,17 @@ void Roode::publish_scan_record(const std::string &payload) {
   if (entry_exit_event_sensor != nullptr)
     entry_exit_event_sensor->publish_state(payload);
   log_event(payload);
+  if (current_session_blob_.size() + payload.size() + 1 <= MAX_SESSION_DATA) {
+    current_session_blob_ += payload;
+    current_session_blob_ += '\n';
+  }
+  scan_record_count_++;
 }
 
 void Roode::start_passive_scan() {
   scan_start_ts_ = millis();
   scan_record_count_ = 0;
+  current_session_blob_.clear();
   scan_cancel_requested = false;
   scan_running = true;
   scan_session_id_ = std::to_string(scan_start_ts_);
@@ -1162,7 +1230,31 @@ void Roode::start_passive_scan() {
                                              samples,
                                              VERSION};
   scan_progress_ = 1.0f;
+  save_current_scan_session();
   scan_running = false;
+}
+
+void Roode::save_current_scan_session() {
+  ScanSession sess{};
+  sess.id = scan_start_ts_;
+  sess.timestamp = time(nullptr);
+  sess.trials = scan_record_count_;
+  sess.duration = (millis() - scan_start_ts_) / 1000.0f;
+  size_t len = std::min(current_session_blob_.size(), (size_t) MAX_SESSION_DATA - 1);
+  memcpy(sess.data, current_session_blob_.c_str(), len);
+  sess.data[len] = '\0';
+  sess.size = len;
+  if (sessions_.size() < MAX_SCAN_SESSIONS) {
+    if (session_next_ >= sessions_.size())
+      sessions_.push_back(sess);
+    else
+      sessions_[session_next_] = sess;
+  } else {
+    sessions_[session_next_] = sess;
+  }
+  session_prefs_[session_next_].save(&sess);
+  session_next_ = (session_next_ + 1) % MAX_SCAN_SESSIONS;
+  session_index_pref_.save(&session_next_);
 }
 
 void Roode::restart_sensor() {

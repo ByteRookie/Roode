@@ -2,6 +2,7 @@
 #include <math.h>
 #include <string>
 #include <optional>
+#include <vector>
 #include "Arduino.h"
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -285,6 +286,23 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   static void sensor_task(void *param);
   bool use_sensor_task_{false};
   void restart_sensor();
+
+  static constexpr uint8_t MAX_SCAN_SESSIONS = 5;
+  static constexpr size_t MAX_SESSION_DATA = 1024;
+  struct ScanSession {
+    uint32_t id;
+    uint32_t timestamp;
+    uint16_t trials;
+    float duration;
+    uint32_t size;
+    char data[MAX_SESSION_DATA];
+  };
+  ESPPreferenceObject session_prefs_[MAX_SCAN_SESSIONS];
+  ESPPreferenceObject session_index_pref_;
+  std::vector<ScanSession> sessions_;
+  uint8_t session_next_{0};
+  std::string current_session_blob_;
+  void save_current_scan_session();
 };
 
 }  // namespace roode

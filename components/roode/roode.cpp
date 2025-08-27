@@ -146,6 +146,8 @@ void Roode::log_event(const std::string &msg) {
   }
 }
 
+void Roode::set_auto_calibration_interval(uint32_t sec) { auto_calibration_interval_sec_ = sec; }
+
 Roode::~Roode() {
   delete entry;
   delete exit;

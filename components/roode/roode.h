@@ -133,6 +133,7 @@ class Roode : public PollingComponent {
   }
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
+  void set_auto_calibration_interval(uint32_t sec);
   void set_cpu_optimization_thresholds(float activate, float deactivate) {
     cpu_opt_activate_threshold_ = activate;
     cpu_opt_deactivate_threshold_ = deactivate;

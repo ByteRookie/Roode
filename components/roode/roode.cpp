@@ -7,6 +7,10 @@
 #include <cmath>
 #include <ctime>
 #include <sstream>
+#include <ArduinoJson.h>
+#ifdef USE_WEB_SERVER
+#include "esphome/components/web_server_base/web_server_base.h"
+#endif
 
 namespace esphome {
 namespace roode {
@@ -14,6 +18,8 @@ namespace roode {
 // When disabled, fallback diagnostics are omitted from the log to reduce noise.
 bool Roode::log_fallback_events_ = false;
 Roode *Roode::instance_ = nullptr;
+static bool scan_running = false;
+static bool scan_cancel_requested = false;
 void Roode::log_event(const std::string &msg) {
   if (!log_fallback_events_) {
     if (msg == "interrupt_fallback" || msg == "interrupt_fallback_polling")
@@ -135,6 +141,122 @@ void Roode::setup() {
   // USE_API_SERVICES compile-time flag is disabled.
 #ifdef USE_API_SERVICES
   this->register_service(&Roode::start_passive_scan, "start_passive_scan");
+#endif
+#ifdef USE_WEB_SERVER
+  if (web_server_base::global_web_server_base != nullptr) {
+    auto server = web_server_base::global_web_server_base->get_server();
+
+    server->on("/api/settings/current", HTTP_GET, [this](AsyncWebServerRequest *request) {
+      DynamicJsonDocument doc(256);
+      doc["samples"] = samples;
+      doc["filter_window"] = filter_window_;
+      doc["filter_mode"] = static_cast<int>(filter_mode_);
+      JsonObject entry_roi = doc.createNestedObject("entry_roi");
+      entry_roi["center"] = entry->roi->center;
+      entry_roi["width"] = entry->roi->width;
+      entry_roi["height"] = entry->roi->height;
+      JsonObject exit_roi = doc.createNestedObject("exit_roi");
+      exit_roi["center"] = exit->roi->center;
+      exit_roi["width"] = exit->roi->width;
+      exit_roi["height"] = exit->roi->height;
+      std::string out;
+      serializeJson(doc, out);
+      request->send(200, "application/json", out.c_str());
+    });
+
+    server->on("/api/scan/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+      DynamicJsonDocument doc(64);
+      doc["running"] = scan_running;
+      std::string out;
+      serializeJson(doc, out);
+      request->send(200, "application/json", out.c_str());
+    });
+
+    server->on("/api/scan/start", HTTP_POST, [this](AsyncWebServerRequest *request) {
+      if (!scan_running) {
+        scan_cancel_requested = false;
+        scan_running = true;
+        this->start_passive_scan();
+        scan_running = false;
+        DynamicJsonDocument doc(64);
+        doc["started"] = true;
+        std::string out;
+        serializeJson(doc, out);
+        request->send(200, "application/json", out.c_str());
+      } else {
+        DynamicJsonDocument doc(64);
+        doc["started"] = false;
+        std::string out;
+        serializeJson(doc, out);
+        request->send(200, "application/json", out.c_str());
+      }
+    });
+
+    server->on("/api/scan/cancel", HTTP_POST, [](AsyncWebServerRequest *request) {
+      scan_cancel_requested = true;
+      DynamicJsonDocument doc(64);
+      doc["cancelled"] = true;
+      std::string out;
+      serializeJson(doc, out);
+      request->send(200, "application/json", out.c_str());
+    });
+
+    server->on("/api/roi/preview", HTTP_GET, [this](AsyncWebServerRequest *request) {
+      DynamicJsonDocument doc(256);
+      JsonObject entry_roi = doc.createNestedObject("entry_roi");
+      entry_roi["center"] = entry->roi->center;
+      entry_roi["width"] = entry->roi->width;
+      entry_roi["height"] = entry->roi->height;
+      JsonObject exit_roi = doc.createNestedObject("exit_roi");
+      exit_roi["center"] = exit->roi->center;
+      exit_roi["width"] = exit->roi->width;
+      exit_roi["height"] = exit->roi->height;
+      std::string out;
+      serializeJson(doc, out);
+      request->send(200, "application/json", out.c_str());
+    });
+
+    server->on("/api/roi/apply", HTTP_POST, [this](AsyncWebServerRequest *request) {
+      this->recalibration();
+      DynamicJsonDocument doc(64);
+      doc["applied"] = true;
+      std::string out;
+      serializeJson(doc, out);
+      request->send(200, "application/json", out.c_str());
+    });
+
+    server->on("/api/scan/sessions", HTTP_GET, [](AsyncWebServerRequest *request) {
+      DynamicJsonDocument doc(64);
+      doc.createNestedArray("sessions");
+      std::string out;
+      serializeJson(doc, out);
+      request->send(200, "application/json", out.c_str());
+    });
+
+    server->on(UriRegex("^/api/scan/session/(.+)$"), HTTP_GET, [](AsyncWebServerRequest *request) {
+      DynamicJsonDocument doc(128);
+      doc["id"] = request->pathArg(0).c_str();
+      std::string out;
+      serializeJson(doc, out);
+      request->send(200, "application/json", out.c_str());
+    });
+
+    server->on("/api/scan/delete", HTTP_POST, [](AsyncWebServerRequest *request) {
+      DynamicJsonDocument doc(64);
+      doc["deleted"] = true;
+      std::string out;
+      serializeJson(doc, out);
+      request->send(200, "application/json", out.c_str());
+    });
+
+    server->on("/api/export/all", HTTP_GET, [](AsyncWebServerRequest *request) {
+      DynamicJsonDocument doc(64);
+      doc["export"] = "all";
+      std::string out;
+      serializeJson(doc, out);
+      request->send(200, "application/json", out.c_str());
+    });
+  }
 #endif
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
@@ -780,11 +902,18 @@ void Roode::publish_scan_record(const std::string &payload) {
 void Roode::start_passive_scan() {
   scan_start_ts_ = millis();
   scan_record_count_ = 0;
+  scan_cancel_requested = false;
+  scan_running = true;
   const std::vector<int> grids{4, 8, 16};
   const char *modes[] = {"short", "medium", "long"};
   constexpr int base_trials = 3;
   constexpr int max_trials = 5;
   for (int grid : grids) {
+    if (scan_cancel_requested) {
+      publish_scan_record("scan_cancel");
+      scan_running = false;
+      return;
+    }
     if (grid == 16 && scan_time_cap_seconds_ > 0) {
       float elapsed = (millis() - scan_start_ts_) / 1000.0f;
       if (elapsed > scan_time_cap_seconds_) {
@@ -793,6 +922,11 @@ void Roode::start_passive_scan() {
       }
     }
     for (const char *mode : modes) {
+      if (scan_cancel_requested) {
+        publish_scan_record("scan_cancel");
+        scan_running = false;
+        return;
+      }
       const RangingMode *ranging_mode = Ranging::Short;
       if (strcmp(mode, "medium") == 0)
         ranging_mode = Ranging::Medium;
@@ -802,6 +936,11 @@ void Roode::start_passive_scan() {
 
       std::vector<float> cv_trials;
       for (int trial = 1; trial <= max_trials; ++trial) {
+        if (scan_cancel_requested) {
+          publish_scan_record("scan_cancel");
+          scan_running = false;
+          return;
+        }
         std::vector<int> mcps(grid * grid, 0);
         std::vector<int> distance(grid * grid, 0);
         std::vector<float> snr(grid * grid, 0.0f);
@@ -910,6 +1049,7 @@ void Roode::start_passive_scan() {
   float elapsed = (millis() - scan_start_ts_) / 1000.0f;
   if (scan_time_cap_seconds_sensor != nullptr)
     scan_time_cap_seconds_sensor->publish_state(elapsed);
+  scan_running = false;
 }
 
 void Roode::restart_sensor() {

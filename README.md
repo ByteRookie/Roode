@@ -50,19 +50,11 @@ manual tuning is required. The steps below show how to enable the automatic
 calibration workflow in Home Assistant without any coding knowledge:
 
 1. **Flash Roode using the example YAML** from the Quick Start above.
-2. **Copy the dashboard**: place `homeassistant/roode_dashboard.yaml` in your
-   Home Assistant configuration folder and add it as a Lovelace view.
-3. **Add helpers and automation**: copy the `input_select` and automation shown
-   in [home_assistant.md](home_assistant.md) into your `configuration.yaml` so
-   Home Assistant can request a passive scan.
-4. **Install helper scripts**: copy `homeassistant/python_scripts/start_passive_scan.py`
-   and `homeassistant/python_scripts/apply_roi_result.py` into the
-   `python_scripts/` directory of Home Assistant.
-5. **Restart Home Assistant**. A new *Roode* dashboard with *Start Scan* and
-   *Recalibrate* buttons appears.
-6. **Run a scan**: press *Start Scan*, walk through the doorway once, and wait
-   until the dashboard shows the result.
-7. **Accept the result**: click *Accept ROI* to apply the automatically
+2. **Enable the calibration portal** by turning on the `Portal` switch exposed
+   by the device.
+3. **Run a scan**: in the portal press *Start Scan*, walk through the doorway
+   once, and wait for the result.
+4. **Apply the result**: click *Accept ROI* to apply the automatically
    calculated region of interest and thresholds. The device updates itself via
    OTA and begins counting immediately.
 
@@ -772,14 +764,15 @@ these sensors.
 
 ## Calibration Workflow
 
-1. In Home Assistant expose an `input_select` like `roode_action` with a `start_passive_scan` option.
-2. An automation calls the `python_script.start_passive_scan` helper, sending `esphome.<node>_start_passive_scan` to the device.
-3. Run `session_recorder.py` to log WebSocket output into a timestamped `calibration_*/session.json` directory.
-4. After the scan, process the session folder with `roi_analysis.py` to produce an `roi_result.json` file.  Advanced options like `--imbalance-ratio`, `--no-retry-axis`, and `--no-retry-roi` control how the script handles imbalanced zone clustering.  Use `--cv-mask` to set the coefficient of variation threshold (default 0.25, allowable range 0.15–0.35).  Thresholds are derived from the idle median: the minimum is clamped between 92–96 % of the idle distance and the maximum is at least 10 % above the minimum.  These factors can be tuned with `--idle-min-low`, `--idle-min-high`, and `--max-delta-factor` or a configuration file.
-5. Use `apply_roi_result.py` to copy the result into Home Assistant so a build like `ota_roi_update.yaml` can include it.
-6. Compile and upload the new firmware; Roode applies the updated ROI automatically.
+The built-in portal handles most calibration tasks:
 
-This flow makes it possible to trigger calibration from Home Assistant and roll out optimized settings without manual flashing.
+1. Enable the `Portal` switch in Home Assistant or via the device API.
+2. Start a passive scan from the portal and walk through the doorway once.
+3. Review the previewed region of interest and thresholds, then press *Apply* to save them.
+
+For advanced tuning you can still record sessions with `session_recorder.py`,
+process them with `roi_analysis.py` and include the generated `roi_result.json`
+in a firmware build.
 
 ## FAQ/Troubleshoot
 

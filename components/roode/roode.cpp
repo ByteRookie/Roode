@@ -286,34 +286,11 @@ void Roode::register_server_endpoints() {
   });
 
   server->on("/api/roi/apply", HTTP_POST, [this](AsyncWebServerRequest *request) {
-    bool applied = false;
-    if (recommended_settings_.has_value()) {
-      entry->roi->center = recommended_settings_->entry_roi.center;
-      entry->roi->width = recommended_settings_->entry_roi.width;
-      entry->roi->height = recommended_settings_->entry_roi.height;
-      entry->threshold->min = recommended_settings_->entry_threshold_min;
-      entry->threshold->max = recommended_settings_->entry_threshold_max;
-      exit->roi->center = recommended_settings_->exit_roi.center;
-      exit->roi->width = recommended_settings_->exit_roi.width;
-      exit->roi->height = recommended_settings_->exit_roi.height;
-      exit->threshold->min = recommended_settings_->exit_threshold_min;
-      exit->threshold->max = recommended_settings_->exit_threshold_max;
-      samples = recommended_settings_->samples;
-      entry->set_max_samples(samples);
-      exit->set_max_samples(samples);
-      const RangingMode *mode = Ranging::Short;
-      if (recommended_settings_->ranging_mode == "medium")
-        mode = Ranging::Medium;
-      else if (recommended_settings_->ranging_mode == "long")
-        mode = Ranging::Long;
-      distanceSensor->set_ranging_mode(mode);
-      applied = true;
-      recommended_settings_.reset();
-    }
-    if (applied)
-      this->recalibration();
+    bool ok = this->apply_recommended_settings();
     DynamicJsonDocument doc(128);
-    doc["applied"] = applied;
+    doc["ok"] = ok;
+    if (!ok)
+      doc["error"] = "no_recommendation";
     std::string out;
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
@@ -862,6 +839,48 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   publish_sensor_configuration(entry, exit, false);
   last_calibration_sec_ = std::max(calibration_data_[0].last_calibrated_sec, calibration_data_[1].last_calibrated_sec);
   publish_feature_list();
+}
+
+bool Roode::apply_recommended_settings() {
+  if (!recommended_settings_.has_value())
+    return false;
+
+  entry->roi->center = recommended_settings_->entry_roi.center;
+  entry->roi->width = recommended_settings_->entry_roi.width;
+  entry->roi->height = recommended_settings_->entry_roi.height;
+  entry->threshold->min = recommended_settings_->entry_threshold_min;
+  entry->threshold->max = recommended_settings_->entry_threshold_max;
+
+  exit->roi->center = recommended_settings_->exit_roi.center;
+  exit->roi->width = recommended_settings_->exit_roi.width;
+  exit->roi->height = recommended_settings_->exit_roi.height;
+  exit->threshold->min = recommended_settings_->exit_threshold_min;
+  exit->threshold->max = recommended_settings_->exit_threshold_max;
+
+  samples = recommended_settings_->samples;
+  entry->set_max_samples(samples);
+  exit->set_max_samples(samples);
+
+  const RangingMode *mode = Ranging::Short;
+  if (recommended_settings_->ranging_mode == "medium")
+    mode = Ranging::Medium;
+  else if (recommended_settings_->ranging_mode == "long")
+    mode = Ranging::Long;
+  distanceSensor->set_ranging_mode(mode);
+
+  publish_sensor_configuration(entry, exit, true);
+  publish_sensor_configuration(entry, exit, false);
+
+  calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max, millis() / 1000};
+  calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max, millis() / 1000};
+  if (calibration_persistence_) {
+    calibration_prefs_[0].save(&calibration_data_[0]);
+    calibration_prefs_[1].save(&calibration_data_[1]);
+  }
+  last_calibration_sec_ = std::max(calibration_data_[0].last_calibrated_sec, calibration_data_[1].last_calibrated_sec);
+
+  recommended_settings_.reset();
+  return true;
 }
 
 void Roode::apply_cpu_optimizations(float cpu) {

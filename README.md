@@ -675,31 +675,106 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 
 | Feature | Description |
 | --- | --- |
-| Path tracking algorithm | Distinguishes entry vs exit by tracking the order of zone crossings |
-| Auto restart via XSHUT | Sensor restarts automatically if a measurement times out |
-| Clean shutdown | Memory and sensor power managed on reboot |
-| Startup pin test | Logs and disables features if xshut or interrupt pins fail |
-| Built-in pull-ups | XSHUT and interrupt pins use internal pull-ups, no resistors needed |
-| Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
-| Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
-| Persistent calibration | Calibration data can persist in flash across reboots |
-| Manual recalibration button | Exposes a `Recalibrate` button for on-demand calibration |
-| Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
-| Filtering options | Median/percentile filters smooth jitter with adjustable window |
-| FSM timeouts | Resets the state machine when a transition stalls |
-| CPU optimizations | Automatic optimizations when CPU usage exceeds 90% |
-| Interrupt fallback | Interrupt mode with graceful fallback to polling and logs |
-| XSHUT multiplexing | Supports multiple sensors sharing I²C bus |
-| Feature text sensor | Reports enabled and fallback features for diagnostics |
-| Manual adjustment counter | Tracks user corrections to the people count |
-| Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
-| Polling timeout recovery | Restarts the sensor if no data arrives for `restart_timeout` |
-| Consecutive failure counter | Soft-resets the sensor after 10 read errors |
-| Consecutive invalid distance recovery | Restarts the sensor after too many suspect readings |
-| Recovery cooldown | Prevents another restart for `restart_timeout` |
-| Sensor status reporting | Text sensor shows `ok`, `timeout`, `reinitializing`, `error` or `offline` |
-| Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
-| Colored logs | Normal info in green, details in yellow, failures in red |
+| [Path tracking algorithm](#path-tracking-algorithm) | Distinguishes entry vs exit by tracking the order of zone crossings |
+| [Auto restart via XSHUT](#auto-restart-via-xshut) | Sensor restarts automatically if a measurement times out |
+| [Clean shutdown](#clean-shutdown) | Memory and sensor power managed on reboot |
+| [Startup pin test](#startup-pin-test) | Logs and disables features if xshut or interrupt pins fail |
+| [Built-in pull-ups](#built-in-pull-ups) | XSHUT and interrupt pins use internal pull-ups, no resistors needed |
+| [Metrics sensors](#metrics-sensors) | Optional sensors report loop time, CPU usage, RAM and flash usage |
+| [Fail-safe recalibration](#fail-safe-recalibration) | Triggers recalibration if a zone stays active too long |
+| [Persistent calibration](#persistent-calibration) | Calibration data can persist in flash across reboots |
+| [Manual recalibration button](#manual-recalibration-button) | Exposes a `Recalibrate` button for on-demand calibration |
+| [Dual-core tasking](#dual-core-tasking) | Keeps polling responsive on ESP32 with automatic retry/fallback |
+| [Filtering options](#filtering-options) | Median/percentile filters smooth jitter with adjustable window |
+| [FSM timeouts](#fsm-timeouts) | Resets the state machine when a transition stalls |
+| [CPU optimizations](#cpu-optimizations) | Automatic optimizations when CPU usage exceeds 90% |
+| [Interrupt fallback](#interrupt-fallback) | Interrupt mode with graceful fallback to polling and logs |
+| [XSHUT multiplexing](#xshut-multiplexing) | Supports multiple sensors sharing I²C bus |
+| [Feature text sensor](#feature-text-sensor) | Reports enabled and fallback features for diagnostics |
+| [Manual adjustment counter](#manual-adjustment-counter) | Tracks user corrections to the people count |
+| [Diagnostic sensors](#diagnostic-sensors) | Report INT/XSHUT pin states and other metrics |
+| [Polling timeout recovery](#polling-timeout-recovery) | Restarts the sensor if no data arrives for `restart_timeout` |
+| [Consecutive failure counter](#consecutive-failure-counter) | Soft-resets the sensor after 10 read errors |
+| [Consecutive invalid distance recovery](#consecutive-invalid-distance-recovery) | Restarts the sensor after too many suspect readings |
+| [Recovery cooldown](#recovery-cooldown) | Prevents another restart for `restart_timeout` |
+| [Sensor status reporting](#sensor-status-reporting) | Text sensor shows `ok`, `timeout`, `reinitializing`, `error` or `offline` |
+| [Event logging](#event-logging) | Logs sensor power cycles, fallback reasons, and manual adjustments |
+| [Colored logs](#colored-logs) | Normal info in green, details in yellow, failures in red |
+
+### Path tracking algorithm
+Distinguishes entry vs exit by tracking the sequence of zone crossings.
+
+### Auto restart via XSHUT
+If a measurement times out, the sensor automatically restarts using the XSHUT pin to recover.
+
+### Clean shutdown
+On reboot Roode shuts down cleanly, managing memory and sensor power.
+
+### Startup pin test
+At startup the device verifies XSHUT and interrupt pins, logging and disabling features if they fail.
+
+### Built-in pull-ups
+Uses internal pull-ups on XSHUT and interrupt pins, so no external resistors are required.
+
+### Metrics sensors
+Optional sensors report loop time, CPU usage, RAM and flash usage.
+
+### Fail-safe recalibration
+If a zone stays active too long Roode triggers a recalibration to maintain accuracy.
+
+### Persistent calibration
+Calibration data can persist in flash across reboots so ROI thresholds survive power cycles.
+
+### Manual recalibration button
+Provides a `Recalibrate` button for on-demand recalibration, complementing automatic scans.
+
+### Dual-core tasking
+On ESP32 platforms polling runs on a separate core to keep response times fast with automatic retry and fallback.
+
+### Filtering options
+Median and percentile filters smooth jitter with adjustable window sizes.
+
+### FSM timeouts
+Resets the state machine when a transition stalls to maintain valid counts.
+
+### CPU optimizations
+Automatically optimizes workload when CPU usage exceeds 90%.
+
+### Interrupt fallback
+Uses interrupt mode with graceful fallback to polling and logs when necessary.
+
+### XSHUT multiplexing
+Supports multiple sensors sharing the I²C bus via the XSHUT pin.
+
+### Feature text sensor
+Exposes an `enabled_features` text sensor that reports active and fallback features for diagnostics.
+
+### Manual adjustment counter
+Tracks user corrections to the people count for visibility.
+
+### Diagnostic sensors
+Report INT/XSHUT pin states and other metrics to aid troubleshooting.
+
+### Polling timeout recovery
+Restarts the sensor if no data arrives within the configured `restart_timeout`.
+
+### Consecutive failure counter
+Soft-resets the sensor after 10 consecutive read errors.
+
+### Consecutive invalid distance recovery
+Restarts the sensor after too many suspect distance readings.
+
+### Recovery cooldown
+Prevents another restart for the duration of `restart_timeout` after recovery.
+
+### Sensor status reporting
+A text sensor reports the current status: `ok`, `timeout`, `reinitializing`, `error` or `offline`.
+
+### Event logging
+Logs sensor power cycles, fallback reasons and manual adjustments for debugging.
+
+### Colored logs
+Normal info appears in green, details in yellow and failures in red for readability.
 
 ## Web Portal & API
 

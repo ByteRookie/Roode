@@ -52,12 +52,10 @@ switch:
       - lambda: |-
           id(portal_on) = true;
           id(roode_platform).start_portal();
-      - web_server.start:
     turn_off_action:
       - lambda: |-
           id(portal_on) = false;
           id(roode_platform).stop_portal();
-      - web_server.stop:
 ```
 
 If the ESPHome `api:` component is enabled, this `Portal` switch is exposed to

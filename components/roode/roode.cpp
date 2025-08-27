@@ -156,12 +156,9 @@ void Roode::register_server_endpoints() {
   auto server = web_server_base::global_web_server_base->get_server();
   portal_registered_ = true;
 
-  server->on("/portal", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", portal_html);
-  });
-  server->on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", portal_html);
-  });
+  server->on("/portal", HTTP_GET,
+             [](AsyncWebServerRequest *request) { request->send_P(200, "text/html", portal_html); });
+  server->on("/", HTTP_GET, [](AsyncWebServerRequest *request) { request->send_P(200, "text/html", portal_html); });
 
   server->on("/api/settings/current", HTTP_GET, [this](AsyncWebServerRequest *request) {
     DynamicJsonDocument doc(512);
@@ -389,11 +386,22 @@ void Roode::register_server_endpoints() {
 void Roode::start_portal() {
   portal_enabled_ = true;
 #ifdef USE_WEB_SERVER
-  register_server_endpoints();
+  if (web_server_base::global_web_server_base != nullptr) {
+    web_server_base::global_web_server_base->init();
+    register_server_endpoints();
+  }
 #endif
 }
 
-void Roode::stop_portal() { portal_enabled_ = false; }
+void Roode::stop_portal() {
+  portal_enabled_ = false;
+#ifdef USE_WEB_SERVER
+  if (web_server_base::global_web_server_base != nullptr) {
+    web_server_base::global_web_server_base->deinit();
+  }
+  portal_registered_ = false;
+#endif
+}
 
 void Roode::set_auto_calibration_interval_sec(uint32_t sec) { auto_calibration_interval_sec_ = sec; }
 void Roode::dump_config() {
@@ -423,7 +431,8 @@ void Roode::setup() {
   this->register_service(&Roode::start_passive_scan, "start_passive_scan");
 #endif
 #ifdef USE_WEB_SERVER
-  if (portal_enabled_) {
+  if (portal_enabled_ && web_server_base::global_web_server_base != nullptr) {
+    web_server_base::global_web_server_base->init();
     register_server_endpoints();
   }
 #endif
@@ -1115,12 +1124,12 @@ void Roode::start_passive_scan() {
       distanceSensor->set_ranging_mode(ranging_mode);
 
       std::vector<float> cv_trials;
-        for (int trial = 1; trial <= max_trials; ++trial) {
-          if (scan_cancel_requested) {
-            publish_scan_record("scan_cancel");
-            scan_running = false;
-            return;
-          }
+      for (int trial = 1; trial <= max_trials; ++trial) {
+        if (scan_cancel_requested) {
+          publish_scan_record("scan_cancel");
+          scan_running = false;
+          return;
+        }
         std::vector<int> mcps(grid * grid, 0);
         std::vector<int> distance(grid * grid, 0);
         std::vector<float> snr(grid * grid, 0.0f);
@@ -1232,14 +1241,9 @@ void Roode::start_passive_scan() {
   float elapsed = (millis() - scan_start_ts_) / 1000.0f;
   if (scan_time_cap_seconds_sensor != nullptr)
     scan_time_cap_seconds_sensor->publish_state(elapsed);
-  recommended_settings_ = RecommendedSettings{*entry->roi,
-                                             *exit->roi,
-                                             entry->threshold->min,
-                                             entry->threshold->max,
-                                             exit->threshold->min,
-                                             exit->threshold->max,
-                                             samples,
-                                             VERSION};
+  recommended_settings_ = RecommendedSettings{
+      *entry->roi, *exit->roi, entry->threshold->min, entry->threshold->max, exit->threshold->min, exit->threshold->max,
+      samples,     VERSION};
   scan_progress_ = 1.0f;
   save_current_scan_session();
   scan_running = false;

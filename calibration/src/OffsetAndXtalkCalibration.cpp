@@ -24,11 +24,23 @@ void setup()
     Serial.readString();
     int16_t foundOffset;
     sensor_status = sensor.CalibrateOffset(140, &foundOffset);
-
-    sensor.SetOffsetInMm(foundOffset);
-
-    Serial.println("Calibrated offset: " + String(foundOffset));
-    Serial.printf("Set this offset in the sensor configuration under offset: %d\n", foundOffset);
+    if (sensor_status == VL53L1_ERROR_NONE)
+    {
+        Serial.println("Calibrated offset: " + String(foundOffset));
+        sensor_status = sensor.SetOffsetInMm(foundOffset);
+        if (sensor_status == VL53L1_ERROR_NONE)
+        {
+            Serial.printf("Offset %d set and active\n", foundOffset);
+        }
+        else
+        {
+            Serial.printf("Failed to set offset, error code: %d\n", sensor_status);
+        }
+    }
+    else
+    {
+        Serial.printf("Offset calibration failed, error code: %d\n", sensor_status);
+    }
 
     /* The target distance : the distance where the sensor start to "under range"
     Crosstalk calibration should be conducted in a dark environment, with no IR contribution.
@@ -43,9 +55,23 @@ void setup()
     uint16_t CalibrationDistance = 140; // crosstalk calibration distance
     uint16_t foundXTalk;
     sensor_status = sensor.CalibrateXTalk(CalibrationDistance, &foundXTalk);
-    Serial.println("Calibrated offset: " + String(foundXTalk));
-    Serial.printf("Set this offset in the sensor configuration under crosstalk: %d\n", foundXTalk);
-    sensor.SetXTalk(foundXTalk);
+    if (sensor_status == VL53L1_ERROR_NONE)
+    {
+        Serial.println("Calibrated crosstalk: " + String(foundXTalk));
+        sensor_status = sensor.SetXTalk(foundXTalk);
+        if (sensor_status == VL53L1_ERROR_NONE)
+        {
+            Serial.printf("Crosstalk %d set and active\n", foundXTalk);
+        }
+        else
+        {
+            Serial.printf("Failed to set crosstalk, error code: %d\n", sensor_status);
+        }
+    }
+    else
+    {
+        Serial.printf("Crosstalk calibration failed, error code: %d\n", sensor_status);
+    }
     sensor.StartRanging();
 }
 void loop()

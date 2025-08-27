@@ -12,6 +12,10 @@
 #include <ArduinoJson.h>
 #ifdef USE_WEB_SERVER
 #include "esphome/components/web_server_base/web_server_base.h"
+#include "esphome/core/pgmspace.h"
+static const char portal_html[] PROGMEM = R"PORTAL(
+#include "web/portal.html"
+)PORTAL";
 #endif
 
 namespace esphome {
@@ -151,6 +155,13 @@ void Roode::register_server_endpoints() {
     return;
   auto server = web_server_base::global_web_server_base->get_server();
   portal_registered_ = true;
+
+  server->on("/portal", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", portal_html);
+  });
+  server->on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", portal_html);
+  });
 
   server->on("/api/settings/current", HTTP_GET, [this](AsyncWebServerRequest *request) {
     DynamicJsonDocument doc(512);

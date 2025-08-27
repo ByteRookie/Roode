@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Roode Portal</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    button { margin: 4px; }
+    pre { background: #f0f0f0; padding: 10px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 4px; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Roode Portal</h1>
+  <section id="controls">
+    <button id="startScan">Start Scan</button>
+    <button id="cancelScan">Cancel Scan</button>
+    <span id="scanStatus"></span>
+  </section>
+
+  <section id="current">
+    <h2>Current Settings</h2>
+    <pre id="currentSettings">{}</pre>
+    <button id="copyCurrent">Copy as JSON</button>
+  </section>
+
+  <section id="recommended">
+    <h2>Recommended Settings</h2>
+    <pre id="recommendedSettings">{}</pre>
+    <button id="copyRecommended">Copy as JSON</button>
+    <button id="applySettings">Apply Settings</button>
+    <button id="saveRoi">Save roi_result.json</button>
+  </section>
+
+  <section id="sessions">
+    <h2>Past Sessions</h2>
+    <button id="refreshSessions">Refresh</button>
+    <button id="exportSessions">Export All</button>
+    <button id="deleteSessions">Delete All</button>
+    <table id="sessionsTable">
+      <thead>
+        <tr><th>ID</th><th>Timestamp</th><th>Trials</th><th>Duration</th><th>Size</th><th>Actions</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+<script>
+async function fetchJSON(url, opts) {
+  const res = await fetch(url, opts);
+  return await res.json();
+}
+
+async function updateCurrent() {
+  const data = await fetchJSON('/api/settings/current');
+  document.getElementById('currentSettings').textContent = JSON.stringify(data, null, 2);
+}
+
+async function updateRecommended() {
+  const data = await fetchJSON('/api/roi/preview');
+  document.getElementById('recommendedSettings').textContent = JSON.stringify(data, null, 2);
+}
+
+async function startScan() {
+  await fetchJSON('/api/scan/start', {method:'POST'});
+  pollStatus();
+}
+
+async function cancelScan() {
+  await fetchJSON('/api/scan/cancel', {method:'POST'});
+}
+
+async function pollStatus() {
+  const status = await fetchJSON('/api/scan/status');
+  const text = status.running ? `Running ${status.step} ${status.progress}%` : 'Idle';
+  document.getElementById('scanStatus').textContent = text;
+  if (status.running) {
+    setTimeout(pollStatus, 1000);
+  } else {
+    updateRecommended();
+    updateSessions();
+  }
+}
+
+function copyText(id) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text);
+}
+
+function saveFile(name, text) {
+  const blob = new Blob([text], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function applySettings() {
+  const r = await fetchJSON('/api/roi/apply', {method:'POST'});
+  if (r.applied) updateCurrent();
+}
+
+async function updateSessions() {
+  const data = await fetchJSON('/api/scan/sessions');
+  const tbody = document.querySelector('#sessionsTable tbody');
+  tbody.innerHTML = '';
+  for (const s of data.sessions) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${s.id}</td><td>${s.timestamp}</td><td>${s.trials}</td><td>${s.duration}</td><td>${s.size}</td><td><button class="download" data-id="${s.id}">Download</button></td>`;
+    tbody.appendChild(tr);
+  }
+}
+</script>
+
+<script>
+document.getElementById('startScan').addEventListener('click', startScan);
+document.getElementById('cancelScan').addEventListener('click', cancelScan);
+document.getElementById('copyCurrent').addEventListener('click', () => copyText('currentSettings'));
+document.getElementById('copyRecommended').addEventListener('click', () => copyText('recommendedSettings'));
+document.getElementById('applySettings').addEventListener('click', applySettings);
+document.getElementById('saveRoi').addEventListener('click', () => saveFile('roi_result.json', document.getElementById('recommendedSettings').textContent));
+document.getElementById('refreshSessions').addEventListener('click', updateSessions);
+document.getElementById('exportSessions').addEventListener('click', async () => {
+  const data = await fetchJSON('/api/export/all');
+  saveFile('sessions.json', JSON.stringify(data, null, 2));
+});
+document.getElementById('deleteSessions').addEventListener('click', async () => {
+  await fetchJSON('/api/scan/delete', {method:'POST'});
+  updateSessions();
+});
+document.querySelector('#sessionsTable').addEventListener('click', async (e) => {
+  if (e.target.classList.contains('download')) {
+    const id = e.target.getAttribute('data-id');
+    const data = await fetchJSON(`/api/scan/session/${id}`);
+    saveFile(`session_${id}.json`, JSON.stringify(data, null, 2));
+  }
+});
+
+updateCurrent();
+updateRecommended();
+updateSessions();
+pollStatus();
+</script>
+</body>
+</html>

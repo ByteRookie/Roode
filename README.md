@@ -10,7 +10,6 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [Automatic Calibration (Home Assistant Setup)](#automatic-calibration-home-assistant-setup)
 - [Hardware Recommendations](#hardware-recommendations)
 - [Wiring](#wiring)
   - [ESP32](#esp32)
@@ -28,6 +27,32 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
 - [Features](#features)
+  - [Path tracking algorithm](#path-tracking-algorithm)
+  - [Auto restart via XSHUT](#auto-restart-via-xshut)
+  - [Clean shutdown](#clean-shutdown)
+  - [Startup pin test](#startup-pin-test)
+  - [Built-in pull-ups](#built-in-pull-ups)
+  - [Metrics sensors](#metrics-sensors)
+  - [Fail-safe recalibration](#fail-safe-recalibration)
+  - [Persistent calibration](#persistent-calibration)
+  - [Automatic calibration (Home Assistant Setup)](#automatic-calibration-home-assistant-setup)
+  - [Manual recalibration button](#manual-recalibration-button)
+  - [Dual-core tasking](#dual-core-tasking)
+  - [Filtering options](#filtering-options)
+  - [FSM timeouts](#fsm-timeouts)
+  - [CPU optimizations](#cpu-optimizations)
+  - [Interrupt fallback](#interrupt-fallback)
+  - [XSHUT multiplexing](#xshut-multiplexing)
+  - [Feature text sensor](#feature-text-sensor)
+  - [Manual adjustment counter](#manual-adjustment-counter)
+  - [Diagnostic sensors](#diagnostic-sensors)
+  - [Polling timeout recovery](#polling-timeout-recovery)
+  - [Consecutive failure counter](#consecutive-failure-counter)
+  - [Consecutive invalid distance recovery](#consecutive-invalid-distance-recovery)
+  - [Recovery cooldown](#recovery-cooldown)
+  - [Sensor status reporting](#sensor-status-reporting)
+  - [Event logging](#event-logging)
+  - [Colored logs](#colored-logs)
 - [Web Portal & API](#web-portal--api)
 - [Logging and Diagnostics](#logging-and-diagnostics)
 - [Calibration Workflow](#calibration-workflow)
@@ -41,26 +66,6 @@ A people counter that works with any smart home system that supports ESPHome/MQT
    - [peopleCounter32.yaml](peopleCounter32.yaml)
    - [peopleCounter8266.yaml](peopleCounter8266.yaml)
 3. Flash it with `esphome run peopleCounter32.yaml` (replace with your file).
-
-## Automatic Calibration (Home Assistant Setup)
-
-Roode can now determine its own idle distance and zone thresholds. The sensor
-recalibrates itself after power‑up and periodically during operation, so no
-manual tuning is required. The steps below show how to enable the automatic
-calibration workflow in Home Assistant without any coding knowledge:
-
-1. **Flash Roode using the example YAML** from the Quick Start above.
-2. **Enable the calibration portal** by turning on the `Portal` switch exposed
-   by the device.
-3. **Run a scan**: in the portal press *Start Scan*, walk through the doorway
-   once, and wait for the result.
-4. **Apply the result**: click *Accept ROI* to apply the automatically
-   calculated region of interest and thresholds. The device updates itself via
-   OTA and begins counting immediately.
-
-After each reboot, leave the monitored area empty for about 10 seconds so the
-sensor can capture a clean baseline. Roode then recalibrates itself every few
-hours to maintain accuracy.
 
 ## Hardware Recommendations
 
@@ -683,6 +688,7 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | [Metrics sensors](#metrics-sensors) | Optional sensors report loop time, CPU usage, RAM and flash usage |
 | [Fail-safe recalibration](#fail-safe-recalibration) | Triggers recalibration if a zone stays active too long |
 | [Persistent calibration](#persistent-calibration) | Calibration data can persist in flash across reboots |
+| [Automatic calibration (Home Assistant Setup)](#automatic-calibration-home-assistant-setup) | Portal-guided scan sets ROI and thresholds automatically |
 | [Manual recalibration button](#manual-recalibration-button) | Exposes a `Recalibrate` button for on-demand calibration |
 | [Dual-core tasking](#dual-core-tasking) | Keeps polling responsive on ESP32 with automatic retry/fallback |
 | [Filtering options](#filtering-options) | Median/percentile filters smooth jitter with adjustable window |
@@ -724,6 +730,16 @@ If a zone stays active too long Roode triggers a recalibration to maintain accur
 
 ### Persistent calibration
 Calibration data can persist in flash across reboots so ROI thresholds survive power cycles.
+
+### Automatic Calibration (Home Assistant Setup)
+Roode can determine its own idle distance and zone thresholds. The sensor recalibrates itself after power-up and periodically during operation, so no manual tuning is required. The steps below show how to enable the automatic calibration workflow in Home Assistant without any coding knowledge:
+
+1. **Flash Roode using the example YAML** from the Quick Start above.
+2. **Enable the calibration portal** by turning on the `Portal` switch exposed by the device.
+3. **Run a scan**: in the portal press *Start Scan*, walk through the doorway once, and wait for the result.
+4. **Apply the result**: click *Accept ROI* to apply the automatically calculated region of interest and thresholds. The device updates itself via OTA and begins counting immediately.
+
+After each reboot, leave the monitored area empty for about 10 seconds so the sensor can capture a clean baseline. Roode then recalibrates itself every few hours to maintain accuracy.
 
 ### Manual recalibration button
 Provides a `Recalibrate` button for on-demand recalibration, complementing automatic scans.
@@ -811,16 +827,9 @@ details. Event logs cover power cycles of the sensor, automatic changes between
 interrupt and polling mode, and manual adjustments to the people count. Debug
 level messages were removed to keep output concise in production builds.
 
-### Feature text sensor
-
-The `enabled_features` text sensor summarizes which runtime features are active.
-Typical values include `dual_core` or `single_core`, `xshut` or `no_xshut`, and
-`interrupt` or `polling`. This helps verify that the hardware pins and options
-are detected correctly.
-
-### Diagnostic sensors
-
-Optional sensors provide insight into Roode's operation:
+For diagnostic entities, the [Feature text sensor](#feature-text-sensor) reports
+active features, while [Diagnostic sensors](#diagnostic-sensors) expose additional
+metrics:
 
 - `loop_time`, `cpu_usage`, `ram_free` and `flash_free` report resource usage.
 - `sensor_status` and `interrupt_status` show the current hardware state. The
@@ -830,11 +839,9 @@ Optional sensors provide insight into Roode's operation:
   and a text-sensor `sensor_status` exposes the same status string.
 - ROI size and threshold sensors allow live tuning of each zone.
 - `manual_adjustment_count` records people-count corrections.
-- The sensor automatically restarts if polling stops for the configured `restart_timeout`
-  or after 10 consecutive read errors. All restart triggers share this cooldown.
 
 See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
-these sensors.
+these sensors. For automatic recovery features, see [Polling timeout recovery](#polling-timeout-recovery), [Consecutive failure counter](#consecutive-failure-counter), and [Recovery cooldown](#recovery-cooldown).
 
 
 ## Calibration Workflow

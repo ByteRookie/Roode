@@ -166,6 +166,7 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   void reset_cpu_optimizations(float cpu);
   void update_metrics();
   void start_passive_scan();
+  void complete_calibration();
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
   static void log_event(const std::string &msg);

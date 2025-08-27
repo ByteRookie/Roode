@@ -41,6 +41,9 @@ api:
     - service: start_passive_scan
       then:
         - lambda: "id(roode_platform)->start_passive_scan();"
+    - service: complete_calibration
+      then:
+        - lambda: "id(roode_platform)->complete_calibration();"
 
 ota:
   password: !secret ota_password

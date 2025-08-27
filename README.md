@@ -150,6 +150,42 @@ external_components:
     refresh: always
     ref: master
 
+# Optional web portal controlled by a template switch
+web_server:
+  port: 80
+  auth:
+    username: admin
+    password: !secret web_password
+
+globals:
+  - id: portal_on
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+
+switch:
+  - platform: template
+    id: portal_switch
+    name: Portal
+    lambda: |-
+      return id(portal_on);
+    turn_on_action:
+      - lambda: |-
+          id(portal_on) = true;
+          id(roode_platform).start_portal();
+      - web_server.start:
+    turn_off_action:
+      - lambda: |-
+          id(portal_on) = false;
+          id(roode_platform).stop_portal();
+      - web_server.stop:
+
+# Convenience restart button
+button:
+  - platform: restart
+    name: Roode Restart
+    entity_category: config
+
 # VL53L1X sensor configuration is separate from Roode people counting algorithm
 vl53l1x:
   # ID for this sensor when using multiple VL53L1X modules on the same bus
@@ -191,6 +227,7 @@ vl53l1x:
 
 # Roode people counting algorithm
 roode:
+  id: roode_platform
   # Smooth out measurements by using the minimum distance from this number of readings
   # Increase to 4-5 if jitter is a problem; 1 is fastest but noisier
   sampling: 2

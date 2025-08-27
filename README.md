@@ -14,22 +14,22 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 - [Wiring](#wiring)
   - [ESP32](#esp32)
   - [ESP8266](#esp8266)
-- [Features](#features)
-  - [Minimal Configuration](#minimal-configuration)
-  - [Platform Setup](#platform-setup)
-  - [Interrupt vs Polling](#interrupt-vs-polling)
-  - [Single vs Dual Core](#single-vs-dual-core)
-  - [Sampling and Filtering](#sampling-and-filtering)
-  - [Default Values and Safe Tuning Ranges](#default-values-and-safe-tuning-ranges)
-  - [Threshold distance](#threshold-distance)
-  - [Algorithm](#algorithm)
-  - [Automatic calibration (Home Assistant Setup)](#automatic-calibration-home-assistant-setup)
 - [Configuration Reference](#configuration-reference)
   - [Example Configurations](#example-configurations)
   - [Sensors](#sensors)
-- [Web Portal & API](#web-portal--api)
-- [Logging and Diagnostics](#logging-and-diagnostics)
-- [Calibration Workflow](#calibration-workflow)
+- [Features](#features)
+  - [Algorithm](#algorithm)
+  - [Automatic Calibration (Home Assistant Setup)](#automatic-calibration-home-assistant-setup)
+  - [Calibration Workflow](#calibration-workflow)
+  - [Default Values and Safe Tuning Ranges](#default-values-and-safe-tuning-ranges)
+  - [Interrupt vs Polling](#interrupt-vs-polling)
+  - [Logging and Diagnostics](#logging-and-diagnostics)
+  - [Minimal Configuration](#minimal-configuration)
+  - [Platform Setup](#platform-setup)
+  - [Sampling and Filtering](#sampling-and-filtering)
+  - [Single vs Dual Core](#single-vs-dual-core)
+  - [Threshold distance](#threshold-distance)
+  - [Web Portal & API](#web-portal--api)
 - [FAQ/Troubleshoot](#faqtroubleshoot)
 - [License](#license)
 
@@ -90,421 +90,6 @@ Ps=0 (when connected to GND): In the IIC mode, the user can operate the chip by 
               D2 (GPIO 4) - SDA
               D1 (GPIO 5) - SCL
 ```
-
-## Features
-
-| Feature | Description |
-| --- | --- |
-| Path tracking algorithm | Distinguishes entry vs exit by tracking the order of zone crossings |
-| Auto restart via XSHUT | Sensor restarts automatically if a measurement times out |
-| Clean shutdown | Memory and sensor power managed on reboot |
-| Startup pin test | Logs and disables features if xshut or interrupt pins fail |
-| Built-in pull-ups | XSHUT and interrupt pins use internal pull-ups, no resistors needed |
-| Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
-| Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
-| Persistent calibration | Calibration data can persist in flash across reboots |
-| [Automatic calibration (Home Assistant Setup)](#automatic-calibration-home-assistant-setup) | Portal-guided scan sets ROI and thresholds automatically |
-| Manual recalibration button | Exposes a `Recalibrate` button for on-demand calibration |
-| Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
-| Filtering options | Median/percentile filters smooth jitter with adjustable window |
-| FSM timeouts | Resets the state machine when a transition stalls |
-| CPU optimizations | Automatic optimizations when CPU usage exceeds 90% |
-| Interrupt fallback | Interrupt mode with graceful fallback to polling and logs |
-| XSHUT multiplexing | Supports multiple sensors sharing I²C bus |
-| Feature text sensor | Reports enabled and fallback features for diagnostics |
-| Manual adjustment counter | Tracks user corrections to the people count |
-| Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
-| Polling timeout recovery | Restarts the sensor if no data arrives for `restart_timeout` |
-| Consecutive failure counter | Soft-resets the sensor after 10 read errors |
-| Consecutive invalid distance recovery | Restarts the sensor after too many suspect readings |
-| Recovery cooldown | Prevents another restart for `restart_timeout` |
-| Sensor status reporting | Text sensor shows `ok`, `timeout`, `reinitializing`, `error` or `offline` |
-| Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
-| Colored logs | Normal info in green, details in yellow, failures in red |
-
-### Minimal Configuration
-
-Add the following to any ESPHome node to enable Roode with sensible defaults:
-
-```yaml
-external_components:
-  - source: github://Lyr3x/Roode@master
-    refresh: always
-vl53l1x:
-roode:
-```
-
-- `external_components` fetches Roode from GitHub on each build.
-- `vl53l1x` activates the VL53L1X distance sensor with its default settings.
-- `roode` starts the people-counting logic using the recommended defaults.
-
-### Platform Setup
-
-Roode is provided as an external_component which means it is easy to set up in any ESPHome sensor configuration file. The minimal setup above works out of the box. The following sections describe optional configuration for advanced use.
-
-However, we offer a lot of flexibility. Here's the full configuration spelled out.
-
-```yml
-external_components:
-  - source: github://Lyr3x/Roode
-    refresh: always
-    ref: master
-
-# Optional web portal controlled by a template switch
-web_server:
-  port: 80
-  auth:
-    username: admin
-    password: !secret web_password
-
-globals:
-  - id: portal_on
-    type: bool
-    restore_value: yes
-    initial_value: 'false'
-
-switch:
-  - platform: template
-    id: portal_switch
-    name: Portal
-    lambda: |-
-      return id(portal_on);
-    turn_on_action:
-      - lambda: |-
-          id(portal_on) = true;
-          id(roode_platform).start_portal();
-    turn_off_action:
-      - lambda: |-
-          id(portal_on) = false;
-          id(roode_platform).stop_portal();
-
-# Convenience restart button
-button:
-  - platform: restart
-    name: Roode Restart
-    entity_category: config
-
-# VL53L1X sensor configuration is separate from Roode people counting algorithm
-vl53l1x:
-  # ID for this sensor when using multiple VL53L1X modules on the same bus
-  sensor_id: 1
-  # A non-standard I2C address
-  address:
-  # How long to wait for boot and measurements before giving up
-  timeout: 2s
-
-  # Sensor calibration options
-  calibration:
-    # The ranging mode is different based on how long the distance is that the sensor need to measure.
-    # The longer the distance, the more time the sensor needs to take a measurement.
-    # Available options are: auto, shortest, short, medium, long, longer, longest
-    ranging: auto
-    # The offset correction distance. Run [calibration/OffsetAndXtalkCalibration](calibration/OffsetAndXtalkCalibration)
-    # with a 17% grey target 140 mm away and copy the reported value.
-    offset: 8mm
-    # The corrected photon count in counts per second. Use the same sketch in a
-    # dark room to measure crosstalk and copy the result.
-    crosstalk: 53406cps
-
-  # Hardware pins
-  pins:
-    # Shutdown/Enable pin used to change the I2C address and recover the sensor if needed.
-    xshut:
-      number: GPIO3
-      mode: OUTPUT_PULLUP
-      ignore_strapping_warning: true
-    # Interrupt pin with internal pull-up for the data ready signal
-    interrupt:
-      number: GPIO1
-      mode: INPUT_PULLUP
-
-  # When an xshut pin is provided the library will power cycle the sensor
-  # automatically if a measurement times out.
-  # On boot the driver checks that the xshut and interrupt pins work and
-  # prints the result to the log.
-
-# Roode people counting algorithm
-roode:
-  id: roode_platform
-  # Smooth out measurements by using the minimum distance from this number of readings
-  # Increase to 4-5 if jitter is a problem; 1 is fastest but noisier
-  sampling: 2
-
-  # The orientation of the two sensor pads in relation to the entryway being tracked.
-  # The advised orientation is parallel, but if needed this can be changed to perpendicular.
-  orientation: parallel
-
-  # This controls the Region of Interest. Adjust width/height a few steps at a time
-  # when the doorway is unusually narrow or wide. The current default is
-  roi: { height: 16, width: 6 }
-  # We have an experimental automatic mode that can be enabled with
-  # roi: auto
-  # or only automatic for one dimension
-  # roi: { height: 16, width: auto }
-
-  # The detection thresholds for determining whether a measurement should count as a person crossing.
-  # A reading must be greater than the minimum and less than the maximum to count as a crossing.
-  # These can be given as absolute distances or as percentages.
-  # Percentages are based on the automatically determined idle or resting distance.
-  detection_thresholds:
-    min: 0%  # default minimum is any distance
-    # raise by ~5% or 50mm steps if door movements cause counts
-    max: 85% # default maximum is 85%
-    # an example of absolute units
-    # min: 50mm
-    # max: 234cm
-  # Automatic calibration settings (seconds)
-  auto_calibration: { interval: 14400, persist: true }
-
-  # Jitter reduction options
-  filter_mode: median  # min, median or percentile10
-  # Increase the window to 7 or 9 for heavy noise, drop to 3 for faster response
-  filter_window: 5     # number of samples used by the filter
-  # Log interrupt fallback events and XSHUT recoveries
-  log_fallback_events: true
-  # Disable dual core tasking if needed
-  force_single_core: false
-  # Restart if readings are 0 or >4000mm too many times
-  invalid_distance_limit: 10
-  # Minimum time between automatic sensor restarts
-  restart_timeout: 30s
-  # Apply less aggressive filtering only when CPU usage is high
-  cpu_optimization:
-    activate: 90%
-    deactivate: 50%
-  # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
-
-  # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
-  # This allows for detecting whether a crossing is an entry or exit based on which zone was crossed first.
-  zones:
-    # Flip the entry/exit zones. If Roode seems to be counting backwards, set this to true.
-    invert: false
-
-    # Entry/Exit zones can set overrides for individual ROI & detection thresholds here.
-    # If omitted, they use the options configured above.
-    entry:
-      # Entry zone will automatically configure ROI, regardless of ROI above.
-      roi: auto
-    exit:
-      roi:
-        # Exit zone height starts at 8. Change by 1-2 if objects are closer on this side
-        height: 8
-        # Additionally, zones can manually set their center point.
-        # Usually though, this is left for Roode to automatically determine.
-        center: 124
-
-      detection_thresholds:
-        # Exit zone's min detection threshold will be 5% of idle/resting distance, regardless of setting above.
-        min: 5%
-        # Exit zone's max detection threshold will be 70% of idle/resting distance, regardless of setting above.
-        # Adjust these in 5% steps if one side sees false counts
-        max: 70%
-```
-
-The `entry` and `exit` blocks allow tuning each zone when they behave differently.
-For example, an entryway with a shelf on one side might need a smaller ROI or
-stricter thresholds only in that zone. Start with small adjustments—change the
-ROI height or width by one or two units or nudge thresholds 5 % at a time—and
-test before making larger changes.
-### Interrupt vs Polling
-
-Roode prefers the interrupt pin for efficient updates. When `interrupt` is defined and validated, the VL53L1X notifies the MCU whenever a new sample is ready. If the INT pin is missing or stops working, Roode falls back to a 10 ms polling loop and tries interrupts again every 30 minutes. Polling also acts as a safety net during startup.
-
-| Situation | Use INT | Use Polling |
-| --- | --- | --- |
-| Normal operation | ✅ | 🔁 (optional verify) |
-| INT not received in time | ⛔️ | ✅ |
-| Sensor just booted | ⛔️ | ✅ |
-| Interrupt unreliable | ⛔️ | ✅ |
-| Low-power mode handling | ⛔️ | ✅ |
-
-
-### Single vs Dual Core
-
-On ESP32 targets Roode tries to run the sensor loop on the second CPU core so
-Wi‑Fi and other ESPHome tasks stay responsive.  If the task fails to start or
-when running on an ESP8266 the code automatically falls back to a single‑core
-loop.  You can force single‑core mode with `force_single_core: true`.
-
-### Sampling and Filtering
-
-Roode smooths distance readings in two stages. The driver first averages
-multiple raw measurements using the `sampling` option. Each zone then applies a
-filter across the last few averaged values controlled by `filter_mode` and
-`filter_window`.
-
-Raising `sampling` makes each reading steadier while `filter_window` dictates
-how many of those readings must agree before an event fires. Because the filter
-operates on averaged data, the total number of raw readings considered is
-`sampling` multiplied by `filter_window`. This gives better noise rejection at
-the cost of reaction speed. Start with `sampling: 2` and `filter_window: 3` and
-increase them together if your environment is unstable. See the table below for
-how the available filter modes behave.
-
-| Mode | When to use | Pros | Cons |
-| --- | --- | --- | --- |
-| `min` | Very clean environments or quick response needed | Reacts instantly to changes | Sensitive to noise and outliers |
-| `median` | General use when noise is moderate | Ignores spikes for stable readings | Can lag behind fast motion |
-| `percentile10` | Noisy locations where some jitter must be ignored | Balances responsiveness and noise rejection | Slightly less stable than median |
-
-#### `sampling`
-
-*Averages consecutive raw measurements before filtering.* Increase above `2` only when noise causes flickering.
-
-**Recommended values** moved to the Quick Tips section below.
-
-#### `filter_window`
-
-*Number of past measurements considered by the filter.* `3` is responsive, while `5+` helps in harsh lighting or reflective areas.
-
-**Recommended values** moved to the Quick Tips section below.
-
-Filter mode tips: use `median` to ignore spikes or `percentile10` for gradual noise.
-
-### Quick Tips Summary
-
-The two settings work together: a window of `3` with `sampling: 2` means each
-reported value reflects six raw readings. Raise both when sunlight or
-reflections cause false triggers.
-
-#### Sampling
-
-| `sampling` | When to use | Tradeoff |
-| ---------- | ---------- | -------- |
-| `1` | Fastest response, low noise | Higher noise |
-| `2–3` | Balanced stability and speed | Slight delay |
-| `4+` | Very noisy or unstable areas | Noticeable lag |
-
-#### Filter Window
-
-| `filter_window` | When to use | Tradeoff |
-| --------------- | ---------- | -------- |
-| `3` | General smoothing | Slightly slower response |
-| `5+` | Suppress false triggers | Laggy detection |
-| `1` | Maximum responsiveness | No noise rejection |
-
-### Default Values and Safe Tuning Ranges
-
-- **ROI** – default `{ height: 16, width: 6 }`. Change each dimension by 2–4 units if the doorway is unusually narrow or wide.
-- **detection_thresholds** – default `min: 0%`, `max: 85%`. Raise `min` in ~5 % (≈50 mm) steps to ignore door swings. Adjust `max` between 70 % and 90 % when traffic is very close or far.
-- **sampling** – default `2`. Values `1–5` balance responsiveness against noise.
-- **filter_window** – default `3`. Windows of `5–9` suppress spikes but slow detection.
-- **restart_timeout** – default `30s`. A range of `15s–60s` is generally safe.
-- **invalid_distance_limit** – default `10`. Tune between `5` and `20` depending on noise level.
-
-Tweak one parameter at a time and verify performance before making further adjustments.
- 
-### Threshold distance
-
-A crossing is detected when the measured distance for a zone falls between its
-configured minimum and maximum values. Roode determines starting thresholds
-automatically: after powering up, leave the area clear for about 10 seconds so
-the idle distance can be measured. The default maximum threshold is 80 % of this
-resting value.
-
-To fine-tune detection, adjust the `detection_thresholds` option in your YAML or call the `recalibrate` service to re-measure the idle distance.
-
-By default, the sensor calculates thresholds after startup by sampling the idle distance for about 10 seconds. The maximum threshold is set to 80% of this distance and the minimum to 15%. These can be changed at runtime using the `set_entry_threshold_percentages()` and `set_exit_threshold_percentages()` methods.
-
-If you install the sensor \~20 cm above a door and want to ignore door movements, you might lower the minimum threshold:
-
-```yaml
-detection_thresholds:
-  min: 10%
-  max: 80%
-```
-
-Or in code:
-
-```cpp
-set_entry_threshold_percentages(10, 80);
-```
-
-This ensures movements too close to the sensor (like door leaf motion) are filtered out while still detecting people passing underneath.
-
-See the [calibration instructions](calibration/) for further details.
-
-### Algorithm
-
-The implemented algorithm is an improved version of my own implementation which checks the direction of a movement through two defined zones. ST implemented a nice and efficient way to track the path from one to the other direction. I migrated the algorithm with some changes into the Roode project.
-The concept of path tracking is the detection of a human:
-
-- In the first zone only
-- In both zones
-- In the second zone only
-- In no zone
-
-That way we can ensure the direction of movement.
-
-The sensor creates a 16x16 grid and computes the final distance by averaging all the values in that grid.
-We are defining two different Region of Interest (ROI) inside this grid. Then the sensor will measure the two distances in the two zones and will detect any presence and tracks the path to receive the direction.
-
-However, the algorithm is very sensitive to the slightest modification of the ROI, regarding both its size and its positioning inside the grid.
-
-STMicroelectronics defines default values for these parameters as follows:
-
-The center of the ROI you set is based on the table below and the optical center has to be set as the pad above and to the right of your exact center:
-
-Set the center SPAD of the region of interest (ROI)
-based on VL53L1X_SetROICenter() from STSW-IMG009 Ultra Lite Driver
-
-ST user manual [UM2555](https://www.st.com/resource/en/user_manual/um2555-ultralite-driver-for-vl53l1x.pdf) explains ROI selection in detail, so we recommend
-reading that document carefully. Here is a table of SPAD locations from
-UM2555 (199 is the default/center):
-
-```
-128,136,144,152,160,168,176,184,  192,200,208,216,224,232,240,248
-129,137,145,153,161,169,177,185,  193,201,209,217,225,233,241,249
-130,138,146,154,162,170,178,186,  194,202,210,218,226,234,242,250
-131,139,147,155,163,171,179,187,  195,203,211,219,227,235,243,251
-132,140,148,156,164,172,180,188,  196,204,212,220,228,236,244,252
-133,141,149,157,165,173,181,189,  197,205,213,221,229,237,245,253
-134,142,150,158,166,174,182,190,  198,206,214,222,230,238,246,254
-135,143,151,159,167,175,183,191,  199,207,215,223,231,239,247,255
-
-127,119,111,103, 95, 87, 79, 71,   63, 55, 47, 39, 31, 23, 15,  7
-126,118,110,102, 94, 86, 78, 70,   62, 54, 46, 38, 30, 22, 14,  6
-125,117,109,101, 93, 85, 77, 69,   61, 53, 45, 37, 29, 21, 13,  5
-124,116,108,100, 92, 84, 76, 68,   60, 52, 44, 36, 28, 20, 12,  4
-123,115,107, 99, 91, 83, 75, 67,   59, 51, 43, 35, 27, 19, 11,  3
-122,114,106, 98, 90, 82, 74, 66,   58, 50, 42, 34, 26, 18, 10,  2
-121,113,105, 97, 89, 81, 73, 65,   57, 49, 41, 33, 25, 17,  9,  1
-120,112,104, 96, 88, 80, 72, 64,   56, 48, 40, 32, 24, 16,  8,  0 <- Pin 1
-```
-
-This table is oriented as if looking into the front of the sensor (or top of the chip). SPAD 0 is closest to pin 1 of the VL53L1X, which is the corner closest to the VDD pin on the Pololu VL53L1X carrier board:
-
-```
-  +--------------+
-  |             O| GPIO1
-  |              |
-  |             O|
-  | 128    248   |
-  |+----------+ O|
-  ||+--+  +--+|  |
-  |||  |  |  || O|
-  ||+--+  +--+|  |
-  |+----------+ O|
-  | 120      0   |
-  |             O|
-  |              |
-  |             O| VDD
-  +--------------+
-```
-
-However, note that the lens inside the VL53L1X inverts the image it sees
-(like the way a camera works). So for example, to shift the sensor's FOV to
-sense objects toward the upper left, you should pick a center SPAD in the lower right.
-
-### Automatic Calibration (Home Assistant Setup)
-Roode can determine its own idle distance and zone thresholds. The sensor recalibrates itself after power-up and periodically during operation, so no manual tuning is required. The steps below show how to enable the automatic calibration workflow in Home Assistant without any coding knowledge:
-
-1. **Flash Roode using the example YAML** from the Quick Start above.
-2. **Enable the calibration portal** by turning on the `Portal` switch exposed by the device.
-3. **Run a scan**: in the portal press *Start Scan*, walk through the doorway once, and wait for the result.
-4. **Apply the result**: click *Accept ROI* to apply the automatically calculated region of interest and thresholds. The device updates itself via OTA and begins counting immediately.
-
-After each reboot, leave the monitored area empty for about 10 seconds so the sensor can capture a clean baseline. Roode then recalibrates itself every few hours to maintain accuracy.
 
 ## Configuration Reference
 
@@ -683,7 +268,476 @@ calibration:6:01PM
 
 
 
-## Web Portal & API
+## Features
+
+
+| Feature | Description |
+| --- | --- |
+| Path tracking algorithm | Distinguishes entry vs exit by tracking the order of zone crossings |
+| Auto restart via XSHUT | Sensor restarts automatically if a measurement times out |
+| Clean shutdown | Memory and sensor power managed on reboot |
+| Startup pin test | Logs and disables features if xshut or interrupt pins fail |
+| Built-in pull-ups | XSHUT and interrupt pins use internal pull-ups, no resistors needed |
+| Metrics sensors | Optional sensors report loop time, CPU usage, RAM and flash usage |
+| Fail-safe recalibration | Triggers recalibration if a zone stays active too long |
+| Persistent calibration | Calibration data can persist in flash across reboots |
+| [Automatic calibration (Home Assistant Setup)](#automatic-calibration-home-assistant-setup) | Portal-guided scan sets ROI and thresholds automatically |
+| Manual recalibration button | Exposes a `Recalibrate` button for on-demand calibration |
+| Dual-core tasking | Keeps polling responsive on ESP32 with automatic retry/fallback |
+| Filtering options | Median/percentile filters smooth jitter with adjustable window |
+| FSM timeouts | Resets the state machine when a transition stalls |
+| CPU optimizations | Automatic optimizations when CPU usage exceeds 90% |
+| Interrupt fallback | Interrupt mode with graceful fallback to polling and logs |
+| XSHUT multiplexing | Supports multiple sensors sharing I²C bus |
+| Feature text sensor | Reports enabled and fallback features for diagnostics |
+| Manual adjustment counter | Tracks user corrections to the people count |
+| Calibration workflow | Portal or scripts guide ROI and threshold tuning |
+| Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
+| Logging and diagnostics | Event logs and optional sensors aid troubleshooting |
+| Web portal & API | Optional web UI and JSON endpoints for calibration |
+| Polling timeout recovery | Restarts the sensor if no data arrives for `restart_timeout` |
+| Consecutive failure counter | Soft-resets the sensor after 10 read errors |
+| Consecutive invalid distance recovery | Restarts the sensor after too many suspect readings |
+| Recovery cooldown | Prevents another restart for `restart_timeout` |
+| Sensor status reporting | Text sensor shows `ok`, `timeout`, `reinitializing`, `error` or `offline` |
+| Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
+| Colored logs | Normal info in green, details in yellow, failures in red |
+
+
+### Algorithm
+
+The implemented algorithm is an improved version of my own implementation which checks the direction of a movement through two defined zones. ST implemented a nice and efficient way to track the path from one to the other direction. I migrated the algorithm with some changes into the Roode project.
+The concept of path tracking is the detection of a human:
+
+- In the first zone only
+- In both zones
+- In the second zone only
+- In no zone
+
+That way we can ensure the direction of movement.
+
+The sensor creates a 16x16 grid and computes the final distance by averaging all the values in that grid.
+We are defining two different Region of Interest (ROI) inside this grid. Then the sensor will measure the two distances in the two zones and will detect any presence and tracks the path to receive the direction.
+
+However, the algorithm is very sensitive to the slightest modification of the ROI, regarding both its size and its positioning inside the grid.
+
+STMicroelectronics defines default values for these parameters as follows:
+
+The center of the ROI you set is based on the table below and the optical center has to be set as the pad above and to the right of your exact center:
+
+Set the center SPAD of the region of interest (ROI)
+based on VL53L1X_SetROICenter() from STSW-IMG009 Ultra Lite Driver
+
+ST user manual [UM2555](https://www.st.com/resource/en/user_manual/um2555-ultralite-driver-for-vl53l1x.pdf) explains ROI selection in detail, so we recommend
+reading that document carefully. Here is a table of SPAD locations from
+UM2555 (199 is the default/center):
+
+```
+128,136,144,152,160,168,176,184,  192,200,208,216,224,232,240,248
+129,137,145,153,161,169,177,185,  193,201,209,217,225,233,241,249
+130,138,146,154,162,170,178,186,  194,202,210,218,226,234,242,250
+131,139,147,155,163,171,179,187,  195,203,211,219,227,235,243,251
+132,140,148,156,164,172,180,188,  196,204,212,220,228,236,244,252
+133,141,149,157,165,173,181,189,  197,205,213,221,229,237,245,253
+134,142,150,158,166,174,182,190,  198,206,214,222,230,238,246,254
+135,143,151,159,167,175,183,191,  199,207,215,223,231,239,247,255
+
+127,119,111,103, 95, 87, 79, 71,   63, 55, 47, 39, 31, 23, 15,  7
+126,118,110,102, 94, 86, 78, 70,   62, 54, 46, 38, 30, 22, 14,  6
+125,117,109,101, 93, 85, 77, 69,   61, 53, 45, 37, 29, 21, 13,  5
+124,116,108,100, 92, 84, 76, 68,   60, 52, 44, 36, 28, 20, 12,  4
+123,115,107, 99, 91, 83, 75, 67,   59, 51, 43, 35, 27, 19, 11,  3
+122,114,106, 98, 90, 82, 74, 66,   58, 50, 42, 34, 26, 18, 10,  2
+121,113,105, 97, 89, 81, 73, 65,   57, 49, 41, 33, 25, 17,  9,  1
+120,112,104, 96, 88, 80, 72, 64,   56, 48, 40, 32, 24, 16,  8,  0 <- Pin 1
+```
+
+This table is oriented as if looking into the front of the sensor (or top of the chip). SPAD 0 is closest to pin 1 of the VL53L1X, which is the corner closest to the VDD pin on the Pololu VL53L1X carrier board:
+
+```
+  +--------------+
+  |             O| GPIO1
+  |              |
+  |             O|
+  | 128    248   |
+  |+----------+ O|
+  ||+--+  +--+|  |
+  |||  |  |  || O|
+  ||+--+  +--+|  |
+  |+----------+ O|
+  | 120      0   |
+  |             O|
+  |              |
+  |             O| VDD
+  +--------------+
+```
+
+However, note that the lens inside the VL53L1X inverts the image it sees
+(like the way a camera works). So for example, to shift the sensor's FOV to
+sense objects toward the upper left, you should pick a center SPAD in the lower right.
+
+
+### Automatic Calibration (Home Assistant Setup)
+Roode can determine its own idle distance and zone thresholds. The sensor recalibrates itself after power-up and periodically during operation, so no manual tuning is required. The steps below show how to enable the automatic calibration workflow in Home Assistant without any coding knowledge:
+
+1. **Flash Roode using the example YAML** from the Quick Start above.
+2. **Enable the calibration portal** by turning on the `Portal` switch exposed by the device.
+3. **Run a scan**: in the portal press *Start Scan*, walk through the doorway once, and wait for the result.
+4. **Apply the result**: click *Accept ROI* to apply the automatically calculated region of interest and thresholds. The device updates itself via OTA and begins counting immediately.
+
+After each reboot, leave the monitored area empty for about 10 seconds so the sensor can capture a clean baseline. Roode then recalibrates itself every few hours to maintain accuracy.
+
+
+### Calibration Workflow
+
+The built-in portal handles most calibration tasks:
+
+1. Enable the `Portal` switch in Home Assistant or via the device API.
+2. Start a passive scan from the portal and walk through the doorway once.
+3. Review the previewed region of interest and thresholds, then press *Apply* to save them.
+
+For advanced tuning you can still record sessions with `session_recorder.py`,
+process them with `roi_analysis.py` and include the generated `roi_result.json`
+in a firmware build.
+
+
+### Default Values and Safe Tuning Ranges
+
+- **ROI** – default `{ height: 16, width: 6 }`. Change each dimension by 2–4 units if the doorway is unusually narrow or wide.
+- **detection_thresholds** – default `min: 0%`, `max: 85%`. Raise `min` in ~5 % (≈50 mm) steps to ignore door swings. Adjust `max` between 70 % and 90 % when traffic is very close or far.
+- **sampling** – default `2`. Values `1–5` balance responsiveness against noise.
+- **filter_window** – default `3`. Windows of `5–9` suppress spikes but slow detection.
+- **restart_timeout** – default `30s`. A range of `15s–60s` is generally safe.
+- **invalid_distance_limit** – default `10`. Tune between `5` and `20` depending on noise level.
+
+Tweak one parameter at a time and verify performance before making further adjustments.
+ 
+
+### Interrupt vs Polling
+
+Roode prefers the interrupt pin for efficient updates. When `interrupt` is defined and validated, the VL53L1X notifies the MCU whenever a new sample is ready. If the INT pin is missing or stops working, Roode falls back to a 10 ms polling loop and tries interrupts again every 30 minutes. Polling also acts as a safety net during startup.
+
+| Situation | Use INT | Use Polling |
+| --- | --- | --- |
+| Normal operation | ✅ | 🔁 (optional verify) |
+| INT not received in time | ⛔️ | ✅ |
+| Sensor just booted | ⛔️ | ✅ |
+| Interrupt unreliable | ⛔️ | ✅ |
+| Low-power mode handling | ⛔️ | ✅ |
+
+
+
+### Logging and Diagnostics
+
+Roode prints key events to the ESPHome logger. Set `log_fallback_events: true`
+in the `roode:` section to include interrupt fallbacks and XSHUT recovery
+details. Event logs cover power cycles of the sensor, automatic changes between
+interrupt and polling mode, and manual adjustments to the people count. Debug
+level messages were removed to keep output concise in production builds.
+
+For diagnostic entities, the feature text sensor reports
+active features, while diagnostic sensors expose additional
+metrics:
+
+- `loop_time`, `cpu_usage`, `ram_free` and `flash_free` report resource usage.
+- `sensor_status` and `interrupt_status` show the current hardware state. The
+  status sensor reports `ok`, `timeout`, `reinitializing`, `error` or `offline`
+  so automations can react to issues.
+- `version`, `entry_exit_event` and `enabled_features` provide diagnostic text,
+  and a text-sensor `sensor_status` exposes the same status string.
+- ROI size and threshold sensors allow live tuning of each zone.
+- `manual_adjustment_count` records people-count corrections.
+
+See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
+these sensors. For automatic recovery features, see Polling timeout recovery, Consecutive failure counter, and Recovery cooldown.
+
+
+
+### Minimal Configuration
+
+Add the following to any ESPHome node to enable Roode with sensible defaults:
+
+```yaml
+external_components:
+  - source: github://Lyr3x/Roode@master
+    refresh: always
+vl53l1x:
+roode:
+```
+
+- `external_components` fetches Roode from GitHub on each build.
+- `vl53l1x` activates the VL53L1X distance sensor with its default settings.
+- `roode` starts the people-counting logic using the recommended defaults.
+
+
+### Platform Setup
+
+Roode is provided as an external_component which means it is easy to set up in any ESPHome sensor configuration file. The minimal setup above works out of the box. The following sections describe optional configuration for advanced use.
+
+However, we offer a lot of flexibility. Here's the full configuration spelled out.
+
+```yml
+external_components:
+  - source: github://Lyr3x/Roode
+    refresh: always
+    ref: master
+
+# Optional web portal controlled by a template switch
+web_server:
+  port: 80
+  auth:
+    username: admin
+    password: !secret web_password
+
+globals:
+  - id: portal_on
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+
+switch:
+  - platform: template
+    id: portal_switch
+    name: Portal
+    lambda: |-
+      return id(portal_on);
+    turn_on_action:
+      - lambda: |-
+          id(portal_on) = true;
+          id(roode_platform).start_portal();
+    turn_off_action:
+      - lambda: |-
+          id(portal_on) = false;
+          id(roode_platform).stop_portal();
+
+# Convenience restart button
+button:
+  - platform: restart
+    name: Roode Restart
+    entity_category: config
+
+# VL53L1X sensor configuration is separate from Roode people counting algorithm
+vl53l1x:
+  # ID for this sensor when using multiple VL53L1X modules on the same bus
+  sensor_id: 1
+  # A non-standard I2C address
+  address:
+  # How long to wait for boot and measurements before giving up
+  timeout: 2s
+
+  # Sensor calibration options
+  calibration:
+    # The ranging mode is different based on how long the distance is that the sensor need to measure.
+    # The longer the distance, the more time the sensor needs to take a measurement.
+    # Available options are: auto, shortest, short, medium, long, longer, longest
+    ranging: auto
+    # The offset correction distance. Run [calibration/OffsetAndXtalkCalibration](calibration/OffsetAndXtalkCalibration)
+    # with a 17% grey target 140 mm away and copy the reported value.
+    offset: 8mm
+    # The corrected photon count in counts per second. Use the same sketch in a
+    # dark room to measure crosstalk and copy the result.
+    crosstalk: 53406cps
+
+  # Hardware pins
+  pins:
+    # Shutdown/Enable pin used to change the I2C address and recover the sensor if needed.
+    xshut:
+      number: GPIO3
+      mode: OUTPUT_PULLUP
+      ignore_strapping_warning: true
+    # Interrupt pin with internal pull-up for the data ready signal
+    interrupt:
+      number: GPIO1
+      mode: INPUT_PULLUP
+
+  # When an xshut pin is provided the library will power cycle the sensor
+  # automatically if a measurement times out.
+  # On boot the driver checks that the xshut and interrupt pins work and
+  # prints the result to the log.
+
+# Roode people counting algorithm
+roode:
+  id: roode_platform
+  # Smooth out measurements by using the minimum distance from this number of readings
+  # Increase to 4-5 if jitter is a problem; 1 is fastest but noisier
+  sampling: 2
+
+  # The orientation of the two sensor pads in relation to the entryway being tracked.
+  # The advised orientation is parallel, but if needed this can be changed to perpendicular.
+  orientation: parallel
+
+  # This controls the Region of Interest. Adjust width/height a few steps at a time
+  # when the doorway is unusually narrow or wide. The current default is
+  roi: { height: 16, width: 6 }
+  # We have an experimental automatic mode that can be enabled with
+  # roi: auto
+  # or only automatic for one dimension
+  # roi: { height: 16, width: auto }
+
+  # The detection thresholds for determining whether a measurement should count as a person crossing.
+  # A reading must be greater than the minimum and less than the maximum to count as a crossing.
+  # These can be given as absolute distances or as percentages.
+  # Percentages are based on the automatically determined idle or resting distance.
+  detection_thresholds:
+    min: 0%  # default minimum is any distance
+    # raise by ~5% or 50mm steps if door movements cause counts
+    max: 85% # default maximum is 85%
+    # an example of absolute units
+    # min: 50mm
+    # max: 234cm
+  # Automatic calibration settings (seconds)
+  auto_calibration: { interval: 14400, persist: true }
+
+  # Jitter reduction options
+  filter_mode: median  # min, median or percentile10
+  # Increase the window to 7 or 9 for heavy noise, drop to 3 for faster response
+  filter_window: 5     # number of samples used by the filter
+  # Log interrupt fallback events and XSHUT recoveries
+  log_fallback_events: true
+  # Disable dual core tasking if needed
+  force_single_core: false
+  # Restart if readings are 0 or >4000mm too many times
+  invalid_distance_limit: 10
+  # Minimum time between automatic sensor restarts
+  restart_timeout: 30s
+  # Apply less aggressive filtering only when CPU usage is high
+  cpu_optimization:
+    activate: 90%
+    deactivate: 50%
+  # Event logs show xshut power cycles, interrupt fallbacks and manual adjustments
+
+  # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
+  # This allows for detecting whether a crossing is an entry or exit based on which zone was crossed first.
+  zones:
+    # Flip the entry/exit zones. If Roode seems to be counting backwards, set this to true.
+    invert: false
+
+    # Entry/Exit zones can set overrides for individual ROI & detection thresholds here.
+    # If omitted, they use the options configured above.
+    entry:
+      # Entry zone will automatically configure ROI, regardless of ROI above.
+      roi: auto
+    exit:
+      roi:
+        # Exit zone height starts at 8. Change by 1-2 if objects are closer on this side
+        height: 8
+        # Additionally, zones can manually set their center point.
+        # Usually though, this is left for Roode to automatically determine.
+        center: 124
+
+      detection_thresholds:
+        # Exit zone's min detection threshold will be 5% of idle/resting distance, regardless of setting above.
+        min: 5%
+        # Exit zone's max detection threshold will be 70% of idle/resting distance, regardless of setting above.
+        # Adjust these in 5% steps if one side sees false counts
+        max: 70%
+```
+
+The `entry` and `exit` blocks allow tuning each zone when they behave differently.
+For example, an entryway with a shelf on one side might need a smaller ROI or
+stricter thresholds only in that zone. Start with small adjustments—change the
+ROI height or width by one or two units or nudge thresholds 5 % at a time—and
+test before making larger changes.
+
+### Sampling and Filtering
+
+Roode smooths distance readings in two stages. The driver first averages
+multiple raw measurements using the `sampling` option. Each zone then applies a
+filter across the last few averaged values controlled by `filter_mode` and
+`filter_window`.
+
+Raising `sampling` makes each reading steadier while `filter_window` dictates
+how many of those readings must agree before an event fires. Because the filter
+operates on averaged data, the total number of raw readings considered is
+`sampling` multiplied by `filter_window`. This gives better noise rejection at
+the cost of reaction speed. Start with `sampling: 2` and `filter_window: 3` and
+increase them together if your environment is unstable. See the table below for
+how the available filter modes behave.
+
+| Mode | When to use | Pros | Cons |
+| --- | --- | --- | --- |
+| `min` | Very clean environments or quick response needed | Reacts instantly to changes | Sensitive to noise and outliers |
+| `median` | General use when noise is moderate | Ignores spikes for stable readings | Can lag behind fast motion |
+| `percentile10` | Noisy locations where some jitter must be ignored | Balances responsiveness and noise rejection | Slightly less stable than median |
+
+#### `sampling`
+
+*Averages consecutive raw measurements before filtering.* Increase above `2` only when noise causes flickering.
+
+**Recommended values** moved to the Quick Tips section below.
+
+#### `filter_window`
+
+*Number of past measurements considered by the filter.* `3` is responsive, while `5+` helps in harsh lighting or reflective areas.
+
+**Recommended values** moved to the Quick Tips section below.
+
+Filter mode tips: use `median` to ignore spikes or `percentile10` for gradual noise.
+
+
+#### Quick Tips Summary
+
+The two settings work together: a window of `3` with `sampling: 2` means each
+reported value reflects six raw readings. Raise both when sunlight or
+reflections cause false triggers.
+
+#### Sampling
+
+| `sampling` | When to use | Tradeoff |
+| ---------- | ---------- | -------- |
+| `1` | Fastest response, low noise | Higher noise |
+| `2–3` | Balanced stability and speed | Slight delay |
+| `4+` | Very noisy or unstable areas | Noticeable lag |
+
+#### Filter Window
+
+| `filter_window` | When to use | Tradeoff |
+| --------------- | ---------- | -------- |
+| `3` | General smoothing | Slightly slower response |
+| `5+` | Suppress false triggers | Laggy detection |
+| `1` | Maximum responsiveness | No noise rejection |
+
+
+### Single vs Dual Core
+
+On ESP32 targets Roode tries to run the sensor loop on the second CPU core so
+Wi‑Fi and other ESPHome tasks stay responsive.  If the task fails to start or
+when running on an ESP8266 the code automatically falls back to a single‑core
+loop.  You can force single‑core mode with `force_single_core: true`.
+
+
+### Threshold distance
+
+A crossing is detected when the measured distance for a zone falls between its
+configured minimum and maximum values. Roode determines starting thresholds
+automatically: after powering up, leave the area clear for about 10 seconds so
+the idle distance can be measured. The default maximum threshold is 80 % of this
+resting value.
+
+To fine-tune detection, adjust the `detection_thresholds` option in your YAML or call the `recalibrate` service to re-measure the idle distance.
+
+By default, the sensor calculates thresholds after startup by sampling the idle distance for about 10 seconds. The maximum threshold is set to 80% of this distance and the minimum to 15%. These can be changed at runtime using the `set_entry_threshold_percentages()` and `set_exit_threshold_percentages()` methods.
+
+If you install the sensor \~20 cm above a door and want to ignore door movements, you might lower the minimum threshold:
+
+```yaml
+detection_thresholds:
+  min: 10%
+  max: 80%
+```
+
+Or in code:
+
+```cpp
+set_entry_threshold_percentages(10, 80);
+```
+
+This ensures movements too close to the sensor (like door leaf motion) are filtered out while still detecting people passing underneath.
+
+See the [calibration instructions](calibration/) for further details.
+
+
+### Web Portal & API
 
 Roode includes a lightweight web portal for configuration and calibration.
 To conserve resources the web server is stopped on boot and only started
@@ -710,42 +764,6 @@ low. If the ESPHome `api:` component is enabled, the `Portal` switch is
 also published as a Home Assistant entity for easy toggling from the UI or
 automations.
 
-## Logging and Diagnostics
-
-Roode prints key events to the ESPHome logger. Set `log_fallback_events: true`
-in the `roode:` section to include interrupt fallbacks and XSHUT recovery
-details. Event logs cover power cycles of the sensor, automatic changes between
-interrupt and polling mode, and manual adjustments to the people count. Debug
-level messages were removed to keep output concise in production builds.
-
-For diagnostic entities, the feature text sensor reports
-active features, while diagnostic sensors expose additional
-metrics:
-
-- `loop_time`, `cpu_usage`, `ram_free` and `flash_free` report resource usage.
-- `sensor_status` and `interrupt_status` show the current hardware state. The
-  status sensor reports `ok`, `timeout`, `reinitializing`, `error` or `offline`
-  so automations can react to issues.
-- `version`, `entry_exit_event` and `enabled_features` provide diagnostic text,
-  and a text-sensor `sensor_status` exposes the same status string.
-- ROI size and threshold sensors allow live tuning of each zone.
-- `manual_adjustment_count` records people-count corrections.
-
-See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
-these sensors. For automatic recovery features, see Polling timeout recovery, Consecutive failure counter, and Recovery cooldown.
-
-
-## Calibration Workflow
-
-The built-in portal handles most calibration tasks:
-
-1. Enable the `Portal` switch in Home Assistant or via the device API.
-2. Start a passive scan from the portal and walk through the doorway once.
-3. Review the previewed region of interest and thresholds, then press *Apply* to save them.
-
-For advanced tuning you can still record sessions with `session_recorder.py`,
-process them with `roi_analysis.py` and include the generated `roi_result.json`
-in a firmware build.
 
 ## FAQ/Troubleshoot
 

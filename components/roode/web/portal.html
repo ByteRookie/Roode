@@ -21,6 +21,8 @@
     .hdr{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:12px}
     .hdr h1{font-size:18px;margin:0;font-weight:600}
     .status{font-size:12px;color:var(--muted)}
+    .banner{display:none;background:var(--err);color:#fff;padding:8px 12px;border-radius:8px;margin-bottom:12px}
+    button[disabled],.disabled{opacity:0.5;pointer-events:none;cursor:not-allowed}
     .row{display:flex;gap:16px;flex-wrap:wrap}
     .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;flex:1 1 300px;min-width:300px}
     .card h2{margin:0 0 10px 0;font-size:14px;font-weight:600;color:var(--acc)}
@@ -47,6 +49,7 @@
 </head>
 <body>
   <div class="wrap">
+    <div id="errorBanner" class="banner"></div>
     <div class="hdr">
       <h1>Roode Calibration Portal</h1>
       <div class="status"><span id="statusText">Status: <b>Idle</b></span> · <span id="lastCal">Last calibration: —</span></div>
@@ -143,6 +146,14 @@
   <script>
   // Helpers
   const $ = (s)=>document.querySelector(s);
+  const showError = (msg)=>{
+    const b = $('#errorBanner');
+    if(!b) return;
+    b.textContent = msg || 'Request failed';
+    b.style.display = 'block';
+    clearTimeout(b._hide);
+    b._hide = setTimeout(()=>{ b.style.display='none'; }, 5000);
+  };
   const fmtBytes = n => {
     if(n==null) return '—';
     const u=['B','KB','MB']; let i=0, v=n;
@@ -160,12 +171,24 @@
 
   // Fetch JSON with graceful fallback
   async function getJSON(url){
-    try { const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw 0; return await r.json(); }
-    catch { return null; }
+    try {
+      const r = await fetch(url, {cache:'no-store'});
+      if(!r.ok) throw new Error(r.status + ' ' + r.statusText);
+      return await r.json();
+    } catch(e) {
+      showError(e.message);
+      return null;
+    }
   }
   async function postJSON(url, body){
-    try { const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: body?JSON.stringify(body):'{}'}); if(!r.ok) throw 0; return await r.json().catch(()=>({ok:true})); }
-    catch { return { ok:false }; }
+    try {
+      const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: body?JSON.stringify(body):'{}'});
+      if(!r.ok) throw new Error(r.status + ' ' + r.statusText);
+      return await r.json().catch(()=>({ok:true}));
+    } catch(e) {
+      showError(e.message);
+      return { ok:false };
+    }
   }
 
   // Renderers
@@ -253,16 +276,36 @@
   }
 
   // Actions
-  $('#btnStart').addEventListener('click', async ()=>{
-    const r = await postJSON('/api/scan/start');
-    if(r && r.id){ status = {state:'Scanning', id:r.id, step:'8×8 Scan', progress:0}; renderStatus(); }
+  $('#btnStart').addEventListener('click', async (e)=>{
+    const btn = e.target;
+    btn.disabled = true;
+    try {
+      const r = await postJSON('/api/scan/start');
+      if(r && r.id){ status = {state:'Scanning', id:r.id, step:'8×8 Scan', progress:0}; renderStatus(); }
+    } finally {
+      btn.disabled = false;
+    }
   });
-  $('#btnCancel').addEventListener('click', async ()=>{
-    await postJSON('/api/scan/cancel'); status = {state:'Idle', id:status?.id || '—', step:'—', progress:0}; renderStatus();
+  $('#btnCancel').addEventListener('click', async (e)=>{
+    const btn = e.target;
+    btn.disabled = true;
+    try {
+      await postJSON('/api/scan/cancel');
+      status = {state:'Idle', id:status?.id || '—', step:'—', progress:0};
+      renderStatus();
+    } finally {
+      btn.disabled = false;
+    }
   });
-  $('#btnApply').addEventListener('click', async ()=>{
-    const r = await postJSON('/api/roi/apply');
-    if(r && r.ok) { /* next poll will refresh Current Settings */ }
+  $('#btnApply').addEventListener('click', async (e)=>{
+    const btn = e.target;
+    btn.disabled = true;
+    try {
+      const r = await postJSON('/api/roi/apply');
+      if(r && r.ok) { /* next poll will refresh Current Settings */ }
+    } finally {
+      btn.disabled = false;
+    }
   });
   $('#btnCopyJSON').addEventListener('click', ()=>{
     if(!current) return;
@@ -271,15 +314,25 @@
   document.querySelector('#tblSessions').addEventListener('click', async (e)=>{
     const a = e.target.closest('a'); if(!a) return;
     if(a.dataset.view){ e.preventDefault();
-      // Prefer a queryable preview endpoint per session if available:
-      const prev = await getJSON(`/api/roi/preview?session_id=${encodeURIComponent(a.dataset.view)}`);
-      preview = prev || preview; renderPreview();
-      document.querySelector('#preview')?.scrollIntoView({behavior:'smooth', block:'start'});
+      a.classList.add('disabled');
+      try {
+        // Prefer a queryable preview endpoint per session if available:
+        const prev = await getJSON(`/api/roi/preview?session_id=${encodeURIComponent(a.dataset.view)}`);
+        preview = prev || preview; renderPreview();
+        document.querySelector('#preview')?.scrollIntoView({behavior:'smooth', block:'start'});
+      } finally {
+        a.classList.remove('disabled');
+      }
     }
     if(a.dataset.del){ e.preventDefault();
-      await postJSON('/api/scan/delete', { session_id: a.dataset.del });
-      sessions = (sessions||[]).filter(s => s.id !== a.dataset.del);
-      renderSessions();
+      a.classList.add('disabled');
+      try {
+        await postJSON('/api/scan/delete', { session_id: a.dataset.del });
+        sessions = (sessions||[]).filter(s => s.id !== a.dataset.del);
+        renderSessions();
+      } finally {
+        a.classList.remove('disabled');
+      }
     }
   });
 

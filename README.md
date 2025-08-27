@@ -113,6 +113,13 @@ external_components:
     refresh: always
     ref: master
 
+# Enable a simple web portal
+web_server:
+  port: 80
+  auth:
+    username: admin
+    password: !secret web_password
+
 # VL53L1X sensor configuration is separate from Roode people counting algorithm
 vl53l1x:
   # ID for this sensor when using multiple VL53L1X modules on the same bus
@@ -154,6 +161,7 @@ vl53l1x:
 
 # Roode people counting algorithm
 roode:
+  id: roode_platform
   # Smooth out measurements by using the minimum distance from this number of readings
   # Increase to 4-5 if jitter is a problem; 1 is fastest but noisier
   sampling: 2
@@ -228,6 +236,18 @@ roode:
         # Exit zone's max detection threshold will be 70% of idle/resting distance, regardless of setting above.
         # Adjust these in 5% steps if one side sees false counts
         max: 70%
+
+# Provide buttons for device control
+button:
+  - platform: restart
+    name: "RooDe Restart"
+    entity_category: config
+  - platform: template
+    name: "RooDe Recalibrate"
+    on_press:
+      - lambda: id(roode_platform)->recalibration();
+    entity_category: config
+
 ```
 
 The `entry` and `exit` blocks allow tuning each zone when they behave differently.

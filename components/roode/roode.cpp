@@ -151,6 +151,24 @@ Roode::~Roode() {
   delete exit;
 }
 
+bool Roode::check_token_(AsyncWebServerRequest *request) {
+#ifdef USE_WEB_SERVER
+  if (portal_password_.empty())
+    return true;
+  if (request->hasHeader("X-Portal-Token") && request->header("X-Portal-Token") == portal_password_.c_str())
+    return true;
+  if (request->hasParam("token")) {
+    auto param = request->getParam("token");
+    if (param->value() == portal_password_.c_str())
+      return true;
+  }
+  request->send(401, "text/plain", "Unauthorized");
+  return false;
+#else
+  return true;
+#endif
+}
+
 void Roode::register_server_endpoints() {
 #ifdef USE_WEB_SERVER
   if (portal_registered_ || web_server_base::global_web_server_base == nullptr)
@@ -158,11 +176,20 @@ void Roode::register_server_endpoints() {
   auto server = web_server_base::global_web_server_base->get_server();
   portal_registered_ = true;
 
-  server->on("/portal", HTTP_GET,
-             [](AsyncWebServerRequest *request) { request->send_P(200, "text/html", portal_html); });
-  server->on("/", HTTP_GET, [](AsyncWebServerRequest *request) { request->send_P(200, "text/html", portal_html); });
+  server->on("/portal", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
+    request->send_P(200, "text/html", portal_html);
+  });
+  server->on("/", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
+    request->send_P(200, "text/html", portal_html);
+  });
 
   server->on("/api/settings/current", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
     DynamicJsonDocument doc(512);
     doc["samples"] = samples;
     doc["filter_window"] = filter_window_;
@@ -195,6 +222,8 @@ void Roode::register_server_endpoints() {
   });
 
   server->on("/api/scan/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
     DynamicJsonDocument doc(256);
     doc["running"] = scan_running;
     doc["session_id"] = scan_session_id_.c_str();
@@ -207,6 +236,8 @@ void Roode::register_server_endpoints() {
   });
 
   server->on("/api/scan/start", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
     DynamicJsonDocument doc(128);
     if (!scan_running) {
       scan_cancel_requested = false;
@@ -226,6 +257,8 @@ void Roode::register_server_endpoints() {
   });
 
   server->on("/api/scan/cancel", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
     scan_cancel_requested = true;
     DynamicJsonDocument doc(128);
     doc["cancelled"] = true;
@@ -236,6 +269,8 @@ void Roode::register_server_endpoints() {
   });
 
   server->on("/api/roi/preview", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
     DynamicJsonDocument doc(512);
     if (recommended_settings_.has_value()) {
       JsonObject entry_cfg = doc.createNestedObject("entry");
@@ -286,6 +321,8 @@ void Roode::register_server_endpoints() {
   });
 
   server->on("/api/roi/apply", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
     bool ok = this->apply_recommended_settings();
     DynamicJsonDocument doc(128);
     doc["ok"] = ok;
@@ -297,6 +334,8 @@ void Roode::register_server_endpoints() {
   });
 
   server->on("/api/scan/sessions", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
     size_t doc_size = sessions_.size() * 128 + 128;
     DynamicJsonDocument doc(doc_size);
     JsonArray arr = doc.createNestedArray("sessions");
@@ -314,6 +353,8 @@ void Roode::register_server_endpoints() {
   });
 
   server->on(UriRegex("^/api/scan/session/(.+)$"), HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
     uint32_t id = strtoul(request->pathArg(0).c_str(), nullptr, 10);
     const ScanSession *found = nullptr;
     for (const auto &s : sessions_) {
@@ -340,6 +381,8 @@ void Roode::register_server_endpoints() {
   });
 
   server->on("/api/scan/delete", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
     for (int i = 0; i < MAX_SCAN_SESSIONS; i++)
       session_prefs_[i].erase();
     sessions_.clear();
@@ -353,6 +396,8 @@ void Roode::register_server_endpoints() {
   });
 
   server->on("/api/export/all", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
     size_t doc_size = sessions_.size() * (MAX_SESSION_DATA + 128) + 128;
     DynamicJsonDocument doc(doc_size);
     JsonArray arr = doc.createNestedArray("sessions");

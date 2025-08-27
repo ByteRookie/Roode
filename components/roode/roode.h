@@ -17,6 +17,10 @@
 #include "orientation.h"
 #include "zone.h"
 
+#ifdef USE_WEB_SERVER
+class AsyncWebServerRequest;
+#endif
+
 using namespace esphome::vl53l1x;
 using TofSensor = esphome::vl53l1x::VL53L1X;
 
@@ -169,6 +173,7 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   void start_portal();
   void stop_portal();
   bool apply_recommended_settings();
+  void set_portal_password(const std::string &password) { portal_password_ = password; }
 
  protected:
   TofSensor *distanceSensor;
@@ -204,6 +209,8 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   void register_server_endpoints();
   bool portal_enabled_{false};
   bool portal_registered_{false};
+  std::string portal_password_{};
+  bool check_token_(AsyncWebServerRequest *request);
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;

@@ -18,9 +18,7 @@ esphome:
             lambda: 'return id(portal_on);'
           then:
             - lambda: 'id(roode_platform).start_portal();'
-            - web_server.start:
           else:
-            - web_server.stop:
             - lambda: 'id(roode_platform).stop_portal();'
 
 esp32:
@@ -75,12 +73,10 @@ switch:
       - lambda: |-
           id(portal_on) = true;
           id(roode_platform).start_portal();
-      - web_server.start:
     turn_off_action:
       - lambda: |-
           id(portal_on) = false;
           id(roode_platform).stop_portal();
-      - web_server.stop:
 
 # Enable logging
 logger:

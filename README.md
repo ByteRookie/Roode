@@ -173,12 +173,10 @@ switch:
       - lambda: |-
           id(portal_on) = true;
           id(roode_platform).start_portal();
-      - web_server.start:
     turn_off_action:
       - lambda: |-
           id(portal_on) = false;
           id(roode_platform).stop_portal();
-      - web_server.stop:
 
 # Convenience restart button
 button:
@@ -710,8 +708,8 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 Roode includes a lightweight web portal for configuration and calibration.
 To conserve resources the web server is stopped on boot and only started
 when the `portal_switch` is turned on. The example YAML files define this
-template switch and tie it to `roode_platform.start_portal()`/`stop_portal()`
-along with the ESPHome `web_server.start`/`web_server.stop` actions.
+template switch and tie it to `roode_platform.start_portal()`/`stop_portal()`,
+which handle starting and stopping the ESPHome web server internally.
 
 When enabled the portal responds on `/portal` (or `/`) and exposes several
 JSON endpoints:

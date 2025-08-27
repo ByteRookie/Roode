@@ -151,8 +151,8 @@ Roode::~Roode() {
   delete exit;
 }
 
-bool Roode::check_token_(AsyncWebServerRequest *request) {
 #ifdef USE_WEB_SERVER
+bool Roode::check_token_(AsyncWebServerRequest *request) {
   if (portal_password_.empty())
     return true;
   if (request->hasHeader("X-Portal-Token") && request->header("X-Portal-Token") == portal_password_.c_str())
@@ -164,10 +164,8 @@ bool Roode::check_token_(AsyncWebServerRequest *request) {
   }
   request->send(401, "text/plain", "Unauthorized");
   return false;
-#else
-  return true;
-#endif
 }
+#endif
 
 void Roode::register_server_endpoints() {
 #ifdef USE_WEB_SERVER

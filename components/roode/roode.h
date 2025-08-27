@@ -210,7 +210,9 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   bool portal_enabled_{false};
   bool portal_registered_{false};
   std::string portal_password_{};
+#ifdef USE_WEB_SERVER
   bool check_token_(AsyncWebServerRequest *request);
+#endif
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;

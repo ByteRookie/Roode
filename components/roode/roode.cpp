@@ -189,6 +189,12 @@ void Roode::setup() {
         z->threshold->idle = calibration_data_[i].baseline_mm;
         z->threshold->min = calibration_data_[i].threshold_min_mm;
         z->threshold->max = calibration_data_[i].threshold_max_mm;
+        z->roi->width = calibration_data_[i].roi_width;
+        z->roi->height = calibration_data_[i].roi_height;
+        z->roi->center = calibration_data_[i].roi_center;
+        z->roi_override->width = calibration_data_[i].roi_width;
+        z->roi_override->height = calibration_data_[i].roi_height;
+        z->roi_override->center = calibration_data_[i].roi_center;
         int valid_count = 0;
         for (int s = 0; s < 5; s++) {
           z->readDistance(distanceSensor);
@@ -212,6 +218,7 @@ void Roode::setup() {
       auto *mode = determine_ranging_mode(entry->threshold->idle, exit->threshold->idle);
       distanceSensor->set_ranging_mode(mode);
       publish_sensor_configuration(entry, exit, true);
+      App.feed_wdt();
       publish_sensor_configuration(entry, exit, false);
     } else {
       calibrate_zones();
@@ -559,6 +566,9 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   calibration_data_[zone_id].baseline_mm = z->threshold->idle;
   calibration_data_[zone_id].threshold_min_mm = z->threshold->min;
   calibration_data_[zone_id].threshold_max_mm = z->threshold->max;
+  calibration_data_[zone_id].roi_width = z->roi->width;
+  calibration_data_[zone_id].roi_height = z->roi->height;
+  calibration_data_[zone_id].roi_center = z->roi->center;
   calibration_data_[zone_id].last_calibrated_ts = static_cast<uint32_t>(time(nullptr));
   if (calibration_persistence_) {
     calibration_prefs_[zone_id].save(&calibration_data_[zone_id]);
@@ -683,8 +693,10 @@ void Roode::calibrate_zones() {
   publish_sensor_configuration(entry, exit, false);
 
   calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max,
+                          entry->roi->width, entry->roi->height, entry->roi->center,
                           static_cast<uint32_t>(time(nullptr))};
   calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max,
+                          exit->roi->width, exit->roi->height, exit->roi->center,
                           static_cast<uint32_t>(time(nullptr))};
 
   if (calibration_persistence_) {

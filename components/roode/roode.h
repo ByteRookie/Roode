@@ -183,6 +183,9 @@ class Roode : public PollingComponent {
     uint16_t baseline_mm;
     uint16_t threshold_min_mm;
     uint16_t threshold_max_mm;
+    uint8_t roi_width;
+    uint8_t roi_height;
+    uint8_t roi_center;
     uint32_t last_calibrated_ts;
   };
   CalibrationPrefs calibration_data_[2];

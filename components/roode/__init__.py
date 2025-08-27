@@ -158,6 +158,8 @@ CONFIG_SCHEMA = cv.Schema(
 
 
 async def to_code(config: Dict):
+    cg.add_library("bblanchon", "6.21.3", "ArduinoJson")
+
     roode = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(roode, config)
 

@@ -693,6 +693,7 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | [Persistent calibration](#persistent-calibration) | Calibration data can persist in flash across reboots |
 | [Automatic calibration (Home Assistant Setup)](#automatic-calibration-home-assistant-setup) | Portal-guided scan sets ROI and thresholds automatically |
 | [Manual recalibration button](#manual-recalibration-button) | Exposes a `Recalibrate` button for on-demand calibration |
+| [Complete calibration button](#complete-calibration-button) | Runs scan, analysis, and applies settings in one step |
 | [Dual-core tasking](#dual-core-tasking) | Keeps polling responsive on ESP32 with automatic retry/fallback |
 | [Filtering options](#filtering-options) | Median/percentile filters smooth jitter with adjustable window |
 | [FSM timeouts](#fsm-timeouts) | Resets the state machine when a transition stalls |
@@ -746,6 +747,9 @@ After each reboot, leave the monitored area empty for about 10 seconds so the s
 
 ### Manual recalibration button
 Provides a `Recalibrate` button for on-demand recalibration, complementing automatic scans.
+
+### Complete calibration button
+Runs a scan, analyzes the result, and applies the recommended ROI and thresholds in one step.
 
 ### Dual-core tasking
 On ESP32 platforms polling runs on a separate core to keep response times fast with automatic retry and fallback.

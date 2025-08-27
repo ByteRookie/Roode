@@ -461,6 +461,7 @@ void Roode::setup() {
   // USE_API_SERVICES compile-time flag is disabled.
 #ifdef USE_API_SERVICES
   this->register_service(&Roode::start_passive_scan, "start_passive_scan");
+  this->register_service(&Roode::complete_calibration, "complete_calibration");
 #endif
 #ifdef USE_WEB_SERVER
   if (portal_enabled_ && web_server_base::global_web_server_base != nullptr) {
@@ -1576,6 +1577,11 @@ void Roode::start_passive_scan() {
   scan_progress_ = 1.0f;
   save_current_scan_session();
   scan_running = false;
+}
+
+void Roode::complete_calibration() {
+  start_passive_scan();
+  apply_recommended_settings();
 }
 
 void Roode::save_current_scan_session() {

@@ -82,14 +82,16 @@ low. The portal and endpoints are only loaded while the switch is on.
 
 ## Passive Scan Trigger
 
-Roode exposes `Start Passive Scan` and `Recalibrate` button entities that
-request a scan session or rerun the calibration directly from the device.
-Both buttons are enabled by default, so Home Assistant will automatically
-surface them in the interface. Pressing the scan button creates a
+Roode exposes `Start Passive Scan`, `Complete Calibration`, and `Recalibrate`
+button entities that request a scan session, perform a full calibration, or
+rerun the calibration directly from the device. All buttons are enabled by
+default, so Home Assistant will automatically surface them in the interface.
+Pressing the scan button creates a
 timestamped `passive_scan_YYYY-MM-DD_HH-MM/` directory with an empty
 `session.json` and dispatches an `esphome.<node>_start_passive_scan`
 command to the ESPHome node. The `Recalibrate` button immediately invokes
-the device's calibration routine.
+the device's calibration routine. The `Complete Calibration` button runs a
+scan and automatically applies the recommended ROI and thresholds.
 
 ## Calibration Portal
 

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.2
+- Add ArduinoJson dependency to resolve missing header during compile
+
 ## 1.6.1
 - Remove debug logging and cleanup unused code
 

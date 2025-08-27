@@ -61,6 +61,7 @@ CONF_DEACTIVATE = "deactivate"
 CONF_TRIAL_BUMP_CV = "trial_bump_cv"
 CONF_SCAN_TIME_CAP_SECONDS = "scan_time_cap_seconds"
 CONF_ROI_RESULT = "roi_result"
+CONF_PORTAL_PASSWORD = "portal_password"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -141,10 +142,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_SCAN_TIME_CAP_SECONDS, default=90.0): cv.All(
             cv.positive_float, cv.Range(min=60.0, max=180.0)
         ),
-
-      
-      
-      
+        cv.Optional(CONF_PORTAL_PASSWORD, default=""): cv.string,
         cv.Optional(CONF_ROI_RESULT): cv.file_,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
@@ -208,6 +206,7 @@ async def to_code(config: Dict):
 
     cg.add(roode.set_orientation(config[CONF_ORIENTATION]))
     cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
+    cg.add(roode.set_portal_password(config[CONF_PORTAL_PASSWORD]))
     auto_conf = config.get(CONF_AUTO_CALIBRATION, {})
     cg.add(roode.set_calibration_persistence(auto_conf.get(CONF_PERSIST, False)))
     cg.add(

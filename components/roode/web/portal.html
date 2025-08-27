@@ -144,6 +144,13 @@
   </div><!-- /wrap -->
 
   <script>
+  const TOKEN = new URLSearchParams(location.search).get('token') || '';
+  const TOKEN_HEADER = TOKEN ? {'X-Portal-Token': TOKEN} : {};
+  const tokenParam = TOKEN ? `?token=${encodeURIComponent(TOKEN)}` : '';
+  if(TOKEN){
+    const exp = document.getElementById('btnExport');
+    if(exp) exp.href = '/api/export/all'+tokenParam;
+  }
   // Helpers
   const $ = (s)=>document.querySelector(s);
   const showToast = (msg, ok=false)=>{
@@ -175,7 +182,7 @@
   // Fetch JSON with graceful fallback
   async function getJSON(url){
     try {
-      const r = await fetch(url, {cache:'no-store'});
+      const r = await fetch(url, {cache:'no-store', headers: TOKEN_HEADER});
       if(!r.ok) throw new Error(r.status + ' ' + r.statusText);
       return await r.json();
     } catch(e) {
@@ -185,7 +192,9 @@
   }
   async function postJSON(url, body){
     try {
-      const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: body?JSON.stringify(body):'{}'});
+      const headers = {'Content-Type':'application/json'};
+      if(TOKEN) headers['X-Portal-Token'] = TOKEN;
+      const r = await fetch(url, {method:'POST', headers, body: body?JSON.stringify(body):'{}'});
       if(!r.ok) throw new Error(r.status + ' ' + r.statusText);
       return await r.json().catch(()=>({ok:true}));
     } catch(e) {
@@ -234,7 +243,7 @@
     if(r.thresholds){ $('#pvMin').textContent = r.thresholds.min+'%'; $('#pvMax').textContent = r.thresholds.max+'%'; }
     $('#pvSampling').textContent = r.sampling || '—';
     $('#pvFw').textContent = r.firmware || '—';
-    if(r.download) $('#dlResult').href = r.download;
+    if(r.download) $('#dlResult').href = r.download + (TOKEN ? (r.download.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(TOKEN) : '');
     if(apply) apply.disabled = false;
   }
   function renderSessions(){
@@ -256,7 +265,7 @@
         <td>${fmtDur(s.duration_sec)}</td>
         <td>${fmtBytes(s.size_bytes)}</td>
         <td class="mono">
-          <a href="/api/scan/session/${encodeURIComponent(s.id)}">Download</a>
+          <a href="/api/scan/session/${encodeURIComponent(s.id)}${tokenParam}">Download</a>
           &nbsp;|&nbsp;<a href="#" data-view="${s.id}">View</a>
           &nbsp;|&nbsp;<a href="#" data-del="${s.id}">Delete</a>
         </td>`;

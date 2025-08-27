@@ -657,29 +657,6 @@ Optional sensors provide insight into Roode's operation:
 See [extra_sensors_example.yaml](extra_sensors_example.yaml) for how to enable
 these sensors.
 
-## Web Portal
-
-When the [ESPHome `web_server` component](https://esphome.io/components/web_server.html) is enabled,
-Roode serves a small portal at `/roode`. The page is protected by the same
-credentials configured for the web server. It shows the current ROI sizes,
-detection thresholds and the time of the last calibration. Buttons and forms
-allow triggering a recalibration or submitting new threshold percentages and ROI
-values. Changes take effect immediately and are published back to Home
-Assistant.
-
-Example configuration:
-
-```yaml
-web_server:
-  port: 80
-  auth:
-    username: admin
-    password: !secret web_password
-```
-
-After flashing, browse to `http://<device-ip>/roode` and log in with the
-credentials above to access the controls.
-
 
 ## FAQ/Troubleshoot
 

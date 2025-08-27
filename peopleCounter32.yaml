@@ -37,10 +37,12 @@ api:
         - lambda: "id(roode_platform)->recalibration();"
 
 ota:
-  password: !secret ota_password
+  - platform: esphome
+    password: !secret ota_password
 
 web_server:
   port: 80
+  include_internal: true
   auth:
     username: admin
     password: !secret web_password

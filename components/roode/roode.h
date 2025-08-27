@@ -13,6 +13,10 @@
 #include "esphome/core/preferences.h"
 #include "orientation.h"
 #include "zone.h"
+#ifdef USE_WEBSERVER
+#include "esphome/components/web_server_base/web_server_base.h"
+class AsyncWebServerRequest;
+#endif
 
 using namespace esphome::vl53l1x;
 using TofSensor = esphome::vl53l1x::VL53L1X;
@@ -135,6 +139,9 @@ class Roode : public PollingComponent {
   }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
+#ifdef USE_WEBSERVER
+  void register_http_handlers();
+#endif
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
   void set_exit_threshold_percentages(uint8_t min, uint8_t max) { exit->set_threshold_percentages(min, max); }
   void apply_cpu_optimizations(float cpu);
@@ -244,6 +251,11 @@ class Roode : public PollingComponent {
   static void sensor_task(void *param);
   bool use_sensor_task_{false};
   void restart_sensor();
+#ifdef USE_WEBSERVER
+  void handle_page_request_(AsyncWebServerRequest *request);
+  void handle_data_request_(AsyncWebServerRequest *request);
+  void handle_config_request_(AsyncWebServerRequest *request);
+#endif
 };
 
 }  // namespace roode

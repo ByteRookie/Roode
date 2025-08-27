@@ -28,6 +28,7 @@ A people counter that works with any smart home system that supports ESPHome/MQT
 - [Threshold distance](#threshold-distance)
 - [Algorithm](#algorithm)
 - [Features](#features)
+- [Web Portal & API](#web-portal--api)
 - [Logging and Diagnostics](#logging-and-diagnostics)
 - [Calibration Workflow](#calibration-workflow)
 - [FAQ/Troubleshoot](#faqtroubleshoot)
@@ -666,6 +667,33 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Sensor status reporting | Text sensor shows `ok`, `timeout`, `reinitializing`, `error` or `offline` |
 | Event logging | Logs sensor power cycles, fallback reasons, and manual adjustments |
 | Colored logs | Normal info in green, details in yellow, failures in red |
+
+## Web Portal & API
+
+Roode includes a lightweight web portal for configuration and calibration.
+To conserve resources the web server is stopped on boot and only started
+when the `portal_switch` is turned on. The example YAML files define this
+template switch and tie it to `roode_platform.start_portal()`/`stop_portal()`
+along with the ESPHome `web_server.start`/`web_server.stop` actions.
+
+When enabled the portal responds on `/portal` (or `/`) and exposes several
+JSON endpoints:
+
+- `/api/settings/current` – current firmware and ROI settings.
+- `/api/scan/start` *(POST)* – begin a passive scan session.
+- `/api/scan/status` – progress of the active scan.
+- `/api/scan/cancel` *(POST)* – cancel the running scan.
+- `/api/roi/preview` – show recommended ROI/threshold values.
+- `/api/roi/apply` *(POST)* – apply the recommended values.
+- `/api/scan/sessions` – list recorded calibration sessions.
+- `/api/scan/session/<id>` – retrieve a specific session.
+- `/api/scan/delete` *(POST)* – remove stored sessions.
+- `/api/export/all` – export all session data as JSON.
+
+Leave the switch off during normal operation to keep memory and CPU usage
+low. If the ESPHome `api:` component is enabled, the `Portal` switch is
+also published as a Home Assistant entity for easy toggling from the UI or
+automations.
 
 ## Logging and Diagnostics
 

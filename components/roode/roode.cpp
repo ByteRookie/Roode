@@ -415,29 +415,6 @@ void Roode::register_server_endpoints() {
 #endif
 }
 
-void Roode::start_portal() {
-  portal_enabled_ = true;
-#ifdef USE_WEB_SERVER
-  if (web_server_base::global_web_server_base != nullptr) {
-    web_server_base::global_web_server_base->init();
-    register_server_endpoints();
-    ESP_LOGI(TAG, "Web server routes registered");
-  } else {
-    ESP_LOGW(TAG, "Web server base not initialized, portal start deferred");
-  }
-#endif
-}
-
-void Roode::stop_portal() {
-  portal_enabled_ = false;
-#ifdef USE_WEB_SERVER
-  if (web_server_base::global_web_server_base != nullptr) {
-    web_server_base::global_web_server_base->deinit();
-  }
-  portal_registered_ = false;
-#endif
-}
-
 void Roode::set_auto_calibration_interval_sec(uint32_t sec) { auto_calibration_interval_sec_ = sec; }
 void Roode::dump_config() {
   ESP_LOGCONFIG(TAG, "Roode:");
@@ -467,9 +444,11 @@ void Roode::setup() {
   this->register_service(&Roode::complete_calibration, "complete_calibration");
 #endif
 #ifdef USE_WEB_SERVER
-  if (portal_enabled_ && web_server_base::global_web_server_base != nullptr) {
+  if (web_server_base::global_web_server_base != nullptr) {
     web_server_base::global_web_server_base->init();
     register_server_endpoints();
+  } else {
+    ESP_LOGW(TAG, "Web server base not initialized, portal not started");
   }
 #endif
   if (version_sensor != nullptr) {

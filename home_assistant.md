@@ -23,47 +23,15 @@ Roode now exposes button entities to start a passive scan or force a recalibrati
       newCount: "{{ states('input_number.set_people32') | int }}"
 ```
 
-## Portal Switch and REST API
+## Portal and REST API
 
-Roode ships with an optional web portal that serves a small HTML page and a
-REST API for configuration and calibration tasks. The web server is disabled
-on boot to save memory; enable it only when needed.
-
-### Enabling the portal
-
-The example firmware defines a `portal_switch` template switch. Turning this
-switch on starts the web server and registers the portal; turning it off stops
-both the server and the portal logic:
-
-```yaml
-globals:
-  - id: portal_on
-    type: bool
-    restore_value: yes
-    initial_value: 'false'
-
-switch:
-  - platform: template
-    id: portal_switch
-    name: Portal
-    lambda: |-
-      return id(portal_on);
-    turn_on_action:
-      - lambda: |-
-          id(portal_on) = true;
-          id(roode_platform).start_portal();
-    turn_off_action:
-      - lambda: |-
-          id(portal_on) = false;
-          id(roode_platform).stop_portal();
-```
-
-If the ESPHome `api:` component is enabled, this `Portal` switch is exposed to
-Home Assistant and can be toggled from the UI or via automations.
+Roode ships with a web portal that serves a small HTML page and a
+REST API for configuration and calibration tasks. The portal starts
+automatically when the device boots.
 
 ### Endpoints
 
-When the portal is active the device serves:
+The portal exposes:
 
 - `/portal` or `/` – simple HTML configuration page.
 - `/api/settings/current` – current firmware and ROI settings.
@@ -76,9 +44,6 @@ When the portal is active the device serves:
 - `/api/scan/session/<id>` – retrieve a specific session.
 - `/api/scan/delete` *(POST)* – delete all stored sessions.
 - `/api/export/all` – export all session data as JSON.
-
-Leave the `portal_switch` off during normal operation to keep resource usage
-low. The portal and endpoints are only loaded while the switch is on.
 
 ## Passive Scan Trigger
 
@@ -95,8 +60,8 @@ scan and automatically applies the recommended ROI and thresholds.
 
 ## Calibration Portal
 
-Enable the `Portal` switch and visit `http://<device>/portal` to access the
-built-in calibration portal. The page provides buttons to start a passive
+Visit `http://<device>/portal` to access the built-in calibration portal.
+The page provides buttons to start a passive
 scan, review the suggested region of interest and apply the result—no extra
 Lovelace views or helper scripts are required.
 

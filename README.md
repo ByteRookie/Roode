@@ -147,33 +147,12 @@ external_components:
     refresh: always
     ref: master
 
-# Optional web portal controlled by a template switch
+# Built-in web portal
 web_server:
   port: 80
   auth:
     username: admin
     password: !secret web_password
-
-globals:
-  - id: portal_on
-    type: bool
-    restore_value: yes
-    initial_value: 'false'
-
-switch:
-  - platform: template
-    id: portal_switch
-    name: Portal
-    lambda: |-
-      return id(portal_on);
-    turn_on_action:
-      - lambda: |-
-          id(portal_on) = true;
-          id(roode_platform).start_portal();
-    turn_off_action:
-      - lambda: |-
-          id(portal_on) = false;
-          id(roode_platform).stop_portal();
 
 # Convenience restart button
 button:
@@ -739,7 +718,7 @@ Calibration data can persist in flash across reboots so ROI thresholds survive p
 Roode can determine its own idle distance and zone thresholds. The sensor recalibrates itself after power-up and periodically during operation, so no manual tuning is required. The steps below show how to enable the automatic calibration workflow in Home Assistant without any coding knowledge:
 
 1. **Flash Roode using the example YAML** from the Quick Start above.
-2. **Enable the calibration portal** by turning on the `Portal` switch exposed by the device.
+2. **Open the calibration portal** at `http://<device>/portal`.
 3. **Run a scan**: in the portal press *Start Scan*, walk through the doorway once, and wait for the result.
 4. **Apply the result**: click *Accept ROI* to apply the automatically calculated region of interest and thresholds. The device updates itself via OTA and begins counting immediately.
 
@@ -802,12 +781,9 @@ Normal info appears in green, details in yellow and failures in red for readabil
 ## Web Portal & API
 
 Roode includes a lightweight web portal for configuration and calibration.
-To conserve resources the web server is stopped on boot and only started
-when the `portal_switch` is turned on. The example YAML files define this
-template switch and tie it to `roode_platform.start_portal()`/`stop_portal()`,
-which handle starting and stopping the ESPHome web server internally.
+The portal starts automatically when the device boots.
 
-When enabled the portal responds on `/portal` (or `/`) and exposes several
+The portal responds on `/portal` (or `/`) and exposes several
 JSON endpoints:
 
 - `/api/settings/current` – current firmware and ROI settings.
@@ -828,11 +804,6 @@ Calibration follows a passive-scan → recommendation → apply cycle:
 3. Apply them via `/api/roi/apply` to write the settings to flash.
 
 Set `portal_password` in the `roode:` configuration to require a token for these requests. Clients supply it via a `token` query parameter or `X-Portal-Token` header. When omitted, the portal remains open to any client while it is running.
-
-Leave the switch off during normal operation to keep memory and CPU usage
-low. If the ESPHome `api:` component is enabled, the `Portal` switch is
-also published as a Home Assistant entity for easy toggling from the UI or
-automations.
 
 ## Logging and Diagnostics
 
@@ -863,7 +834,7 @@ these sensors. For automatic recovery features, see [Polling timeout recovery](#
 
 The built-in portal handles most calibration tasks using a passive-scan → recommendation → apply flow:
 
-1. Enable the `Portal` switch in Home Assistant or via the device API.
+1. Open the portal at `http://<device>/portal`.
 2. Start a passive scan from the portal and walk through the doorway once.
 3. Review the previewed region of interest and thresholds, then press *Apply* to save them.
 

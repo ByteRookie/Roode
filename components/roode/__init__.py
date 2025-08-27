@@ -38,7 +38,6 @@ CONF_FORCE_SINGLE_CORE = "force_single_core"
 CONF_INVALID_DISTANCE_LIMIT = "invalid_distance_limit"
 CONF_RESTART_TIMEOUT = "restart_timeout"
 CONF_CPU_OPTIMIZATION = "cpu_optimization"
-CONF_AUTO_CALIBRATION_INTERVAL = "auto_calibration_interval"
 CONF_ACTIVATE = "activate"
 CONF_DEACTIVATE = "deactivate"
 
@@ -99,9 +98,6 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
         cv.Optional(CONF_INVALID_DISTANCE_LIMIT, default=10): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_RESTART_TIMEOUT, default="30s"): cv.positive_time_period_milliseconds,
-        cv.Optional(
-            CONF_AUTO_CALIBRATION_INTERVAL, default="4h"
-        ): cv.positive_time_period_seconds,
         cv.Optional(CONF_CPU_OPTIMIZATION, default={}): cv.Schema(
             {
                 cv.Optional(CONF_ACTIVATE, default=0.90): cv.percentage,
@@ -135,11 +131,6 @@ async def to_code(config: Dict):
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
     cg.add(roode.set_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT]))
     cg.add(roode.set_restart_timeout(config[CONF_RESTART_TIMEOUT]))
-    cg.add(
-        roode.set_auto_calibration_interval(
-            config[CONF_AUTO_CALIBRATION_INTERVAL]
-        )
-    )
     cpu_conf = config.get(CONF_CPU_OPTIMIZATION, {})
     cg.add(
         roode.set_cpu_optimization_thresholds(

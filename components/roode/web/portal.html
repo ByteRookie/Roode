@@ -105,7 +105,7 @@
           <div class="k">Firmware</div><div id="pvFw">—</div>
         </div>
         <div class="chips">
-          <button class="btn" id="btnApply">Apply Settings</button>
+          <button class="btn" id="btnApply" disabled>Apply Settings</button>
           <a class="btn" id="dlResult" href="#" download>Save roi_result.json</a>
         </div>
       </div>
@@ -146,14 +146,17 @@
   <script>
   // Helpers
   const $ = (s)=>document.querySelector(s);
-  const showError = (msg)=>{
+  const showToast = (msg, ok=false)=>{
     const b = $('#errorBanner');
     if(!b) return;
-    b.textContent = msg || 'Request failed';
+    b.textContent = msg || '';
+    b.style.background = ok ? 'var(--ok)' : 'var(--err)';
     b.style.display = 'block';
     clearTimeout(b._hide);
     b._hide = setTimeout(()=>{ b.style.display='none'; }, 5000);
   };
+  const showError = (msg)=>showToast(msg || 'Request failed', false);
+  const showSuccess = (msg)=>showToast(msg || 'Success', true);
   const fmtBytes = n => {
     if(n==null) return '—';
     const u=['B','KB','MB']; let i=0, v=n;
@@ -214,12 +217,14 @@
     if(current.last_calibration) $('#lastCal').textContent = 'Last calibration: ' + new Date(current.last_calibration).toLocaleString();
   }
   function renderPreview(){
+    const apply = $('#btnApply');
     if(!preview){ // clear
       $('#pvRoiSize').textContent = '—'; $('#pvRoi').textContent='—';
       $('#pvEntry').textContent='—'; $('#pvExit').textContent='—';
       $('#pvMode').textContent='—'; $('#pvMin').textContent='—';
       $('#pvMax').textContent='—'; $('#pvSampling').textContent='—'; $('#pvFw').textContent='—';
       $('#dlResult').removeAttribute('href');
+      if(apply) apply.disabled = true;
       return;
     }
     const r = preview;
@@ -230,6 +235,7 @@
     $('#pvSampling').textContent = r.sampling || '—';
     $('#pvFw').textContent = r.firmware || '—';
     if(r.download) $('#dlResult').href = r.download;
+    if(apply) apply.disabled = false;
   }
   function renderSessions(){
     const tbody = document.querySelector('#tblSessions tbody');
@@ -302,7 +308,11 @@
     btn.disabled = true;
     try {
       const r = await postJSON('/api/roi/apply');
-      if(r && r.ok) { /* next poll will refresh Current Settings */ }
+      if(r && r.ok){
+        showSuccess('Settings applied');
+      } else {
+        showError('Apply failed');
+      }
     } finally {
       btn.disabled = false;
     }

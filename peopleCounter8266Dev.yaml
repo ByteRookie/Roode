@@ -10,15 +10,6 @@ esphome:
   name: $devicename
   platform: ESP8266
   board: d1_mini
-  on_boot:
-    then:
-      - if:
-          condition:
-            lambda: 'return id(portal_on);'
-          then:
-            - lambda: 'id(roode_platform).start_portal();'
-          else:
-            - lambda: 'id(roode_platform).stop_portal();'
 
 wifi:
   networks:
@@ -53,27 +44,6 @@ web_server:
   auth:
     username: admin
     password: !secret web_password
-
-globals:
-  - id: portal_on
-    type: bool
-    restore_value: yes
-    initial_value: 'false'
-
-switch:
-  - platform: template
-    id: portal_switch
-    name: Portal
-    lambda: |-
-      return id(portal_on);
-    turn_on_action:
-      - lambda: |-
-          id(portal_on) = true;
-          id(roode_platform).start_portal();
-    turn_off_action:
-      - lambda: |-
-          id(portal_on) = false;
-          id(roode_platform).stop_portal();
 
 # Enable logging
 logger:

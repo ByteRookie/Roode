@@ -28,7 +28,7 @@ namespace esphome {
 namespace roode {
 #define NOBODY 0
 #define SOMEONE 1
-#define VERSION "1.6.0"
+#define VERSION "1.6.3"
 static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
@@ -171,8 +171,6 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   Zone *exit = new Zone(1);
   static void log_event(const std::string &msg);
 
-  void start_portal();
-  void stop_portal();
   bool apply_recommended_settings();
   void set_portal_password(const std::string &password) { portal_password_ = password; }
 
@@ -208,7 +206,6 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   sensor::Sensor *scan_time_cap_seconds_sensor{nullptr};
 
   void register_server_endpoints();
-  bool portal_enabled_{false};
   bool portal_registered_{false};
   std::string portal_password_{};
 #ifdef USE_WEB_SERVER

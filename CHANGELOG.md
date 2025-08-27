@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.3
+- Always enable web portal; remove portal switch toggle
+
 ## 1.6.2
 - Add ArduinoJson dependency to resolve missing header during compile
 

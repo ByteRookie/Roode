@@ -1,6 +1,7 @@
 #pragma once
 #include <math.h>
 #include <string>
+#include <optional>
 #include "Arduino.h"
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -55,6 +56,17 @@ static int time_budget_in_ms_medium = 33;
 static int time_budget_in_ms_medium_long = 50;
 static int time_budget_in_ms_long = 100;
 static int time_budget_in_ms_max = 200;  // max range: 4m
+
+struct RecommendedSettings {
+  ROI entry_roi;
+  ROI exit_roi;
+  uint16_t entry_threshold_min;
+  uint16_t entry_threshold_max;
+  uint16_t exit_threshold_min;
+  uint16_t exit_threshold_max;
+  uint8_t samples;
+  std::string firmware;
+};
 
 class Roode : public PollingComponent, public api::CustomAPIDevice {
  public:
@@ -218,6 +230,11 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   int manual_adjustment_count_{0};
   uint32_t scan_start_ts_{0};
   uint32_t scan_record_count_{0};
+  std::string scan_session_id_{};
+  int scan_step_{0};
+  int scan_total_steps_{0};
+  float scan_progress_{0.0f};
+  std::optional<RecommendedSettings> recommended_settings_{};
   float trial_bump_cv_{20.0f};
   float scan_time_cap_seconds_{90.0f};
 

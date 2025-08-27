@@ -20,6 +20,16 @@ bool Roode::log_fallback_events_ = false;
 Roode *Roode::instance_ = nullptr;
 static bool scan_running = false;
 static bool scan_cancel_requested = false;
+
+static std::string format_timestamp(uint32_t sec_since_boot) {
+  uint32_t now_sec = millis() / 1000;
+  time_t epoch = time(nullptr) - (now_sec - sec_since_boot);
+  struct tm tm_time;
+  localtime_r(&epoch, &tm_time);
+  char buf[25];
+  strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm_time);
+  return std::string(buf);
+}
 void Roode::log_event(const std::string &msg) {
   if (!log_fallback_events_) {
     if (msg == "interrupt_fallback" || msg == "interrupt_fallback_polling")
@@ -133,79 +143,147 @@ void Roode::register_server_endpoints() {
   portal_registered_ = true;
 
   server->on("/api/settings/current", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    DynamicJsonDocument doc(256);
+    DynamicJsonDocument doc(512);
     doc["samples"] = samples;
     doc["filter_window"] = filter_window_;
     doc["filter_mode"] = static_cast<int>(filter_mode_);
-    JsonObject entry_roi = doc.createNestedObject("entry_roi");
+    doc["orientation"] = static_cast<int>(orientation_);
+    doc["invert_direction"] = invert_direction_;
+    doc["firmware"] = VERSION;
+    doc["last_calibration"] = format_timestamp(last_calibration_sec_);
+    JsonObject entry_cfg = doc.createNestedObject("entry");
+    JsonObject entry_roi = entry_cfg.createNestedObject("roi");
     entry_roi["center"] = entry->roi->center;
     entry_roi["width"] = entry->roi->width;
     entry_roi["height"] = entry->roi->height;
-    JsonObject exit_roi = doc.createNestedObject("exit_roi");
+    JsonObject entry_thr = entry_cfg.createNestedObject("threshold");
+    entry_thr["min"] = entry->threshold->min;
+    entry_thr["max"] = entry->threshold->max;
+    entry_thr["idle"] = entry->threshold->idle;
+    JsonObject exit_cfg = doc.createNestedObject("exit");
+    JsonObject exit_roi = exit_cfg.createNestedObject("roi");
     exit_roi["center"] = exit->roi->center;
     exit_roi["width"] = exit->roi->width;
     exit_roi["height"] = exit->roi->height;
+    JsonObject exit_thr = exit_cfg.createNestedObject("threshold");
+    exit_thr["min"] = exit->threshold->min;
+    exit_thr["max"] = exit->threshold->max;
+    exit_thr["idle"] = exit->threshold->idle;
     std::string out;
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
 
-  server->on("/api/scan/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-    DynamicJsonDocument doc(64);
+  server->on("/api/scan/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    DynamicJsonDocument doc(256);
     doc["running"] = scan_running;
+    doc["session_id"] = scan_session_id_.c_str();
+    doc["step"] = scan_step_;
+    doc["progress"] = scan_progress_;
+    doc["last_calibration"] = format_timestamp(last_calibration_sec_);
     std::string out;
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
 
   server->on("/api/scan/start", HTTP_POST, [this](AsyncWebServerRequest *request) {
+    DynamicJsonDocument doc(128);
     if (!scan_running) {
       scan_cancel_requested = false;
       scan_running = true;
+      scan_session_id_ = std::to_string(millis());
       this->start_passive_scan();
       scan_running = false;
-      DynamicJsonDocument doc(64);
       doc["started"] = true;
-      std::string out;
-      serializeJson(doc, out);
-      request->send(200, "application/json", out.c_str());
+      doc["session_id"] = scan_session_id_.c_str();
     } else {
-      DynamicJsonDocument doc(64);
       doc["started"] = false;
-      std::string out;
-      serializeJson(doc, out);
-      request->send(200, "application/json", out.c_str());
+      doc["session_id"] = scan_session_id_.c_str();
     }
+    std::string out;
+    serializeJson(doc, out);
+    request->send(200, "application/json", out.c_str());
   });
 
-  server->on("/api/scan/cancel", HTTP_POST, [](AsyncWebServerRequest *request) {
+  server->on("/api/scan/cancel", HTTP_POST, [this](AsyncWebServerRequest *request) {
     scan_cancel_requested = true;
-    DynamicJsonDocument doc(64);
+    DynamicJsonDocument doc(128);
     doc["cancelled"] = true;
+    doc["session_id"] = scan_session_id_.c_str();
     std::string out;
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
 
   server->on("/api/roi/preview", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    DynamicJsonDocument doc(256);
-    JsonObject entry_roi = doc.createNestedObject("entry_roi");
-    entry_roi["center"] = entry->roi->center;
-    entry_roi["width"] = entry->roi->width;
-    entry_roi["height"] = entry->roi->height;
-    JsonObject exit_roi = doc.createNestedObject("exit_roi");
-    exit_roi["center"] = exit->roi->center;
-    exit_roi["width"] = exit->roi->width;
-    exit_roi["height"] = exit->roi->height;
+    DynamicJsonDocument doc(512);
+    if (recommended_settings_.has_value()) {
+      JsonObject entry_cfg = doc.createNestedObject("entry");
+      JsonObject entry_roi = entry_cfg.createNestedObject("roi");
+      entry_roi["center"] = recommended_settings_->entry_roi.center;
+      entry_roi["width"] = recommended_settings_->entry_roi.width;
+      entry_roi["height"] = recommended_settings_->entry_roi.height;
+      JsonObject entry_thr = entry_cfg.createNestedObject("threshold");
+      entry_thr["min"] = recommended_settings_->entry_threshold_min;
+      entry_thr["max"] = recommended_settings_->entry_threshold_max;
+      JsonObject exit_cfg = doc.createNestedObject("exit");
+      JsonObject exit_roi = exit_cfg.createNestedObject("roi");
+      exit_roi["center"] = recommended_settings_->exit_roi.center;
+      exit_roi["width"] = recommended_settings_->exit_roi.width;
+      exit_roi["height"] = recommended_settings_->exit_roi.height;
+      JsonObject exit_thr = exit_cfg.createNestedObject("threshold");
+      exit_thr["min"] = recommended_settings_->exit_threshold_min;
+      exit_thr["max"] = recommended_settings_->exit_threshold_max;
+      doc["samples"] = recommended_settings_->samples;
+      doc["firmware"] = recommended_settings_->firmware.c_str();
+    } else {
+      JsonObject entry_cfg = doc.createNestedObject("entry");
+      JsonObject entry_roi = entry_cfg.createNestedObject("roi");
+      entry_roi["center"] = entry->roi->center;
+      entry_roi["width"] = entry->roi->width;
+      entry_roi["height"] = entry->roi->height;
+      JsonObject entry_thr = entry_cfg.createNestedObject("threshold");
+      entry_thr["min"] = entry->threshold->min;
+      entry_thr["max"] = entry->threshold->max;
+      JsonObject exit_cfg = doc.createNestedObject("exit");
+      JsonObject exit_roi = exit_cfg.createNestedObject("roi");
+      exit_roi["center"] = exit->roi->center;
+      exit_roi["width"] = exit->roi->width;
+      exit_roi["height"] = exit->roi->height;
+      JsonObject exit_thr = exit_cfg.createNestedObject("threshold");
+      exit_thr["min"] = exit->threshold->min;
+      exit_thr["max"] = exit->threshold->max;
+      doc["samples"] = samples;
+      doc["firmware"] = VERSION;
+    }
     std::string out;
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
 
   server->on("/api/roi/apply", HTTP_POST, [this](AsyncWebServerRequest *request) {
-    this->recalibration();
-    DynamicJsonDocument doc(64);
-    doc["applied"] = true;
+    bool applied = false;
+    if (recommended_settings_.has_value()) {
+      entry->roi->center = recommended_settings_->entry_roi.center;
+      entry->roi->width = recommended_settings_->entry_roi.width;
+      entry->roi->height = recommended_settings_->entry_roi.height;
+      entry->threshold->min = recommended_settings_->entry_threshold_min;
+      entry->threshold->max = recommended_settings_->entry_threshold_max;
+      exit->roi->center = recommended_settings_->exit_roi.center;
+      exit->roi->width = recommended_settings_->exit_roi.width;
+      exit->roi->height = recommended_settings_->exit_roi.height;
+      exit->threshold->min = recommended_settings_->exit_threshold_min;
+      exit->threshold->max = recommended_settings_->exit_threshold_max;
+      samples = recommended_settings_->samples;
+      entry->set_max_samples(samples);
+      exit->set_max_samples(samples);
+      applied = true;
+      recommended_settings_.reset();
+    }
+    if (applied)
+      this->recalibration();
+    DynamicJsonDocument doc(128);
+    doc["applied"] = applied;
     std::string out;
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
@@ -922,10 +1000,15 @@ void Roode::start_passive_scan() {
   scan_record_count_ = 0;
   scan_cancel_requested = false;
   scan_running = true;
+  scan_session_id_ = std::to_string(scan_start_ts_);
   const std::vector<int> grids{4, 8, 16};
   const char *modes[] = {"short", "medium", "long"};
   constexpr int base_trials = 3;
   constexpr int max_trials = 5;
+  scan_step_ = 0;
+  scan_total_steps_ = grids.size() * (sizeof(modes) / sizeof(modes[0])) * max_trials;
+  scan_progress_ = 0.0f;
+  recommended_settings_.reset();
   for (int grid : grids) {
     if (scan_cancel_requested) {
       publish_scan_record("scan_cancel");
@@ -953,12 +1036,12 @@ void Roode::start_passive_scan() {
       distanceSensor->set_ranging_mode(ranging_mode);
 
       std::vector<float> cv_trials;
-      for (int trial = 1; trial <= max_trials; ++trial) {
-        if (scan_cancel_requested) {
-          publish_scan_record("scan_cancel");
-          scan_running = false;
-          return;
-        }
+        for (int trial = 1; trial <= max_trials; ++trial) {
+          if (scan_cancel_requested) {
+            publish_scan_record("scan_cancel");
+            scan_running = false;
+            return;
+          }
         std::vector<int> mcps(grid * grid, 0);
         std::vector<int> distance(grid * grid, 0);
         std::vector<float> snr(grid * grid, 0.0f);
@@ -1052,6 +1135,9 @@ void Roode::start_passive_scan() {
              << ",\"snr\":" << snr_ss.str() << "}}";
         publish_scan_record(json.str());
 
+        scan_step_++;
+        scan_progress_ = scan_total_steps_ > 0 ? (float) scan_step_ / scan_total_steps_ : 0.0f;
+
         if (trial >= base_trials) {
           float avg_cv = 0.0f;
           for (float cv : cv_trials)
@@ -1067,6 +1153,15 @@ void Roode::start_passive_scan() {
   float elapsed = (millis() - scan_start_ts_) / 1000.0f;
   if (scan_time_cap_seconds_sensor != nullptr)
     scan_time_cap_seconds_sensor->publish_state(elapsed);
+  recommended_settings_ = RecommendedSettings{*entry->roi,
+                                             *exit->roi,
+                                             entry->threshold->min,
+                                             entry->threshold->max,
+                                             exit->threshold->min,
+                                             exit->threshold->max,
+                                             samples,
+                                             VERSION};
+  scan_progress_ = 1.0f;
   scan_running = false;
 }
 

@@ -11,6 +11,17 @@ external_components:
 
 esphome:
   name: $devicename
+  on_boot:
+    then:
+      - if:
+          condition:
+            lambda: 'return id(portal_on);'
+          then:
+            - lambda: 'id(roode_platform).start_portal();'
+            - web_server.start:
+          else:
+            - web_server.stop:
+            - lambda: 'id(roode_platform).stop_portal();'
 
 esp32:
   board: wemos_d1_mini32
@@ -47,6 +58,29 @@ web_server:
   auth:
     username: admin
     password: !secret web_password
+
+globals:
+  - id: portal_on
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+
+switch:
+  - platform: template
+    id: portal_switch
+    name: Portal
+    lambda: |-
+      return id(portal_on);
+    turn_on_action:
+      - lambda: |-
+          id(portal_on) = true;
+          id(roode_platform).start_portal();
+      - web_server.start:
+    turn_off_action:
+      - lambda: |-
+          id(portal_on) = false;
+          id(roode_platform).stop_portal();
+      - web_server.stop:
 
 # Enable logging
 logger:

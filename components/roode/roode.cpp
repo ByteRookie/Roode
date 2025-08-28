@@ -603,6 +603,12 @@ void Roode::update() {
 }
 
 void Roode::loop() {
+#ifdef USE_WEB_SERVER
+  if (!portal_registered_ && web_server_base::global_web_server_base != nullptr) {
+    web_server_base::global_web_server_base->init();
+    register_server_endpoints();
+  }
+#endif
   if (use_sensor_task_) {
     // When running on dual core the sensor loop runs in a separate task
     // Skip execution from main loop

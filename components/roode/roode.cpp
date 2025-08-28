@@ -880,6 +880,16 @@ bool Roode::apply_recommended_settings() {
   }
 
   ESP_LOGI(TAG, "Applying recommended calibration settings");
+  ESP_LOGI(CALIBRATION, "Entry ROI {center: %d, width: %d, height: %d}", recommended_settings_->entry_roi.center,
+           recommended_settings_->entry_roi.width, recommended_settings_->entry_roi.height);
+  ESP_LOGI(CALIBRATION, "Entry thresholds {min: %d, max: %d}", recommended_settings_->entry_threshold_min,
+           recommended_settings_->entry_threshold_max);
+  ESP_LOGI(CALIBRATION, "Exit ROI {center: %d, width: %d, height: %d}", recommended_settings_->exit_roi.center,
+           recommended_settings_->exit_roi.width, recommended_settings_->exit_roi.height);
+  ESP_LOGI(CALIBRATION, "Exit thresholds {min: %d, max: %d}", recommended_settings_->exit_threshold_min,
+           recommended_settings_->exit_threshold_max);
+  ESP_LOGI(CALIBRATION, "Samples: %d, Ranging mode: %s", recommended_settings_->samples,
+           recommended_settings_->ranging_mode.c_str());
 
   entry->roi->center = recommended_settings_->entry_roi.center;
   entry->roi->width = recommended_settings_->entry_roi.width;

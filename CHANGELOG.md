@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.4
+- Ensure calibration portal registers before the default web page so `/portal` shows the portal and the root URL redirects to it
+
 ## 1.6.3
 - Always enable web portal; remove portal switch toggle
 

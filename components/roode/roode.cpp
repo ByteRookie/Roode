@@ -191,7 +191,7 @@ void Roode::register_server_endpoints() {
   server->on("/", HTTP_GET, [this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
-    request->send_P(200, "text/html", portal_html);
+    request->redirect("/portal");
   });
 
   portal_registered_ = true;
@@ -456,8 +456,8 @@ void Roode::setup() {
 #endif
 #ifdef USE_WEB_SERVER
   if (web_server_base::global_web_server_base != nullptr) {
-    web_server_base::global_web_server_base->init();
     register_server_endpoints();
+    web_server_base::global_web_server_base->init();
   } else {
     ESP_LOGW(TAG, "Web server base not initialized, portal not started");
   }
@@ -616,8 +616,8 @@ void Roode::update() {
 void Roode::loop() {
 #ifdef USE_WEB_SERVER
   if (!portal_registered_ && web_server_base::global_web_server_base != nullptr) {
-    web_server_base::global_web_server_base->init();
     register_server_endpoints();
+    web_server_base::global_web_server_base->init();
   }
 #endif
   if (use_sensor_task_) {

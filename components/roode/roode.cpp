@@ -171,32 +171,44 @@ void Roode::register_server_endpoints() {
 #ifdef USE_WEB_SERVER
   if (portal_registered_ || web_server_base::global_web_server_base == nullptr)
     return;
-  auto server = web_server_base::global_web_server_base->get_server();
-  if (server == nullptr) {
-    ESP_LOGW(TAG, "Web server instance not available, portal not started");
-    return;
-  }
+  auto *base = web_server_base::global_web_server_base;
 
-  server->on("/portal", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  auto *portal_handler = new AsyncCallbackWebHandler();
+  portal_handler->setUri("/portal");
+  portal_handler->setMethod(HTTP_GET);
+  portal_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     request->send_P(200, "text/html", portal_html);
   });
-  // Support trailing slash so both /portal and /portal/ work
-  server->on("/portal/", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  base->add_handler(portal_handler);
+
+  auto *portal_slash_handler = new AsyncCallbackWebHandler();
+  portal_slash_handler->setUri("/portal/");
+  portal_slash_handler->setMethod(HTTP_GET);
+  portal_slash_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     request->send_P(200, "text/html", portal_html);
   });
-  server->on("/", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  base->add_handler(portal_slash_handler);
+
+  auto *root_handler = new AsyncCallbackWebHandler();
+  root_handler->setUri("/");
+  root_handler->setMethod(HTTP_GET);
+  root_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     request->redirect("/portal");
   });
+  base->add_handler(root_handler);
 
   portal_registered_ = true;
 
-  server->on("/api/settings/current", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  auto *settings_handler = new AsyncCallbackWebHandler();
+  settings_handler->setUri("/api/settings/current");
+  settings_handler->setMethod(HTTP_GET);
+  settings_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     DynamicJsonDocument doc(512);
@@ -230,7 +242,10 @@ void Roode::register_server_endpoints() {
     request->send(200, "application/json", out.c_str());
   });
 
-  server->on("/api/scan/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  auto *scan_status_handler = new AsyncCallbackWebHandler();
+  scan_status_handler->setUri("/api/scan/status");
+  scan_status_handler->setMethod(HTTP_GET);
+  scan_status_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     DynamicJsonDocument doc(256);
@@ -243,8 +258,12 @@ void Roode::register_server_endpoints() {
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
+  base->add_handler(scan_status_handler);
 
-  server->on("/api/scan/start", HTTP_POST, [this](AsyncWebServerRequest *request) {
+  auto *scan_start_handler = new AsyncCallbackWebHandler();
+  scan_start_handler->setUri("/api/scan/start");
+  scan_start_handler->setMethod(HTTP_POST);
+  scan_start_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     DynamicJsonDocument doc(128);
@@ -264,8 +283,12 @@ void Roode::register_server_endpoints() {
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
+  base->add_handler(scan_start_handler);
 
-  server->on("/api/scan/cancel", HTTP_POST, [this](AsyncWebServerRequest *request) {
+  auto *scan_cancel_handler = new AsyncCallbackWebHandler();
+  scan_cancel_handler->setUri("/api/scan/cancel");
+  scan_cancel_handler->setMethod(HTTP_POST);
+  scan_cancel_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     scan_cancel_requested = true;
@@ -276,8 +299,12 @@ void Roode::register_server_endpoints() {
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
+  base->add_handler(scan_cancel_handler);
 
-  server->on("/api/roi/preview", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  auto *roi_preview_handler = new AsyncCallbackWebHandler();
+  roi_preview_handler->setUri("/api/roi/preview");
+  roi_preview_handler->setMethod(HTTP_GET);
+  roi_preview_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     DynamicJsonDocument doc(512);
@@ -328,8 +355,12 @@ void Roode::register_server_endpoints() {
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
+  base->add_handler(roi_preview_handler);
 
-  server->on("/api/roi/apply", HTTP_POST, [this](AsyncWebServerRequest *request) {
+  auto *roi_apply_handler = new AsyncCallbackWebHandler();
+  roi_apply_handler->setUri("/api/roi/apply");
+  roi_apply_handler->setMethod(HTTP_POST);
+  roi_apply_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     bool ok = this->apply_recommended_settings();
@@ -341,8 +372,12 @@ void Roode::register_server_endpoints() {
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
+  base->add_handler(roi_apply_handler);
 
-  server->on("/api/scan/sessions", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  auto *scan_sessions_handler = new AsyncCallbackWebHandler();
+  scan_sessions_handler->setUri("/api/scan/sessions");
+  scan_sessions_handler->setMethod(HTTP_GET);
+  scan_sessions_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     size_t doc_size = sessions_.size() * 128 + 128;
@@ -360,8 +395,12 @@ void Roode::register_server_endpoints() {
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
+  base->add_handler(scan_sessions_handler);
 
-  server->on(UriRegex("^/api/scan/session/(.+)$"), HTTP_GET, [this](AsyncWebServerRequest *request) {
+  auto *scan_session_handler = new AsyncCallbackWebHandler();
+  scan_session_handler->setUri("^/api/scan/session/(.+)$");
+  scan_session_handler->setMethod(HTTP_GET);
+  scan_session_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     uint32_t id = strtoul(request->pathArg(0).c_str(), nullptr, 10);
@@ -388,8 +427,12 @@ void Roode::register_server_endpoints() {
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
+  base->add_handler(scan_session_handler);
 
-  server->on("/api/scan/delete", HTTP_POST, [this](AsyncWebServerRequest *request) {
+  auto *scan_delete_handler = new AsyncCallbackWebHandler();
+  scan_delete_handler->setUri("/api/scan/delete");
+  scan_delete_handler->setMethod(HTTP_POST);
+  scan_delete_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     for (int i = 0; i < MAX_SCAN_SESSIONS; i++)
@@ -403,8 +446,12 @@ void Roode::register_server_endpoints() {
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
+  base->add_handler(scan_delete_handler);
 
-  server->on("/api/export/all", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  auto *export_all_handler = new AsyncCallbackWebHandler();
+  export_all_handler->setUri("/api/export/all");
+  export_all_handler->setMethod(HTTP_GET);
+  export_all_handler->onRequest([this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     size_t doc_size = sessions_.size() * (MAX_SESSION_DATA + 128) + 128;
@@ -423,6 +470,7 @@ void Roode::register_server_endpoints() {
     serializeJson(doc, out);
     request->send(200, "application/json", out.c_str());
   });
+  base->add_handler(export_all_handler);
 #endif
 }
 

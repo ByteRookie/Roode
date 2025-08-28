@@ -172,9 +172,18 @@ void Roode::register_server_endpoints() {
   if (portal_registered_ || web_server_base::global_web_server_base == nullptr)
     return;
   auto server = web_server_base::global_web_server_base->get_server();
-  portal_registered_ = true;
+  if (server == nullptr) {
+    ESP_LOGW(TAG, "Web server instance not available, portal not started");
+    return;
+  }
 
   server->on("/portal", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
+    request->send_P(200, "text/html", portal_html);
+  });
+  // Support trailing slash so both /portal and /portal/ work
+  server->on("/portal/", HTTP_GET, [this](AsyncWebServerRequest *request) {
     if (!check_token_(request))
       return;
     request->send_P(200, "text/html", portal_html);
@@ -184,6 +193,8 @@ void Roode::register_server_endpoints() {
       return;
     request->send_P(200, "text/html", portal_html);
   });
+
+  portal_registered_ = true;
 
   server->on("/api/settings/current", HTTP_GET, [this](AsyncWebServerRequest *request) {
     if (!check_token_(request))

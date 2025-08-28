@@ -868,8 +868,12 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
 }
 
 bool Roode::apply_recommended_settings() {
-  if (!recommended_settings_.has_value())
+  if (!recommended_settings_.has_value()) {
+    ESP_LOGW(TAG, "No recommended settings to apply");
     return false;
+  }
+
+  ESP_LOGI(TAG, "Applying recommended calibration settings");
 
   entry->roi->center = recommended_settings_->entry_roi.center;
   entry->roi->width = recommended_settings_->entry_roi.width;
@@ -906,6 +910,7 @@ bool Roode::apply_recommended_settings() {
   last_calibration_sec_ = std::max(calibration_data_[0].last_calibrated_sec, calibration_data_[1].last_calibrated_sec);
 
   recommended_settings_.reset();
+  ESP_LOGI(TAG, "Recommended calibration settings applied");
   return true;
 }
 
@@ -1562,7 +1567,13 @@ void Roode::start_passive_scan() {
 }
 
 void Roode::complete_calibration() {
+  ESP_LOGI(TAG, "Starting passive calibration scan");
   start_passive_scan();
+  ESP_LOGI(TAG, "Passive calibration scan complete");
+  if (!recommended_settings_.has_value()) {
+    ESP_LOGW(TAG, "No recommended settings generated during scan");
+    return;
+  }
   apply_recommended_settings();
 }
 

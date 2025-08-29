@@ -39,6 +39,7 @@ web_server:
   auth:
     username: admin
     password: !secret web_password
+  include: web/index.html
 
 # Enable logging
 logger:

@@ -193,15 +193,12 @@ void Roode::register_server_endpoints() {
   });
   base->add_handler(portal_slash_handler);
 
-  auto *root_handler = new AsyncCallbackWebHandler();
-  root_handler->setUri("/");
-  root_handler->setMethod(HTTP_GET);
-  root_handler->onRequest([this](AsyncWebServerRequest *request) {
-    if (!check_token_(request))
-      return;
-    request->redirect("/portal");
-  });
-  base->add_handler(root_handler);
+  // Rewrite root requests to the portal to ensure it is always exposed.
+  auto server = base->get_server();
+  if (server != nullptr) {
+    server->rewrite("/", "/portal");
+    server->rewrite("/portal/", "/portal");
+  }
 
   portal_registered_ = true;
 
@@ -504,8 +501,9 @@ void Roode::setup() {
 #endif
 #ifdef USE_WEB_SERVER
   if (web_server_base::global_web_server_base != nullptr) {
+    auto *base = web_server_base::global_web_server_base;
+    base->init();
     register_server_endpoints();
-    web_server_base::global_web_server_base->init();
   } else {
     ESP_LOGW(TAG, "Web server base not initialized, portal not started");
   }
@@ -664,8 +662,9 @@ void Roode::update() {
 void Roode::loop() {
 #ifdef USE_WEB_SERVER
   if (!portal_registered_ && web_server_base::global_web_server_base != nullptr) {
+    auto *base = web_server_base::global_web_server_base;
+    base->init();
     register_server_endpoints();
-    web_server_base::global_web_server_base->init();
   }
 #endif
   if (use_sensor_task_) {

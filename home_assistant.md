@@ -26,8 +26,18 @@ Roode now exposes button entities to start a passive scan or force a recalibrati
 ## Portal and REST API
 
 Roode ships with a web portal that serves a small HTML page and a
-REST API for configuration and calibration tasks. The portal starts
-automatically when the device boots.
+REST API for configuration and calibration tasks. It requires the ESPHome
+`web_server` component:
+
+```yaml
+web_server:
+  port: 80
+  auth:
+    username: admin
+    password: !secret web_password
+```
+
+With `web_server` enabled, the portal starts automatically when the device boots.
 
 ### Endpoints
 

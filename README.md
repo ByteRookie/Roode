@@ -781,9 +781,19 @@ Normal info appears in green, details in yellow and failures in red for readabil
 ## Web Portal & API
 
 Roode includes a lightweight web portal for configuration and calibration.
-The portal starts automatically when the device boots.
+It requires the ESPHome `web_server` component:
 
-The portal responds on `/portal` (or `/`) and exposes several
+```yaml
+web_server:
+  port: 80
+  auth:
+    username: admin
+    password: !secret web_password
+```
+
+With `web_server` enabled, the portal starts automatically when the device boots.
+
+The portal responds on `/portal` (the root path redirects here) and exposes several
 JSON endpoints:
 
 - `/api/settings/current` – current firmware and ROI settings.

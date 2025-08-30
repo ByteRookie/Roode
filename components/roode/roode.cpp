@@ -193,6 +193,16 @@ void Roode::register_server_endpoints() {
   });
   base->add_handler(portal_slash_handler);
 
+  auto *root_handler = new AsyncCallbackWebHandler();
+  root_handler->setUri("/");
+  root_handler->setMethod(HTTP_GET);
+  root_handler->onRequest([this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
+    request->redirect("/portal");
+  });
+  base->add_handler(root_handler);
+
   portal_registered_ = true;
 
   auto *settings_handler = new AsyncCallbackWebHandler();

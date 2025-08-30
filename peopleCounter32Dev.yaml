@@ -44,6 +44,9 @@ web_server:
     username: admin
     password: !secret web_password
   include_internal: true
+  pages:
+    - path: /web
+      file: web/index.html
 
 # Enable logging
 logger:

@@ -203,6 +203,7 @@ void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
   base->add_handler(root_handler);
 
   portal_registered_ = true;
+  ESP_LOGI(TAG, "Portal routes registered");
 
   auto *settings_handler = new AsyncCallbackWebHandler();
   settings_handler->setUri("/api/settings/current");
@@ -503,7 +504,6 @@ void Roode::setup() {
 #endif
 #ifdef USE_WEB_SERVER
   App.register_on_web_server_callback([this](web_server_base::WebServerBase *base) {
-    base->init();
     this->register_server_endpoints(base);
   });
 #endif

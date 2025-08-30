@@ -38,13 +38,11 @@ ota:
 
 web_server:
   port: 80
+  version: 3
   auth:
     username: admin
     password: !secret web_password
   include_internal: true
-  pages:
-    - path: /web
-      file: web/index.html
 
 # Enable logging
 logger:

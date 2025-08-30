@@ -505,8 +505,8 @@ void Roode::setup() {
 #ifdef USE_WEB_SERVER
   if (web_server_base::global_web_server_base != nullptr) {
     auto *base = web_server_base::global_web_server_base;
-    register_server_endpoints();
     base->init();
+    register_server_endpoints();
   } else {
     ESP_LOGW(TAG, "Web server base not initialized, portal not started");
   }
@@ -666,8 +666,8 @@ void Roode::loop() {
 #ifdef USE_WEB_SERVER
   if (!portal_registered_ && web_server_base::global_web_server_base != nullptr) {
     auto *base = web_server_base::global_web_server_base;
-    register_server_endpoints();
     base->init();
+    register_server_endpoints();
   }
 #endif
   if (use_sensor_task_) {

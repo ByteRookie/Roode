@@ -167,11 +167,10 @@ bool Roode::check_token_(AsyncWebServerRequest *request) {
 }
 #endif
 
-void Roode::register_server_endpoints() {
+void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
 #ifdef USE_WEB_SERVER
-  if (portal_registered_ || web_server_base::global_web_server_base == nullptr)
+  if (portal_registered_ || base == nullptr)
     return;
-  auto *base = web_server_base::global_web_server_base;
 
   auto *portal_handler = new AsyncCallbackWebHandler();
   portal_handler->setUri("/portal");
@@ -503,13 +502,10 @@ void Roode::setup() {
   this->register_service(&Roode::complete_calibration, "complete_calibration");
 #endif
 #ifdef USE_WEB_SERVER
-  if (web_server_base::global_web_server_base != nullptr) {
-    auto *base = web_server_base::global_web_server_base;
+  App.register_on_web_server_callback([this](web_server_base::WebServerBase *base) {
     base->init();
-    register_server_endpoints();
-  } else {
-    ESP_LOGW(TAG, "Web server base not initialized, portal not started");
-  }
+    this->register_server_endpoints(base);
+  });
 #endif
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
@@ -663,13 +659,6 @@ void Roode::update() {
 }
 
 void Roode::loop() {
-#ifdef USE_WEB_SERVER
-  if (!portal_registered_ && web_server_base::global_web_server_base != nullptr) {
-    auto *base = web_server_base::global_web_server_base;
-    base->init();
-    register_server_endpoints();
-  }
-#endif
   if (use_sensor_task_) {
     // When running on dual core the sensor loop runs in a separate task
     // Skip execution from main loop

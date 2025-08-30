@@ -167,8 +167,8 @@ bool Roode::check_token_(AsyncWebServerRequest *request) {
 }
 #endif
 
-void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
 #ifdef USE_WEB_SERVER
+void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
   if (portal_registered_ || base == nullptr)
     return;
 
@@ -470,8 +470,8 @@ void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
     request->send(200, "application/json", out.c_str());
   });
   base->add_handler(export_all_handler);
-#endif
 }
+#endif
 
 void Roode::set_auto_calibration_interval_sec(uint32_t sec) { auto_calibration_interval_sec_ = sec; }
 void Roode::dump_config() {

@@ -34,16 +34,10 @@ ota:
   platform: esphome
   password: !secret ota_password
 
-web_server:
+web_portal:
   port: 80
-  version: 3
-  auth:
-    username: admin
-    password: !secret web_password
-  include_internal: true
-  pages:
-    - path: /web
-      file: web/index.html
+  username: admin
+  password: !secret web_password
 
 # Enable logging
 logger:

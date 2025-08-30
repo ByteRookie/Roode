@@ -169,8 +169,12 @@ bool Roode::check_token_(AsyncWebServerRequest *request) {
 
 #ifdef USE_WEB_SERVER
 void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
-  if (portal_registered_ || base == nullptr)
+  if (portal_registered_)
     return;
+  if (base == nullptr) {
+    ESP_LOGW(TAG, "Web server base not initialized, portal not started");
+    return;
+  }
 
   auto *portal_handler = new AsyncCallbackWebHandler();
   portal_handler->setUri("/portal");

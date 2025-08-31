@@ -210,7 +210,6 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
 #ifdef USE_WEB_SERVER
   void register_server_endpoints(web_server_base::WebServerBase *base);
   bool portal_registered_ = false;
-  web_server_base::WebServerBase *server_base_{nullptr};
   bool check_token_(AsyncWebServerRequest *request);
 #endif
 

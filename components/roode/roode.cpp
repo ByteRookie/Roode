@@ -507,7 +507,12 @@ void Roode::setup() {
 #endif
 #ifdef USE_WEB_SERVER
   App.register_on_web_server_callback([this](web_server_base::WebServerBase *base) {
-    this->register_server_endpoints(base);
+    if (base != nullptr) {
+      ESP_LOGD(TAG, "Web server base available: %p", base);
+      this->server_base_ = base;
+    } else {
+      ESP_LOGW(TAG, "Web server base null in callback");
+    }
   });
 #endif
   if (version_sensor != nullptr) {
@@ -662,6 +667,12 @@ void Roode::update() {
 }
 
 void Roode::loop() {
+  #ifdef USE_WEB_SERVER
+  if (!portal_registered_ && server_base_ != nullptr) {
+    register_server_endpoints(server_base_);
+  }
+  #endif
+
   if (use_sensor_task_) {
     // When running on dual core the sensor loop runs in a separate task
     // Skip execution from main loop

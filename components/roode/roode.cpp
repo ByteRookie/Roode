@@ -172,7 +172,7 @@ void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
   if (portal_registered_)
     return;
   if (base == nullptr) {
-    ESP_LOGW(TAG, "Web server base not initialized, portal not started");
+    ESP_LOGW(TAG, "Web server base not initialized, will retry in loop");
     return;
   }
 
@@ -649,6 +649,14 @@ void Roode::update() {
 }
 
 void Roode::loop() {
+#ifdef USE_WEB_SERVER
+  if (!portal_registered_) {
+    auto *base = web_server_base::global_web_server_base;
+    if (base != nullptr) {
+      this->register_server_endpoints(base);
+    }
+  }
+#endif
   if (use_sensor_task_) {
     // When running on dual core the sensor loop runs in a separate task
     // Skip execution from main loop

@@ -180,8 +180,6 @@ void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
   portal_handler->setUri("/portal");
   portal_handler->setMethod(HTTP_GET);
   portal_handler->onRequest([this](AsyncWebServerRequest *request) {
-    if (!check_token_(request))
-      return;
     request->send_P(200, "text/html", portal_html);
   });
   base->add_handler(portal_handler);
@@ -190,8 +188,6 @@ void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
   portal_slash_handler->setUri("/portal/");
   portal_slash_handler->setMethod(HTTP_GET);
   portal_slash_handler->onRequest([this](AsyncWebServerRequest *request) {
-    if (!check_token_(request))
-      return;
     request->send_P(200, "text/html", portal_html);
   });
   base->add_handler(portal_slash_handler);
@@ -200,8 +196,6 @@ void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
   root_handler->setUri("/");
   root_handler->setMethod(HTTP_GET);
   root_handler->onRequest([this](AsyncWebServerRequest *request) {
-    if (!check_token_(request))
-      return;
     request->redirect("/portal");
   });
   base->add_handler(root_handler);

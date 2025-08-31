@@ -197,7 +197,9 @@ void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
   auto *root_handler = new AsyncCallbackWebHandler();
   root_handler->setUri("/");
   root_handler->setMethod(HTTP_GET);
-  root_handler->onRequest([](AsyncWebServerRequest *request) {
+  root_handler->onRequest([this](AsyncWebServerRequest *request) {
+    if (!check_token_(request))
+      return;
     request->redirect("/portal");
   });
   srv->addHandler(root_handler);

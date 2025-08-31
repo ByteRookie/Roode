@@ -43,7 +43,7 @@ With `web_server` enabled, the portal starts automatically when the device boots
 
 The portal exposes:
 
-- `/portal` or `/` – simple HTML configuration page.
+- `/portal` – simple HTML configuration page.
 - `/api/settings/current` – current firmware and ROI settings.
 - `/api/scan/start` *(POST)* – start a passive scan.
 - `/api/scan/status` – progress of the active scan.

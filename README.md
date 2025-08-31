@@ -793,7 +793,7 @@ web_server:
 
 With `web_server` enabled, the portal starts automatically when the device boots.
 
-The portal responds on `/portal` (the root path redirects here) and exposes several
+The portal responds on `/portal` (and `/portal/`) and exposes several
 JSON endpoints:
 
 - `/api/settings/current` – current firmware and ROI settings.

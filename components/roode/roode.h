@@ -18,12 +18,8 @@
 #include "zone.h"
 
 #ifdef USE_WEB_SERVER
+#include "esphome/components/web_server_base/web_server_base.h"
 class AsyncWebServerRequest;
-namespace esphome {
-namespace web_server_base {
-class WebServerBase;
-}  // namespace web_server_base
-}  // namespace esphome
 #endif
 
 using namespace esphome::vl53l1x;
@@ -210,10 +206,10 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   sensor::Sensor *trial_bump_cv_sensor{nullptr};
   sensor::Sensor *scan_time_cap_seconds_sensor{nullptr};
 
-  bool portal_registered_{false};
   std::string portal_password_{};
 #ifdef USE_WEB_SERVER
   void register_server_endpoints(web_server_base::WebServerBase *base);
+  bool portal_registered_ = false;
   bool check_token_(AsyncWebServerRequest *request);
 #endif
 

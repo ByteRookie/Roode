@@ -18,8 +18,9 @@ from esphome.const import (
 from esphome.core import ID
 from ..vl53l1x import distance_as_mm, NullableSchema, VL53L1X
 
-DEPENDENCIES = ["vl53l1x"]
+DEPENDENCIES = ["vl53l1x", "web_server"]
 AUTO_LOAD = [
+    "web_server",
     "vl53l1x",
     "sensor",
     "binary_sensor",

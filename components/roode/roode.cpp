@@ -172,7 +172,7 @@ void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
   if (portal_registered_)
     return;
   if (base == nullptr) {
-    ESP_LOGW(TAG, "Web server base still null; will retry later");
+    ESP_LOGW(TAG, "Web server base null; portal routes not registered");
     return;
   }
 
@@ -505,10 +505,6 @@ void Roode::setup() {
 #endif
 #ifdef USE_WEB_SERVER
   App.register_on_web_server_callback([this](web_server_base::WebServerBase *base) {
-    if (base == nullptr) {
-      ESP_LOGW("roode", "Web server base not ready in callback; will retry in loop");
-      return;
-    }
     this->register_server_endpoints(base);
   });
 #endif
@@ -664,14 +660,6 @@ void Roode::update() {
 }
 
 void Roode::loop() {
-#ifdef USE_WEB_SERVER
-  if (!this->portal_registered_) {
-    auto *base = web_server_base::global_web_server_base;
-    if (base != nullptr) {
-      this->register_server_endpoints(base);
-    }
-  }
-#endif
   if (use_sensor_task_) {
     // When running on dual core the sensor loop runs in a separate task
     // Skip execution from main loop

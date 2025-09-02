@@ -14,7 +14,9 @@ CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
         cv.Optional(CONF_WEB_PORTAL): switch.switch_schema(
-            PortalSwitch, icon="mdi:web"
+            PortalSwitch,
+            icon="mdi:web",
+            default_restore_mode="RESTORE_DEFAULT_OFF",
         ),
     }
 )

@@ -532,7 +532,11 @@ void Roode::setup() {
   this->register_service(&Roode::complete_calibration, "complete_calibration");
 #endif
   if (portal_switch != nullptr) {
-    portal_switch->publish_state(false);
+    optional<bool> init = portal_switch->get_initial_state_with_restore_mode();
+    bool enabled = init.has_value() ? *init : false;
+    portal_switch->publish_state(enabled);
+    if (enabled)
+      start_portal_server();
     portal_switch->add_on_state_callback([this](bool state) {
       if (state)
         start_portal_server();

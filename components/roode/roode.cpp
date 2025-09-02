@@ -889,7 +889,29 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;
   z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
-  z->calibrateThreshold(distanceSensor, 50);
+  const uint8_t max_attempts = 3;
+  bool success = false;
+  for (uint8_t attempt = 1; attempt <= max_attempts; attempt++) {
+    z->calibrateThreshold(distanceSensor, 50);
+    if (z->threshold->idle > 0) {
+      success = true;
+      break;
+    }
+    if (attempt < max_attempts) {
+      ESP_LOGW(CALIBRATION, "Calibration attempt %d for zone %d failed, restarting sensor", attempt, zone_id);
+      distanceSensor->restart();
+    }
+  }
+  if (!success) {
+    ESP_LOGE(CALIBRATION, "Calibration failed for zone %d after %d attempts. Manual intervention required.", zone_id,
+             max_attempts);
+    log_event(std::string("zone_") + std::to_string(zone_id) + "_calibration_failed");
+    if (status_sensor != nullptr)
+      status_sensor->publish_state(-1);
+    update_status_text("calibration_failed");
+    return;
+  }
+
   // Recalculate ROI sizes so thresholds remain consistent
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
   exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);

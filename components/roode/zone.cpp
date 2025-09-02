@@ -71,20 +71,28 @@ void Zone::reset_roi(uint8_t default_center) {
 }
 
 bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
+  // Preserve previous thresholds in case calibration fails
+  Threshold previous = *threshold;
+
   std::vector<int> zone_distances;
   zone_distances.reserve(number_attempts);
   int sum = 0;
+  bool read_failed = false;
+
   for (int i = 0; i < number_attempts; i++) {
     this->readDistance(distanceSensor);
     if (sensor_status != VL53L1_ERROR_NONE) {
       ESP_LOGW(CALIBRATION, "Distance read failed during calibration. status: %d", sensor_status);
+      read_failed = true;
       break;
     }
     zone_distances.push_back(this->getDistance());
     sum += zone_distances.back();
   }
-  if (zone_distances.empty()) {
-    threshold->idle = 0;
+
+  if (zone_distances.empty() || read_failed) {
+    *threshold = previous;
+    distanceSensor->restart();
     ESP_LOGW(CALIBRATION, "Calibration failed: no valid distances recorded");
     return false;
   }
@@ -98,8 +106,7 @@ bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   threshold->max = (avg * max_pct) / 100;
   threshold->min = (avg * min_pct) / 100;
 
-  ESP_LOGI(CALIBRATION,
-           "Calibrated threshold for zone. zoneId: %d, idle: %d, min: %d (%d%%), max: %d (%d%%)", id,
+  ESP_LOGI(CALIBRATION, "Calibrated threshold for zone. zoneId: %d, idle: %d, min: %d (%d%%), max: %d (%d%%)", id,
            threshold->idle, threshold->min,
            threshold->min_percentage.value_or((threshold->min * 100) / threshold->idle), threshold->max,
            threshold->max_percentage.value_or((threshold->max * 100) / threshold->idle));

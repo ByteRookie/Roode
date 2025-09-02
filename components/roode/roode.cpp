@@ -894,17 +894,11 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   CalibrationPrefs prev_cal = calibration_data_[zone_id];
 
   bool calibrated = z->calibrateThreshold(distanceSensor, 50);
-  if (!calibrated || z->threshold->idle == 0) {
+  if (!calibrated) {
     ESP_LOGE(CALIBRATION, "Calibration failed for zone %d. Restoring previous settings.", zone_id);
     log_event(std::string("zone_") + std::to_string(zone_id) + "_calibration_failed");
 
-    // Restore previous calibration values
-    z->threshold->idle = prev_cal.baseline_mm;
-    z->threshold->min = prev_cal.threshold_min_mm;
-    z->threshold->max = prev_cal.threshold_max_mm;
     calibration_data_[zone_id] = prev_cal;
-
-    distanceSensor->restart();
 
     if (status_sensor != nullptr)
       status_sensor->publish_state(-1);
@@ -1095,9 +1089,15 @@ void Roode::calibrate_zones() {
   calibrateDistance();
 
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-  entry->calibrateThreshold(distanceSensor, 50);
+  if (!entry->calibrateThreshold(distanceSensor, 50)) {
+    ESP_LOGE(CALIBRATION, "Entry zone threshold calibration failed");
+    return;
+  }
   exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-  exit->calibrateThreshold(distanceSensor, 50);
+  if (!exit->calibrateThreshold(distanceSensor, 50)) {
+    ESP_LOGE(CALIBRATION, "Exit zone threshold calibration failed");
+    return;
+  }
 
   publish_sensor_configuration(entry, exit, true);
   App.feed_wdt();
@@ -1119,8 +1119,12 @@ void Roode::calibrateDistance() {
   auto *const initial = distanceSensor->get_ranging_mode_override().value_or(Ranging::Longest);
   distanceSensor->set_ranging_mode(initial);
 
-  entry->calibrateThreshold(distanceSensor, 50);
-  exit->calibrateThreshold(distanceSensor, 50);
+  bool entry_ok = entry->calibrateThreshold(distanceSensor, 50);
+  bool exit_ok = exit->calibrateThreshold(distanceSensor, 50);
+  if (!entry_ok || !exit_ok) {
+    ESP_LOGE(CALIBRATION, "Distance calibration failed");
+    return;
+  }
 
   if (distanceSensor->get_ranging_mode_override().has_value()) {
     return;

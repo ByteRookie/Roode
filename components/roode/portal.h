@@ -68,10 +68,13 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
         </div>
         <div class="hr"></div>
         <div class="kv">
-          <div class="k">Active Session</div><div id="activeSession">—</div>
+          <div class="k">Time Remaining</div><div id="timeRemaining">—</div>
           <div class="k">Step</div><div id="stepText">—</div>
           <div class="k">Progress</div>
-          <div><div class="progress"><div id="progressBar" style="width:0%"></div></div></div>
+          <div>
+            <div class="progress"><div id="progressBar" style="width:0%"></div></div>
+            <div id="progressPercent" style="margin-top:4px">0%</div>
+          </div>
         </div>
       </div>
 
@@ -212,11 +215,13 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
 
   // Renderers
   function renderStatus(){
-    const st = status || {state:'Idle', id:'—', step:'—', progress:0};
+    const st = status || {state:'Idle', id:'—', step:'—', progress:0, remaining:0};
     $('#statusText').innerHTML = 'Status: <b>'+st.state+'</b>';
-    $('#activeSession').textContent = st.id || '—';
+    $('#timeRemaining').textContent = Number.isFinite(st.remaining) ? fmtDur(Math.round(st.remaining)) : '—';
     $('#stepText').textContent = st.step || '—';
-    $('#progressBar').style.width = (st.progress||0)+'%';
+    const prog = st.progress || 0;
+    $('#progressBar').style.width = prog + '%';
+    $('#progressPercent').textContent = prog.toFixed(0) + '%';
     $('#btnCancel').style.display = (st.state==='Scanning') ? 'inline-block' : 'none';
     $('#btnStart').style.display = (st.state==='Scanning') ? 'none' : 'inline-block';
     if (st.last_calibration !== undefined) {
@@ -300,10 +305,10 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
   async function poll(){
     try {
       const [cur, stat, list, prev] = await Promise.all([
-        getJSON('/api/settings/current'),
-        getJSON('/api/scan/status'),
-        getJSON('/api/scan/sessions'),
-        getJSON('/api/roi/preview')
+        getJSON('/api/settings/current').catch(()=>null),
+        getJSON('/api/scan/status').catch(()=>null),
+        getJSON('/api/scan/sessions').catch(()=>null),
+        getJSON('/api/roi/preview').catch(()=>null)
       ]);
       if(cur) current = cur;
       if(stat) {
@@ -312,6 +317,7 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
           id: stat.session_id || '—',
           step: stat.running ? describeStep(stat.step) : '—',
           progress: (stat.progress || 0) * 100,
+          remaining: stat.time_remaining,
           last_calibration: stat.last_calibration
         };
       }
@@ -332,7 +338,7 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     try {
       const r = await postJSON('/api/scan/start');
       const id = r && (r.id || r.session_id);
-      if(id){ status = {state:'Scanning', id, step:'4×4 Scan', progress:0}; renderStatus(); }
+      if(id){ status = {state:'Scanning', id, step:'4×4 Scan', progress:0, remaining:0}; renderStatus(); }
     } finally {
       btn.disabled = false;
     }
@@ -342,7 +348,7 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     btn.disabled = true;
     try {
       await postJSON('/api/scan/cancel');
-      status = {state:'Idle', id:status?.id || '—', step:'—', progress:0};
+      status = {state:'Idle', id:status?.id || '—', step:'—', progress:0, remaining:0};
       renderStatus();
     } finally {
       btn.disabled = false;

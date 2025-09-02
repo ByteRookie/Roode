@@ -238,14 +238,18 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
   }
   function renderCurrent(){
     const c = current || {};
-    $('#curRoiSize').textContent = (c.roi_width&&c.roi_height) ? `${c.roi_width} × ${c.roi_height}` : '—';
-    $('#curRoiCenter').textContent = c.roi_center ? `(${c.roi_center.x}, ${c.roi_center.y})` : '—';
-    $('#curEntry').textContent = c.entry_center ? `(${c.entry_center.x}, ${c.entry_center.y})` : '—';
-    $('#curExit').textContent = c.exit_center ? `(${c.exit_center.x}, ${c.exit_center.y})` : '—';
+    const entry = c.entry || {};
+    const exit = c.exit || {};
+    const roi = entry.roi || {};
+    $('#curRoiSize').textContent = (roi.width && roi.height) ? `${roi.width} × ${roi.height}` : '—';
+    $('#curRoiCenter').textContent = roi.center ? `(${roi.center.x}, ${roi.center.y})` : '—';
+    $('#curEntry').textContent = entry.roi && entry.roi.center ? `(${entry.roi.center.x}, ${entry.roi.center.y})` : '—';
+    $('#curExit').textContent = exit.roi && exit.roi.center ? `(${exit.roi.center.x}, ${exit.roi.center.y})` : '—';
     $('#curMode').textContent = c.ranging_mode || '—';
-    $('#curMin').textContent = c.min_threshold!=null ? c.min_threshold+'%' : '—';
-    $('#curMax').textContent = c.max_threshold!=null ? c.max_threshold+'%' : '—';
-    $('#curSampling').textContent = c.sampling || '—';
+    const thr = entry.threshold || {};
+    $('#curMin').textContent = thr.min!=null ? thr.min+'%' : '—';
+    $('#curMax').textContent = thr.max!=null ? thr.max+'%' : '—';
+    $('#curSampling').textContent = c.samples != null ? c.samples : '—';
     $('#curFw').textContent = c.firmware || '—';
     const last = c.last_calibration;
     $('#lastCal').textContent = 'Last calibration: ' + (last ? new Date(last).toLocaleString() : 'Not run yet');
@@ -262,11 +266,18 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
       return;
     }
     const r = preview;
-    if(r.roi){ $('#pvRoiSize').textContent = `${r.roi.width} × ${r.roi.height}`; $('#pvRoi').textContent = `(${r.roi.center.x}, ${r.roi.center.y})`; }
-    if(r.zones){ $('#pvEntry').textContent = `(${r.zones.entry.x}, ${r.zones.entry.y})`; $('#pvExit').textContent = `(${r.zones.exit.x}, ${r.zones.exit.y})`; }
+    const entry = r.entry || {};
+    const exit = r.exit || {};
+    const roi = entry.roi || {};
+    $('#pvRoiSize').textContent = (roi.width && roi.height) ? `${roi.width} × ${roi.height}` : '—';
+    $('#pvRoi').textContent = roi.center ? `(${roi.center.x}, ${roi.center.y})` : '—';
+    $('#pvEntry').textContent = entry.roi && entry.roi.center ? `(${entry.roi.center.x}, ${entry.roi.center.y})` : '—';
+    $('#pvExit').textContent = exit.roi && exit.roi.center ? `(${exit.roi.center.x}, ${exit.roi.center.y})` : '—';
     $('#pvMode').textContent = r.ranging_mode || '—';
-    if(r.thresholds){ $('#pvMin').textContent = r.thresholds.min+'%'; $('#pvMax').textContent = r.thresholds.max+'%'; }
-    $('#pvSampling').textContent = r.sampling || '—';
+    const thr = entry.threshold || {};
+    $('#pvMin').textContent = thr.min!=null ? thr.min+'%' : '—';
+    $('#pvMax').textContent = thr.max!=null ? thr.max+'%' : '—';
+    $('#pvSampling').textContent = r.samples != null ? r.samples : '—';
     $('#pvFw').textContent = r.firmware || '—';
     if(r.download) $('#dlResult').href = r.download + (TOKEN ? (r.download.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(TOKEN) : '');
     if(apply) apply.disabled = false;
@@ -307,8 +318,8 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
   }
 
   async function fetchLog(){
-    if(!status || !status.id) return;
-    const sess = await getJSON(`/api/scan/session/${encodeURIComponent(status.id)}`).catch(()=>null);
+    if(!status || !status.id || status.id === '—') return;
+    const sess = await getJSON(`/api/scan/session/${encodeURIComponent(status.id)}${tokenParam}`).catch(()=>null);
     const txt = (sess && sess.data) ? sess.data : '';
     $('#logBox').textContent = txt;
   }

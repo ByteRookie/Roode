@@ -11,8 +11,8 @@ CONF_WEB_PORTAL = "web_portal"
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
-        cv.Optional(CONF_WEB_PORTAL): switch.switch_schema(icon="mdi:web").extend(
-            {cv.GenerateID(): cv.declare_id(switch.Switch)}
+        cv.Optional(CONF_WEB_PORTAL): switch.switch_schema(
+            switch.Switch, icon="mdi:web"
         ),
     }
 )

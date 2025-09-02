@@ -14,9 +14,7 @@
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
 #include <pgmspace.h>
-static const char portal_html[] PROGMEM =
 #include "portal.h"
-    ;
 
 namespace esphome {
 namespace roode {

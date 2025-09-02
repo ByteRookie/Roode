@@ -211,8 +211,7 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   std::string portal_password_{};
 #ifdef USE_WEB_SERVER
   bool portal_registered_ = false;
-  void register_server_endpoints(AsyncWebServer *srv);
-  void register_routes_once_();
+  void setup_portal_routes_();
   bool check_token_(AsyncWebServerRequest *request);
 #endif
 

@@ -167,51 +167,31 @@ bool Roode::check_token_(AsyncWebServerRequest *request) {
   request->send(401, "text/plain", "Unauthorized");
   return false;
 }
-
-void Roode::register_routes_once_() {
+void Roode::setup_portal_routes_() {
   if (portal_registered_)
     return;
-  auto *base = global_web_server;
-  if (!base || !base->get_server()) {
-    this->set_timeout("portal_retry", 200, [this]() { this->register_routes_once_(); });
+  auto *wsb = global_web_server;
+  if (!wsb || !wsb->get_server()) {
+    this->set_timeout("portal_retry", 250, [this]() { this->setup_portal_routes_(); });
     return;
   }
-  this->register_server_endpoints(base->get_server());
-}
+  auto *srv = wsb->get_server();
 
-void Roode::register_server_endpoints(AsyncWebServer *srv) {
-  if (portal_registered_)
-    return;
-  if (srv == nullptr) {
-    ESP_LOGW(TAG, "Web server not initialized; portal routes not registered");
-    return;
-  }
-
-  srv->on("/ping", HTTP_GET, [](AsyncWebServerRequest *r) {
-    r->send(200, "text/plain; charset=utf-8", "pong");
+  srv->onNotFound([](AsyncWebServerRequest *r) {
+    ESP_LOGI(TAG, "404 for URL: %s", r->url().c_str());
+    r->send(404, "text/plain; charset=utf-8", "404: " + r->url());
   });
 
-  auto *portal_handler = new AsyncCallbackWebHandler();
-  portal_handler->setUri("/portal");
-  portal_handler->setMethod(HTTP_GET);
-  portal_handler->onRequest([](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html; charset=utf-8", portal_html, strlen_P(portal_html));
+  srv->on("/hello", HTTP_GET, [](AsyncWebServerRequest *r) {
+    r->send(200, "text/plain; charset=utf-8", "ok");
   });
-  srv->addHandler(portal_handler);
 
-  auto *portal_slash = new AsyncCallbackWebHandler();
-  portal_slash->setUri("/portal/");
-  portal_slash->setMethod(HTTP_GET);
-  portal_slash->onRequest([](AsyncWebServerRequest *request) {
-    request->redirect("/portal");
-  });
-  srv->addHandler(portal_slash);
-
-  auto *root_handler = new AsyncCallbackWebHandler();
-  root_handler->setUri("/");
-  root_handler->setMethod(HTTP_GET);
-  root_handler->onRequest([](AsyncWebServerRequest *request) { request->redirect("/portal"); });
-  srv->addHandler(root_handler);
+  extern const char portal_html[] PROGMEM;
+  auto send_portal = [](AsyncWebServerRequest *r) {
+    r->send_P(200, "text/html; charset=utf-8", portal_html, strlen_P(portal_html));
+  };
+  srv->on("/portal", HTTP_GET, send_portal);
+  srv->on("/portal/", HTTP_GET, send_portal);
 
   portal_registered_ = true;
   ESP_LOGI(TAG, "Portal routes registered");
@@ -516,7 +496,7 @@ void Roode::setup() {
   this->register_service(&Roode::complete_calibration, "complete_calibration");
 #endif
 #ifdef USE_WEB_SERVER
-  this->register_routes_once_();
+  this->setup_portal_routes_();
 #endif
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);

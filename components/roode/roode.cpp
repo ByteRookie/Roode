@@ -229,11 +229,12 @@ void Roode::register_server_endpoints() {
     doc["session_id"] = scan_session_id_.c_str();
     doc["step"] = scan_step_;
     doc["progress"] = scan_progress_;
-    float elapsed = scan_running ? (millis() - scan_start_ts_) / 1000.0f : 0.0f;
-    float remaining = (scan_running && scan_progress_ > 0.0f && scan_progress_ < 1.0f)
-                          ? elapsed * (1.0f - scan_progress_) / scan_progress_
-                          : 0.0f;
+    double elapsed = scan_running ? (millis() - scan_start_ts_) / 1000.0 : 0.0;
+    double remaining = (scan_running && scan_progress_ > 0.0f && scan_progress_ < 1.0f)
+                           ? elapsed * (1.0 - scan_progress_) / scan_progress_
+                           : 0.0;
     doc["time_remaining"] = remaining;
+    doc["time_unit"] = "s";
     doc["last_calibration"] = format_timestamp(last_calibration_sec_);
     std::string out;
     serializeJson(doc, out);

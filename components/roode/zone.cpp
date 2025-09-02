@@ -1,4 +1,5 @@
 #include "zone.h"
+#include "roode.h"
 #include <algorithm>
 
 namespace esphome {
@@ -80,20 +81,38 @@ bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   bool read_failed = false;
 
   for (int i = 0; i < number_attempts; i++) {
-    this->readDistance(distanceSensor);
-    if (sensor_status != VL53L1_ERROR_NONE) {
-      ESP_LOGW(CALIBRATION, "Distance read failed during calibration. status: %d", sensor_status);
+    bool success = false;
+    for (int retry = 0; retry < 3 && !success; retry++) {
+      this->readDistance(distanceSensor);
+      if (sensor_status == VL53L1_ERROR_NONE) {
+        success = true;
+        break;
+      }
+      // log and delay before retrying to give the sensor time to recover
+      ESP_LOGW(CALIBRATION,
+               "Distance read failed during calibration. status: %d (retry %d)",
+               sensor_status, retry + 1);
+      Roode::log_event("calibration_read_retry");
+      delay(50);
+      App.feed_wdt();
+    }
+    if (!success) {
       read_failed = true;
       break;
     }
+
     zone_distances.push_back(this->getDistance());
     sum += zone_distances.back();
+    // small pause between measurements to avoid spamming the sensor
+    delay(10);
+    App.feed_wdt();
   }
 
   if (zone_distances.empty() || read_failed) {
     *threshold = previous;
     distanceSensor->restart();
     ESP_LOGW(CALIBRATION, "Calibration failed: no valid distances recorded");
+    Roode::log_event("calibration_failed_no_distance");
     return false;
   }
 

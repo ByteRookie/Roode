@@ -792,6 +792,10 @@ web_server:
 ```
 
 With `web_server` enabled, the portal starts automatically when the device boots.
+The portal is always active in v1.6.3 and later, so legacy `portal_on` globals or
+switches are no longer needed. If the page fails to load, check the boot log for
+`Portal routes registered`; a warning like `Web server base not initialized, portal not started`
+indicates the web server failed to start.
 
 The portal responds on `/portal` (and `/portal/`) and exposes several
 JSON endpoints:
@@ -866,6 +870,14 @@ in a firmware build.
 **Question:** The counter counts backwards.
 
 **Answer:** Set `zones.invert: true` or rotate the sensor so entry and exit zones match your doorway, then recalibrate.
+
+**Question:** The web portal at `/portal` does not load.
+
+**Answer:** Confirm that the ESPHome `web_server` component is present in your YAML.
+On boot the log should show `Portal routes registered`. If it instead prints
+`Web server base not initialized, portal not started`, the web server failed to
+start (configuration, port, or network issue). The portal is always enabled on
+v1.6.3 and later; remove any legacy `portal_on` switches.
 
 ## License
 

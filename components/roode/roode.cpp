@@ -965,7 +965,8 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   // Preserve previous calibration data in case calibration fails
   CalibrationPrefs prev_cal = calibration_data_[zone_id];
 
-  bool calibrated = z->calibrateThreshold(distanceSensor, 50);
+  int error_count = 0;
+  bool calibrated = z->calibrateThreshold(distanceSensor, 50, &error_count);
   if (!calibrated) {
     ESP_LOGE(CALIBRATION, "Calibration failed for zone %d. Restoring previous settings.", zone_id);
     log_event(std::string("zone_") + std::to_string(zone_id) + "_calibration_failed");
@@ -976,6 +977,11 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
       status_sensor->publish_state(-1);
     update_status_text("calibration_failed");
     return;
+  }
+
+  if (error_count > 0) {
+    ESP_LOGW(CALIBRATION, "Zone %d calibration completed with %d errors", zone_id, error_count);
+    log_event(std::string("zone_") + std::to_string(zone_id) + "_calibration_errors_" + std::to_string(error_count));
   }
 
   // Recalculate ROI sizes so thresholds remain consistent

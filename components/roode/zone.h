@@ -38,10 +38,14 @@ class Zone {
   VL53L1_Error readDistance(TofSensor *distanceSensor);
   void reset_roi(uint8_t default_center);
   /**
-   * Calibrate the zone's distance thresholds. Returns true when at least one
-   * valid distance measurement is recorded.
+   * Calibrate the zone's distance thresholds.
+   *
+   * The calibration will attempt the given number of reads and tolerate
+   * individual failures. When at least one valid distance measurement is
+   * recorded the calibration succeeds, even if some reads fail. The number of
+   * failed reads is returned via @p error_count when provided.
    */
-  bool calibrateThreshold(TofSensor *distanceSensor, int number_attempts);
+  bool calibrateThreshold(TofSensor *distanceSensor, int number_attempts, int *error_count = nullptr);
   void roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Orientation orientation);
   void set_threshold_percentages(uint8_t min_percent, uint8_t max_percent);
   const uint8_t id;

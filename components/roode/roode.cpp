@@ -153,6 +153,7 @@ Roode::~Roode() {
   delete exit;
 }
 
+#ifdef USE_WEB_SERVER
 bool Roode::check_token_(AsyncWebServerRequest *request) {
   if (portal_password_.empty())
     return true;
@@ -167,7 +168,6 @@ bool Roode::check_token_(AsyncWebServerRequest *request) {
   return false;
 }
 
-#ifdef USE_WEB_SERVER
 void Roode::register_routes_once_() {
   if (portal_registered_)
     return;
@@ -178,7 +178,6 @@ void Roode::register_routes_once_() {
   }
   this->register_server_endpoints(base->get_server());
 }
-#endif
 
 void Roode::register_server_endpoints(AsyncWebServer *srv) {
   if (portal_registered_)
@@ -486,6 +485,7 @@ void Roode::register_server_endpoints(AsyncWebServer *srv) {
   });
   srv->addHandler(export_all_handler);
 }
+#endif  // USE_WEB_SERVER
 
 void Roode::set_auto_calibration_interval_sec(uint32_t sec) { auto_calibration_interval_sec_ = sec; }
 void Roode::dump_config() {

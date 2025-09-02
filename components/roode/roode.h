@@ -258,6 +258,7 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   int scan_step_{0};
   int scan_total_steps_{0};
   float scan_progress_{0.0f};
+  std::string scan_error_msg_{};
   std::optional<RecommendedSettings> recommended_settings_{};
   float trial_bump_cv_{20.0f};
   float scan_time_cap_seconds_{90.0f};

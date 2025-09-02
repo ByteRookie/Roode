@@ -184,8 +184,7 @@ void Roode::register_server_endpoints() {
     log_request(request);
     if (!check_token_(request))
       return;
-    JsonDocument doc;
-    doc.reserve(512);
+    JsonDocument doc(512);
     doc["samples"] = samples;
     doc["filter_window"] = filter_window_;
     doc["filter_mode"] = static_cast<int>(filter_mode_);
@@ -224,8 +223,7 @@ void Roode::register_server_endpoints() {
     log_request(request);
     if (!check_token_(request))
       return;
-    JsonDocument doc;
-    doc.reserve(256);
+    JsonDocument doc(256);
     doc["running"] = scan_running;
     doc["session_id"] = scan_session_id_.c_str();
     doc["step"] = scan_step_;
@@ -244,8 +242,7 @@ void Roode::register_server_endpoints() {
     log_request(request);
     if (!check_token_(request))
       return;
-    JsonDocument doc;
-    doc.reserve(128);
+    JsonDocument doc(128);
     if (!scan_running) {
       scan_cancel_requested = false;
       scan_running = true;
@@ -272,8 +269,7 @@ void Roode::register_server_endpoints() {
     if (!check_token_(request))
       return;
     scan_cancel_requested = true;
-    JsonDocument doc;
-    doc.reserve(128);
+    JsonDocument doc(128);
     doc["cancelled"] = true;
     doc["session_id"] = scan_session_id_.c_str();
     std::string out;
@@ -289,8 +285,7 @@ void Roode::register_server_endpoints() {
     log_request(request);
     if (!check_token_(request))
       return;
-    JsonDocument doc;
-    doc.reserve(512);
+    JsonDocument doc(512);
     if (recommended_settings_.has_value()) {
       JsonObject entry_cfg = doc["entry"].to<JsonObject>();
       JsonObject entry_roi = entry_cfg["roi"].to<JsonObject>();
@@ -348,8 +343,7 @@ void Roode::register_server_endpoints() {
     if (!check_token_(request))
       return;
     bool ok = this->apply_recommended_settings();
-    JsonDocument doc;
-    doc.reserve(128);
+    JsonDocument doc(128);
     doc["ok"] = ok;
     if (!ok)
       doc["error"] = "no_recommendation";
@@ -367,8 +361,7 @@ void Roode::register_server_endpoints() {
     if (!check_token_(request))
       return;
     size_t doc_size = sessions_.size() * 128 + 128;
-    JsonDocument doc;
-    doc.reserve(doc_size);
+    JsonDocument doc(doc_size);
     JsonArray arr = doc["sessions"].to<JsonArray>();
     for (const auto &s : sessions_) {
       JsonObject obj = arr.add<JsonObject>();
@@ -400,8 +393,7 @@ void Roode::register_server_endpoints() {
       }
     }
     size_t doc_size = found ? MAX_SESSION_DATA + 128 : 64;
-    JsonDocument doc;
-    doc.reserve(doc_size);
+    JsonDocument doc(doc_size);
     if (found) {
       doc["id"] = found->id;
       doc["timestamp"] = format_epoch(found->timestamp).c_str();
@@ -432,8 +424,7 @@ void Roode::register_server_endpoints() {
     sessions_.clear();
     session_next_ = 0;
     session_index_pref_.save(&session_next_);
-    JsonDocument doc;
-    doc.reserve(64);
+    JsonDocument doc(64);
     doc["deleted"] = true;
     std::string out;
     serializeJson(doc, out);
@@ -449,8 +440,7 @@ void Roode::register_server_endpoints() {
     if (!check_token_(request))
       return;
     size_t doc_size = sessions_.size() * (MAX_SESSION_DATA + 128) + 128;
-    JsonDocument doc;
-    doc.reserve(doc_size);
+    JsonDocument doc(doc_size);
     JsonArray arr = doc["sessions"].to<JsonArray>();
     for (const auto &s : sessions_) {
       JsonObject obj = arr.add<JsonObject>();

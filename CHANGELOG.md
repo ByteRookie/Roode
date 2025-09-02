@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.7
+- Persist web portal toggle state across reboots, defaulting to off when unset
+
 ## 1.6.6
 - Ensure portal server starts reliably on port 8080 and log all web requests
 - Drop legacy web server integration and serve API endpoints from the portal server

@@ -15,7 +15,7 @@
 #include <ESPAsyncWebServer.h>
 #include <pgmspace.h>
 static const char portal_html[] PROGMEM =
-#include "web/portal.html"
+#include "web/portal.h"
     ;
 
 namespace esphome {

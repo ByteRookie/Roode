@@ -318,10 +318,14 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
   }
 
   async function fetchLog(){
-    if(!status || !status.id || status.id === '—') return;
-    const sess = await getJSON(`/api/scan/session/${encodeURIComponent(status.id)}${tokenParam}`).catch(()=>null);
-    const txt = (sess && sess.data) ? sess.data : '';
-    $('#logBox').textContent = txt;
+    try {
+      const r = await fetch(`/api/system/logs${tokenParam}`, {cache:'no-store', headers: TOKEN_HEADER});
+      if(!r.ok) throw new Error(r.status + ' ' + r.statusText);
+      const txt = await r.text();
+      $('#logBox').textContent = txt;
+    } catch(e) {
+      showError(e.message);
+    }
   }
 
   // Polling

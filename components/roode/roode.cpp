@@ -13,7 +13,7 @@
 #include <cstdlib>
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
-#include "esphome/core/pgmspace.h"
+#include <pgmspace.h>
 static const char portal_html[] PROGMEM = R"PORTAL(
 #include "web/portal.html"
 )PORTAL";

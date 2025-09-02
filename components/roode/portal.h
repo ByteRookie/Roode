@@ -302,7 +302,7 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
         last_calibration: stat.last_calibration
       };
     }
-    if(list) sessions = list;
+    if(list) sessions = list.sessions || list;
     // Only show preview if we have one (typically after completion)
     preview = prev || null;
 
@@ -315,7 +315,8 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     btn.disabled = true;
     try {
       const r = await postJSON('/api/scan/start');
-      if(r && r.id){ status = {state:'Scanning', id:r.id, step:'8×8 Scan', progress:0}; renderStatus(); }
+      const id = r && (r.id || r.session_id);
+      if(id){ status = {state:'Scanning', id, step:'8×8 Scan', progress:0}; renderStatus(); }
     } finally {
       btn.disabled = false;
     }

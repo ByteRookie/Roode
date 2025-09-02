@@ -246,15 +246,25 @@ void Roode::register_server_endpoints() {
     DynamicJsonDocument doc(128);
     if (!scan_running) {
       scan_cancel_requested = false;
-      scan_running = true;
+      // Prepare a session id and launch the potentially long running scan in
+      // its own task so that the web server can continue to serve status
+      // updates.
       scan_session_id_ = std::to_string(millis());
-      this->start_passive_scan();
-      scan_running = false;
+      scan_running = true;
+      xTaskCreate(
+          [](void *param) {
+            auto *self = static_cast<Roode *>(param);
+            self->start_passive_scan();
+            vTaskDelete(nullptr);
+          },
+          "ScanTask", 4096, this, 1, nullptr);
       doc["started"] = true;
       doc["session_id"] = scan_session_id_.c_str();
+      doc["id"] = scan_session_id_.c_str();
     } else {
       doc["started"] = false;
       doc["session_id"] = scan_session_id_.c_str();
+      doc["id"] = scan_session_id_.c_str();
     }
     std::string out;
     serializeJson(doc, out);
@@ -1235,7 +1245,8 @@ void Roode::start_passive_scan() {
   current_session_blob_.clear();
   scan_cancel_requested = false;
   scan_running = true;
-  scan_session_id_ = std::to_string(scan_start_ts_);
+  if (scan_session_id_.empty())
+    scan_session_id_ = std::to_string(scan_start_ts_);
   const std::vector<int> grids{4, 8, 16};
   const char *modes[] = {"short", "medium", "long"};
   constexpr int base_trials = 3;

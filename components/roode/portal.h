@@ -187,7 +187,10 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
   async function getJSON(url){
     try {
       const r = await fetch(url, {cache:'no-store', headers: TOKEN_HEADER});
-      if(!r.ok) throw new Error(r.status + ' ' + r.statusText);
+      if(!r.ok){
+        if(r.status===404) return null;
+        throw new Error(r.status + ' ' + r.statusText);
+      }
       return await r.json();
     } catch(e) {
       showError(e.message);
@@ -215,6 +218,7 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     $('#stepText').textContent = st.step || '—';
     $('#progressBar').style.width = (st.progress||0)+'%';
     $('#btnCancel').style.display = (st.state==='Scanning') ? 'inline-block' : 'none';
+    $('#btnStart').style.display = (st.state==='Scanning') ? 'none' : 'inline-block';
     if (st.last_calibration !== undefined) {
       const txt = st.last_calibration
         ? new Date(st.last_calibration).toLocaleString()
@@ -284,29 +288,41 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     });
   }
 
+  // Translate numeric scan step into description
+  function describeStep(step){
+    const grids = ['4×4 Scan','8×8 Scan','16×16 Scan'];
+    if(step == null) return '—';
+    const idx = Math.floor(step / 15);
+    return grids[idx] || 'Analyzing';
+  }
+
   // Polling
   async function poll(){
-    const [cur, stat, list, prev] = await Promise.all([
-      getJSON('/api/settings/current'),
-      getJSON('/api/scan/status'),
-      getJSON('/api/scan/sessions'),
-      getJSON('/api/roi/preview')
-    ]);
-    if(cur) current = cur;
-    if(stat) {
-      status = {
-        state: stat.running ? 'Scanning' : 'Idle',
-        id: stat.session_id || '—',
-        step: stat.step || '—',
-        progress: stat.progress || 0,
-        last_calibration: stat.last_calibration
-      };
-    }
-    if(list) sessions = list.sessions || list;
-    // Only show preview if we have one (typically after completion)
-    preview = prev || null;
+    try {
+      const [cur, stat, list, prev] = await Promise.all([
+        getJSON('/api/settings/current'),
+        getJSON('/api/scan/status'),
+        getJSON('/api/scan/sessions'),
+        getJSON('/api/roi/preview')
+      ]);
+      if(cur) current = cur;
+      if(stat) {
+        status = {
+          state: stat.running ? 'Scanning' : 'Idle',
+          id: stat.session_id || '—',
+          step: stat.running ? describeStep(stat.step) : '—',
+          progress: (stat.progress || 0) * 100,
+          last_calibration: stat.last_calibration
+        };
+      }
+      if(list) sessions = list.sessions || list;
+      // Only show preview if we have one (typically after completion)
+      preview = prev || null;
 
-    renderStatus(); renderCurrent(); renderPreview(); renderSessions();
+      renderStatus(); renderCurrent(); renderPreview(); renderSessions();
+    } catch(e) {
+      showError(e.message);
+    }
   }
 
   // Actions
@@ -316,7 +332,7 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     try {
       const r = await postJSON('/api/scan/start');
       const id = r && (r.id || r.session_id);
-      if(id){ status = {state:'Scanning', id, step:'8×8 Scan', progress:0}; renderStatus(); }
+      if(id){ status = {state:'Scanning', id, step:'4×4 Scan', progress:0}; renderStatus(); }
     } finally {
       btn.disabled = false;
     }

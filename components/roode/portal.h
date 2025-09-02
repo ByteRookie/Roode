@@ -49,6 +49,8 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     .right{margin-left:auto}
     .hr{height:1px;background:var(--line);margin:12px 0}
     .muted{color:var(--muted)}
+    #logBox{background:#0f1520;color:var(--text)}
+    @media (prefers-color-scheme: light){#logBox{background:#f6f8fa;color:var(--text)}}
   </style>
 </head>
 <body>
@@ -78,7 +80,9 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
         </div>
         <div class="hr"></div>
         <button class="btn" id="btnLog">Show Log</button>
-        <pre id="logBox" class="mono" style="display:none;max-height:200px;overflow:auto;background:#0f1520;border:1px solid var(--line);padding:8px;border-radius:8px;margin-top:8px"></pre>
+        <button class="btn" id="btnCopyLog" style="display:none">Copy Log</button>
+        <button class="btn" id="btnClearLog" style="display:none">Clear Log</button>
+        <pre id="logBox" class="mono" style="display:none;max-height:200px;overflow:auto;border:1px solid var(--line);padding:8px;border-radius:8px;margin-top:8px"></pre>
       </div>
 
       <!-- Current Settings -->
@@ -346,12 +350,16 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
           step: stat.running ? describeStep(stat.step) : '—',
           progress: stat.running ? (stat.progress || 0) * 100 : 0,
           remaining: stat.time_remaining,
-          last_calibration: stat.last_calibration
+          last_calibration: stat.last_calibration,
+          error: stat.error
         };
       } else {
-        status = {state:'Idle', id:status?.id || '—', step:'—', progress:0, remaining:0};
+        status = {state:'Idle', id:status?.id || '—', step:'—', progress:0, remaining:0, error:status?.error};
       }
-      if(wasScanning && status.state !== 'Scanning') showSuccess('Calibration complete');
+      if(wasScanning && status.state !== 'Scanning'){
+        if(status.error) showError(status.error);
+        else showSuccess('Calibration complete');
+      }
       if(list) sessions = list.sessions || list;
       preview = prev || null;
 
@@ -369,7 +377,7 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     try {
       const r = await postJSON('/api/scan/start');
       const id = r && (r.id || r.session_id);
-      if(id){ status = {state:'Scanning', id, step:'4×4 Scan', progress:0, remaining:0}; renderStatus(); }
+      if(id){ status = {state:'Scanning', id, step:'4×4 Scan', progress:0, remaining:0, error:null}; renderStatus(); }
     } finally {
       btn.disabled = false;
     }
@@ -379,8 +387,9 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     btn.disabled = true;
     try {
       await postJSON('/api/scan/cancel');
-      status = {state:'Idle', id:status?.id || '—', step:'—', progress:0, remaining:0};
+      status = {state:'Idle', id:status?.id || '—', step:'—', progress:0, remaining:0, error:'Scan cancelled'};
       renderStatus();
+      showError('Scan cancelled');
     } finally {
       btn.disabled = false;
     }
@@ -389,7 +398,16 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     logVisible = !logVisible;
     $('#logBox').style.display = logVisible ? 'block' : 'none';
     $('#btnLog').textContent = logVisible ? 'Hide Log' : 'Show Log';
+    $('#btnCopyLog').style.display = logVisible ? 'inline-block' : 'none';
+    $('#btnClearLog').style.display = logVisible ? 'inline-block' : 'none';
     if(logVisible) await fetchLog();
+  });
+  $('#btnCopyLog').addEventListener('click', ()=>{
+    const txt = $('#logBox').textContent;
+    navigator.clipboard.writeText(txt);
+  });
+  $('#btnClearLog').addEventListener('click', ()=>{
+    $('#logBox').textContent = '';
   });
   $('#btnApply').addEventListener('click', async (e)=>{
     const btn = e.target;

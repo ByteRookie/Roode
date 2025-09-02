@@ -270,6 +270,7 @@ void Roode::register_server_endpoints() {
     doc["session_id"] = scan_session_id_.c_str();
     doc["step"] = scan_step_;
     doc["progress"] = scan_progress_;
+    doc["error"] = scan_error_msg_.c_str();
     double elapsed = scan_running ? (millis() - scan_start_ts_) / 1000.0 : 0.0;
     double remaining = (scan_running && scan_progress_ > 0.0f && scan_progress_ < 1.0f)
                            ? elapsed * (1.0 - scan_progress_) / scan_progress_
@@ -293,6 +294,7 @@ void Roode::register_server_endpoints() {
     DynamicJsonDocument doc(128);
     if (!scan_running) {
       scan_cancel_requested = false;
+      scan_error_msg_.clear();
       // Prepare a session id and launch the potentially long running scan in
       // its own task so that the web server can continue to serve status
       // updates.
@@ -1312,6 +1314,7 @@ void Roode::start_passive_scan() {
   scan_step_ = 0;
   scan_total_steps_ = grids.size() * (sizeof(modes) / sizeof(modes[0])) * max_trials;
   scan_progress_ = 0.0f;
+  scan_error_msg_.clear();
   recommended_settings_.reset();
   struct ScanGroup {
     int grid;
@@ -1323,6 +1326,7 @@ void Roode::start_passive_scan() {
   for (int grid : grids) {
     if (scan_cancel_requested) {
       publish_scan_record("scan_cancel");
+      scan_error_msg_ = "Scan cancelled";
       scan_running = false;
       return;
     }
@@ -1336,6 +1340,7 @@ void Roode::start_passive_scan() {
     for (const char *mode : modes) {
       if (scan_cancel_requested) {
         publish_scan_record("scan_cancel");
+        scan_error_msg_ = "Scan cancelled";
         scan_running = false;
         return;
       }
@@ -1350,6 +1355,7 @@ void Roode::start_passive_scan() {
       for (int trial = 1; trial <= max_trials; ++trial) {
         if (scan_cancel_requested) {
           publish_scan_record("scan_cancel");
+          scan_error_msg_ = "Scan cancelled";
           scan_running = false;
           return;
         }
@@ -1363,15 +1369,16 @@ void Roode::start_passive_scan() {
             retries++;
             if (scan_cancel_requested) {
               publish_scan_record("scan_cancel");
+              scan_error_msg_ = "Scan cancelled";
               scan_running = false;
               return;
             }
           }
           if (presence_sensor->state) {
-            ESP_LOGE(TAG, "Presence did not clear, aborting scan");
-            publish_scan_record("scan_presence_abort");
-            scan_running = false;
-            return;
+            ESP_LOGW(TAG, "Presence did not clear, forcing reset");
+            log_event("scan_presence_force_clear");
+            publish_scan_record("scan_presence_force_clear");
+            presence_sensor->publish_state(false);
           }
         }
         std::vector<int> mcps(grid * grid, 0);

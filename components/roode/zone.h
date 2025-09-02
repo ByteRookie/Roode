@@ -37,7 +37,7 @@ class Zone {
   void dump_config() const;
   VL53L1_Error readDistance(TofSensor *distanceSensor);
   void reset_roi(uint8_t default_center);
-  void calibrateThreshold(TofSensor *distanceSensor, int number_attempts);
+  bool calibrateThreshold(TofSensor *distanceSensor, int number_attempts);
   void roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Orientation orientation);
   void set_threshold_percentages(uint8_t min_percent, uint8_t max_percent);
   const uint8_t id;

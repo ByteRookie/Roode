@@ -889,23 +889,23 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;
   z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
-  const uint8_t max_attempts = 3;
-  bool success = false;
-  for (uint8_t attempt = 1; attempt <= max_attempts; attempt++) {
-    z->calibrateThreshold(distanceSensor, 50);
-    if (z->threshold->idle > 0) {
-      success = true;
-      break;
-    }
-    if (attempt < max_attempts) {
-      ESP_LOGW(CALIBRATION, "Calibration attempt %d for zone %d failed, restarting sensor", attempt, zone_id);
-      distanceSensor->restart();
-    }
-  }
-  if (!success) {
-    ESP_LOGE(CALIBRATION, "Calibration failed for zone %d after %d attempts. Manual intervention required.", zone_id,
-             max_attempts);
+
+  // Preserve previous calibration data in case calibration fails
+  CalibrationPrefs prev_cal = calibration_data_[zone_id];
+
+  bool calibrated = z->calibrateThreshold(distanceSensor, 50);
+  if (!calibrated || z->threshold->idle == 0) {
+    ESP_LOGE(CALIBRATION, "Calibration failed for zone %d. Restoring previous settings.", zone_id);
     log_event(std::string("zone_") + std::to_string(zone_id) + "_calibration_failed");
+
+    // Restore previous calibration values
+    z->threshold->idle = prev_cal.baseline_mm;
+    z->threshold->min = prev_cal.threshold_min_mm;
+    z->threshold->max = prev_cal.threshold_max_mm;
+    calibration_data_[zone_id] = prev_cal;
+
+    distanceSensor->restart();
+
     if (status_sensor != nullptr)
       status_sensor->publish_state(-1);
     update_status_text("calibration_failed");

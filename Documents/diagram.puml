@@ -24,7 +24,7 @@ class Configuration {
 
 class Zone {
     + Zone(Configuration *configuration)
-    + void calibrateThreshold(VL53L1X_ULD distanceSensor)
+    + bool calibrateThreshold(VL53L1X_ULD distanceSensor)
     + void calibrateRoi(VL53L1X_ULD distanceSensor)
     + uint16_t getMaxThreshold()
     + uint16_t getMinThreshold()

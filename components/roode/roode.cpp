@@ -889,7 +889,10 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;
   z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
-  z->calibrateThreshold(distanceSensor, 50);
+  if (!z->calibrateThreshold(distanceSensor, 50)) {
+    ESP_LOGW(CALIBRATION, "Calibration failed for zone %d", zone_id);
+    return;
+  }
   // Recalculate ROI sizes so thresholds remain consistent
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
   exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
@@ -1073,9 +1076,15 @@ void Roode::calibrate_zones() {
   calibrateDistance();
 
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-  entry->calibrateThreshold(distanceSensor, 50);
+  if (!entry->calibrateThreshold(distanceSensor, 50)) {
+    ESP_LOGW(CALIBRATION, "Entry zone calibration failed");
+    return;
+  }
   exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-  exit->calibrateThreshold(distanceSensor, 50);
+  if (!exit->calibrateThreshold(distanceSensor, 50)) {
+    ESP_LOGW(CALIBRATION, "Exit zone calibration failed");
+    return;
+  }
 
   publish_sensor_configuration(entry, exit, true);
   App.feed_wdt();
@@ -1097,8 +1106,12 @@ void Roode::calibrateDistance() {
   auto *const initial = distanceSensor->get_ranging_mode_override().value_or(Ranging::Longest);
   distanceSensor->set_ranging_mode(initial);
 
-  entry->calibrateThreshold(distanceSensor, 50);
-  exit->calibrateThreshold(distanceSensor, 50);
+  bool entry_ok = entry->calibrateThreshold(distanceSensor, 50);
+  bool exit_ok = exit->calibrateThreshold(distanceSensor, 50);
+  if (!entry_ok || !exit_ok) {
+    ESP_LOGW(CALIBRATION, "Distance calibration failed");
+    return;
+  }
 
   if (distanceSensor->get_ranging_mode_override().has_value()) {
     return;

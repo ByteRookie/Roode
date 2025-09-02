@@ -70,37 +70,43 @@ void Zone::reset_roi(uint8_t default_center) {
   roi->center = roi_override->center ?: default_center;
 }
 
-void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
+bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
+  Threshold prev = *threshold;
   std::vector<int> zone_distances;
   zone_distances.reserve(number_attempts);
   int sum = 0;
+  bool any_failed = false;
   for (int i = 0; i < number_attempts; i++) {
     this->readDistance(distanceSensor);
     if (sensor_status != VL53L1_ERROR_NONE) {
       ESP_LOGW(CALIBRATION, "Distance read failed during calibration. status: %d", sensor_status);
+      any_failed = true;
       break;
     }
     zone_distances.push_back(this->getDistance());
     sum += zone_distances.back();
-  };
-  if (zone_distances.empty()) {
-    threshold->idle = 0;
-    ESP_LOGW(CALIBRATION, "Calibration failed: no valid distances recorded");
-  } else {
-    int avg = sum / zone_distances.size();
-    threshold->idle = avg;
-    uint8_t max_pct = threshold->max_percentage.value_or(80);
-    uint8_t min_pct = threshold->min_percentage.value_or(15);
-    threshold->max_percentage = max_pct;
-    threshold->min_percentage = min_pct;
-    threshold->max = (avg * max_pct) / 100;
-    threshold->min = (avg * min_pct) / 100;
   }
+  if (zone_distances.empty() || any_failed) {
+    *threshold = prev;
+    distanceSensor->restart();
+    ESP_LOGW(CALIBRATION, "Calibration failed: reverting to previous thresholds");
+    return false;
+  }
+
+  int avg = sum / zone_distances.size();
+  threshold->idle = avg;
+  uint8_t max_pct = threshold->max_percentage.value_or(80);
+  uint8_t min_pct = threshold->min_percentage.value_or(15);
+  threshold->max_percentage = max_pct;
+  threshold->min_percentage = min_pct;
+  threshold->max = (avg * max_pct) / 100;
+  threshold->min = (avg * min_pct) / 100;
 
   ESP_LOGI(CALIBRATION, "Calibrated threshold for zone. zoneId: %d, idle: %d, min: %d (%d%%), max: %d (%d%%)", id,
            threshold->idle, threshold->min,
            threshold->min_percentage.value_or((threshold->min * 100) / threshold->idle), threshold->max,
            threshold->max_percentage.value_or((threshold->max * 100) / threshold->idle));
+  return true;
 }
 
 void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Orientation orientation) {

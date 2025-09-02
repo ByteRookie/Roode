@@ -12,7 +12,6 @@
 #include <cstring>
 #include <cstdlib>
 #include <ArduinoJson.h>
-#define ASYNCWEBSERVER_REGEX 1
 #include <ESPAsyncWebServer.h>
 #include <pgmspace.h>
 #include "portal.h"
@@ -184,7 +183,7 @@ void Roode::register_server_endpoints() {
     log_request(request);
     if (!check_token_(request))
       return;
-    JsonDocument doc(512);
+    DynamicJsonDocument doc(512);
     doc["samples"] = samples;
     doc["filter_window"] = filter_window_;
     doc["filter_mode"] = static_cast<int>(filter_mode_);
@@ -192,21 +191,21 @@ void Roode::register_server_endpoints() {
     doc["invert_direction"] = invert_direction_;
     doc["firmware"] = VERSION;
     doc["last_calibration"] = format_timestamp(last_calibration_sec_);
-    JsonObject entry_cfg = doc["entry"].to<JsonObject>();
-    JsonObject entry_roi = entry_cfg["roi"].to<JsonObject>();
+    JsonObject entry_cfg = doc.createNestedObject("entry");
+    JsonObject entry_roi = entry_cfg.createNestedObject("roi");
     entry_roi["center"] = entry->roi->center;
     entry_roi["width"] = entry->roi->width;
     entry_roi["height"] = entry->roi->height;
-    JsonObject entry_thr = entry_cfg["threshold"].to<JsonObject>();
+    JsonObject entry_thr = entry_cfg.createNestedObject("threshold");
     entry_thr["min"] = entry->threshold->min;
     entry_thr["max"] = entry->threshold->max;
     entry_thr["idle"] = entry->threshold->idle;
-    JsonObject exit_cfg = doc["exit"].to<JsonObject>();
-    JsonObject exit_roi = exit_cfg["roi"].to<JsonObject>();
+    JsonObject exit_cfg = doc.createNestedObject("exit");
+    JsonObject exit_roi = exit_cfg.createNestedObject("roi");
     exit_roi["center"] = exit->roi->center;
     exit_roi["width"] = exit->roi->width;
     exit_roi["height"] = exit->roi->height;
-    JsonObject exit_thr = exit_cfg["threshold"].to<JsonObject>();
+    JsonObject exit_thr = exit_cfg.createNestedObject("threshold");
     exit_thr["min"] = exit->threshold->min;
     exit_thr["max"] = exit->threshold->max;
     exit_thr["idle"] = exit->threshold->idle;
@@ -223,7 +222,7 @@ void Roode::register_server_endpoints() {
     log_request(request);
     if (!check_token_(request))
       return;
-    JsonDocument doc(256);
+    DynamicJsonDocument doc(256);
     doc["running"] = scan_running;
     doc["session_id"] = scan_session_id_.c_str();
     doc["step"] = scan_step_;
@@ -242,7 +241,7 @@ void Roode::register_server_endpoints() {
     log_request(request);
     if (!check_token_(request))
       return;
-    JsonDocument doc(128);
+    DynamicJsonDocument doc(128);
     if (!scan_running) {
       scan_cancel_requested = false;
       scan_running = true;
@@ -269,7 +268,7 @@ void Roode::register_server_endpoints() {
     if (!check_token_(request))
       return;
     scan_cancel_requested = true;
-    JsonDocument doc(128);
+    DynamicJsonDocument doc(128);
     doc["cancelled"] = true;
     doc["session_id"] = scan_session_id_.c_str();
     std::string out;
@@ -285,42 +284,42 @@ void Roode::register_server_endpoints() {
     log_request(request);
     if (!check_token_(request))
       return;
-    JsonDocument doc(512);
+    DynamicJsonDocument doc(512);
     if (recommended_settings_.has_value()) {
-      JsonObject entry_cfg = doc["entry"].to<JsonObject>();
-      JsonObject entry_roi = entry_cfg["roi"].to<JsonObject>();
+      JsonObject entry_cfg = doc.createNestedObject("entry");
+      JsonObject entry_roi = entry_cfg.createNestedObject("roi");
       entry_roi["center"] = recommended_settings_->entry_roi.center;
       entry_roi["width"] = recommended_settings_->entry_roi.width;
       entry_roi["height"] = recommended_settings_->entry_roi.height;
-      JsonObject entry_thr = entry_cfg["threshold"].to<JsonObject>();
+      JsonObject entry_thr = entry_cfg.createNestedObject("threshold");
       entry_thr["min"] = recommended_settings_->entry_threshold_min;
       entry_thr["max"] = recommended_settings_->entry_threshold_max;
-      JsonObject exit_cfg = doc["exit"].to<JsonObject>();
-      JsonObject exit_roi = exit_cfg["roi"].to<JsonObject>();
+      JsonObject exit_cfg = doc.createNestedObject("exit");
+      JsonObject exit_roi = exit_cfg.createNestedObject("roi");
       exit_roi["center"] = recommended_settings_->exit_roi.center;
       exit_roi["width"] = recommended_settings_->exit_roi.width;
       exit_roi["height"] = recommended_settings_->exit_roi.height;
-      JsonObject exit_thr = exit_cfg["threshold"].to<JsonObject>();
+      JsonObject exit_thr = exit_cfg.createNestedObject("threshold");
       exit_thr["min"] = recommended_settings_->exit_threshold_min;
       exit_thr["max"] = recommended_settings_->exit_threshold_max;
       doc["samples"] = recommended_settings_->samples;
       doc["firmware"] = recommended_settings_->firmware.c_str();
       doc["ranging_mode"] = recommended_settings_->ranging_mode.c_str();
     } else {
-      JsonObject entry_cfg = doc["entry"].to<JsonObject>();
-      JsonObject entry_roi = entry_cfg["roi"].to<JsonObject>();
+      JsonObject entry_cfg = doc.createNestedObject("entry");
+      JsonObject entry_roi = entry_cfg.createNestedObject("roi");
       entry_roi["center"] = entry->roi->center;
       entry_roi["width"] = entry->roi->width;
       entry_roi["height"] = entry->roi->height;
-      JsonObject entry_thr = entry_cfg["threshold"].to<JsonObject>();
+      JsonObject entry_thr = entry_cfg.createNestedObject("threshold");
       entry_thr["min"] = entry->threshold->min;
       entry_thr["max"] = entry->threshold->max;
-      JsonObject exit_cfg = doc["exit"].to<JsonObject>();
-      JsonObject exit_roi = exit_cfg["roi"].to<JsonObject>();
+      JsonObject exit_cfg = doc.createNestedObject("exit");
+      JsonObject exit_roi = exit_cfg.createNestedObject("roi");
       exit_roi["center"] = exit->roi->center;
       exit_roi["width"] = exit->roi->width;
       exit_roi["height"] = exit->roi->height;
-      JsonObject exit_thr = exit_cfg["threshold"].to<JsonObject>();
+      JsonObject exit_thr = exit_cfg.createNestedObject("threshold");
       exit_thr["min"] = exit->threshold->min;
       exit_thr["max"] = exit->threshold->max;
       doc["samples"] = samples;
@@ -343,7 +342,7 @@ void Roode::register_server_endpoints() {
     if (!check_token_(request))
       return;
     bool ok = this->apply_recommended_settings();
-    JsonDocument doc(128);
+    DynamicJsonDocument doc(128);
     doc["ok"] = ok;
     if (!ok)
       doc["error"] = "no_recommendation";
@@ -361,10 +360,10 @@ void Roode::register_server_endpoints() {
     if (!check_token_(request))
       return;
     size_t doc_size = sessions_.size() * 128 + 128;
-    JsonDocument doc(doc_size);
-    JsonArray arr = doc["sessions"].to<JsonArray>();
+    DynamicJsonDocument doc(doc_size);
+    JsonArray arr = doc.createNestedArray("sessions");
     for (const auto &s : sessions_) {
-      JsonObject obj = arr.add<JsonObject>();
+      JsonObject obj = arr.createNestedObject();
       obj["id"] = s.id;
       obj["timestamp"] = format_epoch(s.timestamp).c_str();
       obj["trials"] = s.trials;
@@ -393,7 +392,7 @@ void Roode::register_server_endpoints() {
       }
     }
     size_t doc_size = found ? MAX_SESSION_DATA + 128 : 64;
-    JsonDocument doc(doc_size);
+    DynamicJsonDocument doc(doc_size);
     if (found) {
       doc["id"] = found->id;
       doc["timestamp"] = format_epoch(found->timestamp).c_str();
@@ -424,7 +423,7 @@ void Roode::register_server_endpoints() {
     sessions_.clear();
     session_next_ = 0;
     session_index_pref_.save(&session_next_);
-    JsonDocument doc(64);
+    DynamicJsonDocument doc(64);
     doc["deleted"] = true;
     std::string out;
     serializeJson(doc, out);
@@ -440,10 +439,10 @@ void Roode::register_server_endpoints() {
     if (!check_token_(request))
       return;
     size_t doc_size = sessions_.size() * (MAX_SESSION_DATA + 128) + 128;
-    JsonDocument doc(doc_size);
-    JsonArray arr = doc["sessions"].to<JsonArray>();
+    DynamicJsonDocument doc(doc_size);
+    JsonArray arr = doc.createNestedArray("sessions");
     for (const auto &s : sessions_) {
-      JsonObject obj = arr.add<JsonObject>();
+      JsonObject obj = arr.createNestedObject();
       obj["id"] = s.id;
       obj["timestamp"] = format_epoch(s.timestamp).c_str();
       obj["trials"] = s.trials;
@@ -494,7 +493,7 @@ void Roode::setup() {
       ESP_LOGW(TAG, "Portal auth failed from %s", request->client()->remoteIP().toString().c_str());
       return request->requestAuthentication();
     }
-    request->send(200, "text/html", portal_html);
+    request->send_P(200, "text/html", portal_html);
   });
   register_server_endpoints();
   ESP_LOGI(TAG, "Starting portal web server on port 8080");

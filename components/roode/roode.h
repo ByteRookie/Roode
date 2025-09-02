@@ -74,6 +74,11 @@ struct RecommendedSettings {
   std::string ranging_mode;
 };
 
+class PortalSwitch : public switch_::Switch {
+ public:
+  void write_state(bool state) override { this->publish_state(state); }
+};
+
 class Roode : public PollingComponent, public api::CustomAPIDevice {
  public:
   Roode() { instance_ = this; }

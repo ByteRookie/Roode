@@ -2,17 +2,19 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import switch
 from esphome.const import CONF_ID
-from . import Roode, CONF_ROODE_ID
+from . import Roode, CONF_ROODE_ID, roode_ns
 
 DEPENDENCIES = ["roode"]
 
 CONF_WEB_PORTAL = "web_portal"
 
+PortalSwitch = roode_ns.class_("PortalSwitch", switch.Switch)
+
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
         cv.Optional(CONF_WEB_PORTAL): switch.switch_schema(
-            switch.Switch, icon="mdi:web"
+            PortalSwitch, icon="mdi:web"
         ),
     }
 )

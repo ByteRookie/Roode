@@ -27,7 +27,7 @@ namespace esphome {
 namespace roode {
 #define NOBODY 0
 #define SOMEONE 1
-#define VERSION "1.6.5"
+#define VERSION "1.6.6"
 static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
@@ -212,9 +212,7 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   AsyncWebServer *portal_server_{nullptr};
   std::string web_username_{};
   std::string web_password_{};
-#ifdef USE_WEB_SERVER
   bool check_token_(AsyncWebServerRequest *request);
-#endif
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;

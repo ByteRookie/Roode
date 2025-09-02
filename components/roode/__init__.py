@@ -27,6 +27,7 @@ AUTO_LOAD = [
     "number",
     "button",
     "template",
+    "async_tcp",
 ]
 MULTI_CONF = True
 
@@ -161,6 +162,9 @@ CONFIG_SCHEMA = cv.Schema(
 
 async def to_code(config: Dict):
     cg.add_library("bblanchon", "6.21.3", "ArduinoJson")
+    cg.add_library("ESP32Async/ESPAsyncWebServer", "3.7.10")
+    cg.add_library("WiFi", None)
+    cg.add_library("FS", None)
 
     roode = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(roode, config)

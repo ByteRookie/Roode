@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.6
+- Ensure portal server starts reliably on port 8080 and log all web requests
+- Drop legacy web server integration and serve API endpoints from the portal server
+
 ## 1.6.5
 - Move calibration portal to dedicated web server on port 8080 with HTTP basic auth
 - Use `portal_password` token only for securing API endpoints

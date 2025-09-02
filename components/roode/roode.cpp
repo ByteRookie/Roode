@@ -889,7 +889,19 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;
   z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
-  z->calibrateThreshold(distanceSensor, 50);
+
+  CalibrationData previous = calibration_data_[zone_id];
+  bool calibrated = z->calibrateThreshold(distanceSensor, 50);
+  if (!calibrated || z->threshold->idle == 0) {
+    ESP_LOGW(CALIBRATION, "Calibration failed for zone %d", zone_id);
+    z->threshold->idle = previous.baseline_mm;
+    z->threshold->min = previous.threshold_min_mm;
+    z->threshold->max = previous.threshold_max_mm;
+    calibration_data_[zone_id] = previous;
+    distanceSensor->restart();
+    return;
+  }
+
   // Recalculate ROI sizes so thresholds remain consistent
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
   exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);

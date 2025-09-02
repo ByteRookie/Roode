@@ -418,8 +418,10 @@ void Roode::register_server_endpoints() {
     log_request(request);
     if (!check_token_(request))
       return;
-    for (int i = 0; i < MAX_SCAN_SESSIONS; i++)
-      session_prefs_[i].erase();
+    for (int i = 0; i < MAX_SCAN_SESSIONS; i++) {
+      ScanSession empty{};
+      session_prefs_[i].save(&empty);
+    }
     sessions_.clear();
     session_next_ = 0;
     session_index_pref_.save(&session_next_);

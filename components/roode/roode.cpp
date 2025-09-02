@@ -1,7 +1,6 @@
 #include "roode.h"
 #include "Arduino.h"
 #include <string>
-#include <optional>
 #include <vector>
 #include <algorithm>
 #include <cmath>
@@ -17,7 +16,7 @@
 #ifdef USE_WEB_SERVER
 #include "esphome/components/web_server_base/web_server_base.h"
 #endif
-#include "esphome/core/pgmspace.h"
+#include <pgmspace.h>
 static const char portal_html[] PROGMEM = R"PORTAL(
 #include "web/portal.html"
 )PORTAL";

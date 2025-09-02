@@ -435,7 +435,7 @@ void Roode::register_server_endpoints(AsyncWebServer *srv) {
     if (!check_token_(request))
       return;
     for (int i = 0; i < MAX_SCAN_SESSIONS; i++)
-      session_prefs_[i].erase();
+      session_prefs_[i].remove();
     sessions_.clear();
     session_next_ = 0;
     session_index_pref_.save(&session_next_);
@@ -471,7 +471,6 @@ void Roode::register_server_endpoints(AsyncWebServer *srv) {
   });
   srv->addHandler(export_all_handler);
 }
-#endif
 
 void Roode::set_auto_calibration_interval_sec(uint32_t sec) { auto_calibration_interval_sec_ = sec; }
 void Roode::dump_config() {

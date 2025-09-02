@@ -18,6 +18,7 @@
 #include "zone.h"
 
 #ifdef USE_WEB_SERVER
+class AsyncWebServer;
 class AsyncWebServerRequest;
 #endif
 
@@ -28,7 +29,7 @@ namespace esphome {
 namespace roode {
 #define NOBODY 0
 #define SOMEONE 1
-#define VERSION "1.6.3"
+#define VERSION "1.6.5"
 static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
@@ -173,6 +174,8 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
 
   bool apply_recommended_settings();
   void set_portal_password(const std::string &password) { portal_password_ = password; }
+  void set_web_username(const std::string &username) { web_username_ = username; }
+  void set_web_password(const std::string &password) { web_password_ = password; }
 
  protected:
   TofSensor *distanceSensor;
@@ -206,8 +209,11 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   sensor::Sensor *scan_time_cap_seconds_sensor{nullptr};
 
   void register_server_endpoints();
-  bool portal_registered_{false};
+  bool api_registered_{false};
   std::string portal_password_{};
+  AsyncWebServer *portal_server_{nullptr};
+  std::string web_username_{};
+  std::string web_password_{};
 #ifdef USE_WEB_SERVER
   bool check_token_(AsyncWebServerRequest *request);
 #endif

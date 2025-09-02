@@ -149,6 +149,9 @@ void Roode::log_event(const std::string &msg) {
 Roode::~Roode() {
   delete entry;
   delete exit;
+#ifdef USE_WEB_SERVER
+  delete portal_server_;
+#endif
 }
 
 #ifdef USE_WEB_SERVER
@@ -169,31 +172,9 @@ bool Roode::check_token_(AsyncWebServerRequest *request) {
 
 void Roode::register_server_endpoints() {
 #ifdef USE_WEB_SERVER
-  if (portal_registered_ || web_server_base::global_web_server_base == nullptr)
+  if (api_registered_ || web_server_base::global_web_server_base == nullptr)
     return;
   auto *base = web_server_base::global_web_server_base;
-
-  auto *portal_handler = new AsyncCallbackWebHandler();
-  portal_handler->setUri("/portal");
-  portal_handler->setMethod(HTTP_GET);
-  portal_handler->onRequest([this](AsyncWebServerRequest *request) {
-    if (!check_token_(request))
-      return;
-    request->send_P(200, "text/html", portal_html);
-  });
-  base->add_handler(portal_handler);
-
-  auto *portal_slash_handler = new AsyncCallbackWebHandler();
-  portal_slash_handler->setUri("/portal/");
-  portal_slash_handler->setMethod(HTTP_GET);
-  portal_slash_handler->onRequest([this](AsyncWebServerRequest *request) {
-    if (!check_token_(request))
-      return;
-    request->send_P(200, "text/html", portal_html);
-  });
-  base->add_handler(portal_slash_handler);
-
-  portal_registered_ = true;
 
   auto *settings_handler = new AsyncCallbackWebHandler();
   settings_handler->setUri("/api/settings/current");
@@ -461,6 +442,7 @@ void Roode::register_server_endpoints() {
     request->send(200, "application/json", out.c_str());
   });
   base->add_handler(export_all_handler);
+  api_registered_ = true;
 #endif
 }
 
@@ -493,12 +475,21 @@ void Roode::setup() {
   this->register_service(&Roode::complete_calibration, "complete_calibration");
 #endif
 #ifdef USE_WEB_SERVER
+  portal_server_ = new AsyncWebServer(8080);
+  portal_server_->on("/", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    if (!web_username_.empty() && !request->authenticate(web_username_.c_str(), web_password_.c_str())) {
+      return request->requestAuthentication();
+    }
+    request->send_P(200, "text/html", portal_html);
+  });
+  portal_server_->begin();
+
   if (web_server_base::global_web_server_base != nullptr) {
     auto *base = web_server_base::global_web_server_base;
     register_server_endpoints();
     base->init();
   } else {
-    ESP_LOGW(TAG, "Web server base not initialized, portal not started");
+    ESP_LOGW(TAG, "Web server base not initialized, API not started");
   }
 #endif
   if (version_sensor != nullptr) {
@@ -654,7 +645,7 @@ void Roode::update() {
 
 void Roode::loop() {
 #ifdef USE_WEB_SERVER
-  if (!portal_registered_ && web_server_base::global_web_server_base != nullptr) {
+  if (!api_registered_ && web_server_base::global_web_server_base != nullptr) {
     auto *base = web_server_base::global_web_server_base;
     register_server_endpoints();
     base->init();

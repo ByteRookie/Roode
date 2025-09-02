@@ -27,13 +27,12 @@ Roode now exposes button entities to start a passive scan or force a recalibrati
 
 Roode ships with a web portal that serves a small HTML page and a
 REST API for configuration and calibration tasks. The portal starts
-automatically when the device boots.
+automatically when the device boots and listens on port 8080.
 
 ### Endpoints
 
-The portal exposes:
+The device exposes the following API endpoints on the main web server:
 
-- `/portal` or `/` – simple HTML configuration page.
 - `/api/settings/current` – current firmware and ROI settings.
 - `/api/scan/start` *(POST)* – start a passive scan.
 - `/api/scan/status` – progress of the active scan.
@@ -44,6 +43,8 @@ The portal exposes:
 - `/api/scan/session/<id>` – retrieve a specific session.
 - `/api/scan/delete` *(POST)* – delete all stored sessions.
 - `/api/export/all` – export all session data as JSON.
+
+Set `portal_password` in the `roode:` configuration to require a token for API requests. Clients supply it via a `token` query parameter or `X-Portal-Token` header. The web portal uses basic authentication via `web_username` and `web_password`.
 
 ## Passive Scan Trigger
 
@@ -60,7 +61,7 @@ scan and automatically applies the recommended ROI and thresholds.
 
 ## Calibration Portal
 
-Visit `http://<device>/portal` to access the built-in calibration portal.
+Visit `http://<device>:8080` to access the built-in calibration portal secured with HTTP basic authentication.
 The page provides buttons to start a passive
 scan, review the suggested region of interest and apply the result—no extra
 Lovelace views or helper scripts are required.

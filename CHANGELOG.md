@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.5
+- Move calibration portal to dedicated web server on port 8080 with HTTP basic auth
+- Use `portal_password` token only for securing API endpoints
+
 ## 1.6.4
 - Ensure calibration portal registers before the default web page so `/portal` shows the portal and the root URL redirects to it
 

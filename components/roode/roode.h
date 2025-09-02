@@ -8,6 +8,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/components/switch/switch.h"
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
@@ -174,6 +175,7 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   void set_portal_password(const std::string &password) { portal_password_ = password; }
   void set_web_username(const std::string &username) { web_username_ = username; }
   void set_web_password(const std::string &password) { web_password_ = password; }
+  void set_web_portal_switch(switch_::Switch *sw) { portal_switch = sw; }
 
  protected:
   TofSensor *distanceSensor;
@@ -213,6 +215,9 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   std::string web_username_{};
   std::string web_password_{};
   bool check_token_(AsyncWebServerRequest *request);
+  switch_::Switch *portal_switch{nullptr};
+  void start_portal_server();
+  void stop_portal_server();
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;

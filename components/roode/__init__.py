@@ -25,6 +25,7 @@ AUTO_LOAD = [
     "binary_sensor",
     "text_sensor",
     "number",
+    "switch",
     "button",
     "template",
     "async_tcp",
@@ -141,7 +142,6 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_TRIAL_BUMP_CV, default=0.20): cv.percentage,
-
         cv.Optional(CONF_SCAN_TIME_CAP_SECONDS, default=90.0): cv.All(
             cv.positive_float, cv.Range(min=60.0, max=180.0)
         ),
@@ -199,9 +199,7 @@ async def to_code(config: Dict):
     }
     complete_button = await button.new_button(btn_conf)
     cg.add(
-        complete_button.set_entity_category(
-            cg.EntityCategory.ENTITY_CATEGORY_CONFIG
-        )
+        complete_button.set_entity_category(cg.EntityCategory.ENTITY_CATEGORY_CONFIG)
     )
     cg.add(
         complete_button.add_on_press_callback(

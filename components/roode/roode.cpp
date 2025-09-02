@@ -147,7 +147,34 @@ void Roode::log_event(const std::string &msg) {
 Roode::~Roode() {
   delete entry;
   delete exit;
+  stop_portal_server();
+}
+
+void Roode::start_portal_server() {
+  if (portal_server_ != nullptr)
+    return;
+  portal_server_ = new AsyncWebServer(8080);
+  portal_server_->on("/", HTTP_GET, [this](AsyncWebServerRequest *request) {
+    ESP_LOGI(TAG, "Portal request from %s", request->client()->remoteIP().toString().c_str());
+    if (!web_username_.empty() && !request->authenticate(web_username_.c_str(), web_password_.c_str())) {
+      ESP_LOGW(TAG, "Portal auth failed from %s", request->client()->remoteIP().toString().c_str());
+      return request->requestAuthentication();
+    }
+    request->send_P(200, "text/html", portal_html);
+  });
+  register_server_endpoints();
+  ESP_LOGI(TAG, "Starting portal web server on port 8080");
+  portal_server_->begin();
+}
+
+void Roode::stop_portal_server() {
+  if (portal_server_ == nullptr)
+    return;
+  ESP_LOGI(TAG, "Stopping portal web server");
+  portal_server_->end();
   delete portal_server_;
+  portal_server_ = nullptr;
+  api_registered_ = false;
 }
 bool Roode::check_token_(AsyncWebServerRequest *request) {
   if (portal_password_.empty())
@@ -498,18 +525,17 @@ void Roode::setup() {
   this->register_service(&Roode::start_passive_scan, "start_passive_scan");
   this->register_service(&Roode::complete_calibration, "complete_calibration");
 #endif
-  portal_server_ = new AsyncWebServer(8080);
-  portal_server_->on("/", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    ESP_LOGI(TAG, "Portal request from %s", request->client()->remoteIP().toString().c_str());
-    if (!web_username_.empty() && !request->authenticate(web_username_.c_str(), web_password_.c_str())) {
-      ESP_LOGW(TAG, "Portal auth failed from %s", request->client()->remoteIP().toString().c_str());
-      return request->requestAuthentication();
-    }
-    request->send_P(200, "text/html", portal_html);
-  });
-  register_server_endpoints();
-  ESP_LOGI(TAG, "Starting portal web server on port 8080");
-  portal_server_->begin();
+  if (portal_switch != nullptr) {
+    portal_switch->publish_state(false);
+    portal_switch->add_on_state_callback([this](bool state) {
+      if (state)
+        start_portal_server();
+      else
+        stop_portal_server();
+    });
+  } else {
+    start_portal_server();
+  }
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
   }

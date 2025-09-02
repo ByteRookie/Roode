@@ -17,10 +17,8 @@
 #include "orientation.h"
 #include "zone.h"
 
-#ifdef USE_WEB_SERVER
 class AsyncWebServer;
 class AsyncWebServerRequest;
-#endif
 
 using namespace esphome::vl53l1x;
 using TofSensor = esphome::vl53l1x::VL53L1X;

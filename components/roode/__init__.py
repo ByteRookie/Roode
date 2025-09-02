@@ -144,9 +144,9 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_SCAN_TIME_CAP_SECONDS, default=90.0): cv.All(
             cv.positive_float, cv.Range(min=60.0, max=180.0)
         ),
-        cv.Optional(CONF_PORTAL_PASSWORD, default=""): cv.string,
-        cv.Optional(CONF_WEB_USERNAME, default=""): cv.string,
-        cv.Optional(CONF_WEB_PASSWORD, default=""): cv.string,
+        cv.Optional(CONF_PORTAL_PASSWORD): cv.string,
+        cv.Optional(CONF_WEB_USERNAME): cv.string,
+        cv.Optional(CONF_WEB_PASSWORD): cv.string,
         cv.Optional(CONF_ROI_RESULT): cv.file_,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
@@ -230,9 +230,12 @@ async def to_code(config: Dict):
 
     cg.add(roode.set_orientation(config[CONF_ORIENTATION]))
     cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
-    cg.add(roode.set_portal_password(config[CONF_PORTAL_PASSWORD]))
-    cg.add(roode.set_web_username(config[CONF_WEB_USERNAME]))
-    cg.add(roode.set_web_password(config[CONF_WEB_PASSWORD]))
+    if CONF_PORTAL_PASSWORD in config:
+        cg.add(roode.set_portal_password(config[CONF_PORTAL_PASSWORD]))
+    if CONF_WEB_USERNAME in config:
+        cg.add(roode.set_web_username(config[CONF_WEB_USERNAME]))
+    if CONF_WEB_PASSWORD in config:
+        cg.add(roode.set_web_password(config[CONF_WEB_PASSWORD]))
     auto_conf = config.get(CONF_AUTO_CALIBRATION, {})
     cg.add(roode.set_calibration_persistence(auto_conf.get(CONF_PERSIST, False)))
     cg.add(

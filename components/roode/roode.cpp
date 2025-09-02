@@ -24,6 +24,7 @@ bool Roode::log_fallback_events_ = false;
 Roode *Roode::instance_ = nullptr;
 static bool scan_running = false;
 static bool scan_cancel_requested = false;
+std::vector<std::string> Roode::log_buffer_;
 
 static std::string format_timestamp(uint32_t sec_since_boot) {
   if (sec_since_boot == 0)
@@ -131,6 +132,10 @@ void Roode::log_event(const std::string &msg) {
 
   std::string colored = std::string(color) + out + "\033[0m";
   ESP_LOGI(TAG, "%s", colored.c_str());
+  std::string line = format_timestamp(millis() / 1000) + " " + out;
+  log_buffer_.push_back(line);
+  if (log_buffer_.size() > 200)
+    log_buffer_.erase(log_buffer_.begin());
   if (instance_ != nullptr) {
     if (msg.find("reinitialize") != std::string::npos) {
       instance_->update_status_text("reinitializing");
@@ -142,6 +147,15 @@ void Roode::log_event(const std::string &msg) {
       instance_->publish_feature_list();
     }
   }
+}
+
+std::string Roode::get_log_buffer() {
+  std::string out;
+  for (const auto &line : log_buffer_) {
+    out += line;
+    out += "\n";
+  }
+  return out;
 }
 
 Roode::~Roode() {
@@ -453,6 +467,18 @@ void Roode::register_server_endpoints() {
     request->send(200, "application/json", out.c_str());
   });
   server->addHandler(scan_session_handler);
+
+  auto *system_log_handler = new AsyncCallbackWebHandler();
+  system_log_handler->setUri("/api/system/logs");
+  system_log_handler->setMethod(HTTP_GET);
+  system_log_handler->onRequest([log_request](AsyncWebServerRequest *request) {
+    log_request(request);
+    if (!instance_->check_token_(request))
+      return;
+    std::string out = Roode::get_log_buffer();
+    request->send(200, "text/plain", out.c_str());
+  });
+  server->addHandler(system_log_handler);
 
   auto *scan_delete_handler = new AsyncCallbackWebHandler();
   scan_delete_handler->setUri("/api/scan/delete");
@@ -1330,6 +1356,27 @@ void Roode::start_passive_scan() {
           publish_scan_record("scan_cancel");
           scan_running = false;
           return;
+        }
+        if (presence_sensor != nullptr && presence_sensor->state) {
+          int retries = 0;
+          while (presence_sensor->state && retries < 10) {
+            ESP_LOGW(TAG, "Presence detected during scan, waiting...");
+            log_event("scan_wait_presence");
+            delay(500);
+            App.feed_wdt();
+            retries++;
+            if (scan_cancel_requested) {
+              publish_scan_record("scan_cancel");
+              scan_running = false;
+              return;
+            }
+          }
+          if (presence_sensor->state) {
+            ESP_LOGE(TAG, "Presence did not clear, aborting scan");
+            publish_scan_record("scan_presence_abort");
+            scan_running = false;
+            return;
+          }
         }
         std::vector<int> mcps(grid * grid, 0);
         std::vector<int> distance(grid * grid, 0);

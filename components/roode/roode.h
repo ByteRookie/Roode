@@ -175,14 +175,16 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
   static void log_event(const std::string &msg);
+  static std::string get_log_buffer();
 
-  bool apply_recommended_settings();
+ bool apply_recommended_settings();
   void set_portal_password(const std::string &password) { portal_password_ = password; }
   void set_web_username(const std::string &username) { web_username_ = username; }
   void set_web_password(const std::string &password) { web_password_ = password; }
-  void set_web_portal_switch(switch_::Switch *sw) { portal_switch = sw; }
+ void set_web_portal_switch(switch_::Switch *sw) { portal_switch = sw; }
 
  protected:
+  static std::vector<std::string> log_buffer_;
   TofSensor *distanceSensor;
   Zone *current_zone = entry;
   sensor::Sensor *distance_entry{nullptr};

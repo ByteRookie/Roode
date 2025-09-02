@@ -209,10 +209,12 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   sensor::Sensor *scan_time_cap_seconds_sensor{nullptr};
 
   std::string portal_password_{};
-  std::unique_ptr<AsyncWebServer> internal_server_;
+#ifdef USE_WEB_SERVER
   bool portal_registered_ = false;
   void register_server_endpoints(AsyncWebServer *srv);
+  void register_routes_once_();
   bool check_token_(AsyncWebServerRequest *request);
+#endif
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;

@@ -15,6 +15,7 @@
 #include <ESPAsyncWebServer.h>
 #ifdef USE_WEB_SERVER
 #include "esphome/components/web_server_base/web_server_base.h"
+using esphome::web_server_base::global_web_server;
 #endif
 #include <pgmspace.h>
 static const char portal_html[] PROGMEM = R"PORTAL(
@@ -166,6 +167,19 @@ bool Roode::check_token_(AsyncWebServerRequest *request) {
   return false;
 }
 
+#ifdef USE_WEB_SERVER
+void Roode::register_routes_once_() {
+  if (portal_registered_)
+    return;
+  auto *base = global_web_server;
+  if (!base || !base->get_server()) {
+    this->set_timeout("portal_retry", 200, [this]() { this->register_routes_once_(); });
+    return;
+  }
+  this->register_server_endpoints(base->get_server());
+}
+#endif
+
 void Roode::register_server_endpoints(AsyncWebServer *srv) {
   if (portal_registered_)
     return;
@@ -174,11 +188,15 @@ void Roode::register_server_endpoints(AsyncWebServer *srv) {
     return;
   }
 
+  srv->on("/ping", HTTP_GET, [](AsyncWebServerRequest *r) {
+    r->send(200, "text/plain; charset=utf-8", "pong");
+  });
+
   auto *portal_handler = new AsyncCallbackWebHandler();
   portal_handler->setUri("/portal");
   portal_handler->setMethod(HTTP_GET);
-  portal_handler->onRequest([this](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", portal_html);
+  portal_handler->onRequest([](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html; charset=utf-8", portal_html, strlen_P(portal_html));
   });
   srv->addHandler(portal_handler);
 
@@ -193,11 +211,7 @@ void Roode::register_server_endpoints(AsyncWebServer *srv) {
   auto *root_handler = new AsyncCallbackWebHandler();
   root_handler->setUri("/");
   root_handler->setMethod(HTTP_GET);
-  root_handler->onRequest([this](AsyncWebServerRequest *request) {
-    if (!check_token_(request))
-      return;
-    request->redirect("/portal");
-  });
+  root_handler->onRequest([](AsyncWebServerRequest *request) { request->redirect("/portal"); });
   srv->addHandler(root_handler);
 
   portal_registered_ = true;
@@ -502,13 +516,7 @@ void Roode::setup() {
   this->register_service(&Roode::complete_calibration, "complete_calibration");
 #endif
 #ifdef USE_WEB_SERVER
-  App.register_on_web_server_callback([this](web_server_base::WebServerBase *base) {
-    this->register_server_endpoints(base->get_server());
-  });
-#else
-  internal_server_ = std::make_unique<AsyncWebServer>(80);
-  this->register_server_endpoints(internal_server_.get());
-  internal_server_->begin();
+  this->register_routes_once_();
 #endif
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);

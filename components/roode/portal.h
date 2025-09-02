@@ -1,3 +1,7 @@
+#pragma once
+#include <pgmspace.h>
+
+inline const char portal_html[] PROGMEM = R"PORTAL(
 <!doctype html>
 <html lang="en">
 <head>
@@ -361,3 +365,4 @@
   </script>
 </body>
 </html>
+)PORTAL";

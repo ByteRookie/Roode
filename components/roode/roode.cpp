@@ -11,14 +11,16 @@
 #include <sstream>
 #include <cstring>
 #include <cstdlib>
+#include <memory>
 #include <ArduinoJson.h>
+#include <ESPAsyncWebServer.h>
 #ifdef USE_WEB_SERVER
 #include "esphome/components/web_server_base/web_server_base.h"
+#endif
 #include "esphome/core/pgmspace.h"
 static const char portal_html[] PROGMEM = R"PORTAL(
 #include "web/portal.html"
 )PORTAL";
-#endif
 
 namespace esphome {
 namespace roode {
@@ -151,7 +153,6 @@ Roode::~Roode() {
   delete exit;
 }
 
-#ifdef USE_WEB_SERVER
 bool Roode::check_token_(AsyncWebServerRequest *request) {
   if (portal_password_.empty())
     return true;
@@ -165,18 +166,14 @@ bool Roode::check_token_(AsyncWebServerRequest *request) {
   request->send(401, "text/plain", "Unauthorized");
   return false;
 }
-#endif
 
-#ifdef USE_WEB_SERVER
-void Roode::register_server_endpoints(web_server_base::WebServerBase *base) {
+void Roode::register_server_endpoints(AsyncWebServer *srv) {
   if (portal_registered_)
     return;
-  if (base == nullptr) {
-    ESP_LOGW(TAG, "Web server base null; portal routes not registered");
+  if (srv == nullptr) {
+    ESP_LOGW(TAG, "Web server not initialized; portal routes not registered");
     return;
   }
-
-  auto *srv = base->get_server();
 
   auto *portal_handler = new AsyncCallbackWebHandler();
   portal_handler->setUri("/portal");
@@ -507,8 +504,12 @@ void Roode::setup() {
 #endif
 #ifdef USE_WEB_SERVER
   App.register_on_web_server_callback([this](web_server_base::WebServerBase *base) {
-    this->register_server_endpoints(base);
+    this->register_server_endpoints(base->get_server());
   });
+#else
+  internal_server_ = std::make_unique<AsyncWebServer>(80);
+  this->register_server_endpoints(internal_server_.get());
+  internal_server_->begin();
 #endif
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);

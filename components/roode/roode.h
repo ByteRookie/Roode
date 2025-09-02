@@ -3,7 +3,10 @@
 #include <string>
 #include <optional>
 #include <vector>
+#include <memory>
 #include "Arduino.h"
+
+#include <ESPAsyncWebServer.h>
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
@@ -19,7 +22,6 @@
 
 #ifdef USE_WEB_SERVER
 #include "esphome/components/web_server_base/web_server_base.h"
-class AsyncWebServerRequest;
 #endif
 
 using namespace esphome::vl53l1x;
@@ -207,11 +209,10 @@ class Roode : public PollingComponent, public api::CustomAPIDevice {
   sensor::Sensor *scan_time_cap_seconds_sensor{nullptr};
 
   std::string portal_password_{};
-#ifdef USE_WEB_SERVER
-  void register_server_endpoints(web_server_base::WebServerBase *base);
+  std::unique_ptr<AsyncWebServer> internal_server_;
   bool portal_registered_ = false;
+  void register_server_endpoints(AsyncWebServer *srv);
   bool check_token_(AsyncWebServerRequest *request);
-#endif
 
   struct CalibrationPrefs {
     uint16_t baseline_mm;

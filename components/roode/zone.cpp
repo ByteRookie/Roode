@@ -71,14 +71,14 @@ void Zone::reset_roi(uint8_t default_center) {
   roi->center = roi_override->center ?: default_center;
 }
 
-bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
+bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts, int *error_count) {
   // Preserve previous thresholds in case calibration fails
   Threshold previous = *threshold;
 
   std::vector<int> zone_distances;
   zone_distances.reserve(number_attempts);
   int sum = 0;
-  bool read_failed = false;
+  int errors = 0;
 
   for (int i = 0; i < number_attempts; i++) {
     bool success = false;
@@ -89,16 +89,17 @@ bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
         break;
       }
       // log and delay before retrying to give the sensor time to recover
-      ESP_LOGW(CALIBRATION,
-               "Distance read failed during calibration. status: %d (retry %d)",
-               sensor_status, retry + 1);
+      ESP_LOGW(CALIBRATION, "Distance read failed during calibration. status: %d (retry %d)", sensor_status, retry + 1);
       Roode::log_event("calibration_read_retry");
       delay(50);
       App.feed_wdt();
     }
     if (!success) {
-      read_failed = true;
-      break;
+      errors++;
+      ESP_LOGW(CALIBRATION, "Distance read failed during calibration. marking attempt %d bad", i + 1);
+      Roode::log_event("calibration_read_fail");
+      // continue to next attempt without adding a distance
+      continue;
     }
 
     zone_distances.push_back(this->getDistance());
@@ -108,7 +109,10 @@ bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
     App.feed_wdt();
   }
 
-  if (zone_distances.empty() || read_failed) {
+  if (error_count != nullptr)
+    *error_count = errors;
+
+  if (zone_distances.empty()) {
     *threshold = previous;
     distanceSensor->restart();
     ESP_LOGW(CALIBRATION, "Calibration failed: no valid distances recorded");
@@ -129,6 +133,12 @@ bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
            threshold->idle, threshold->min,
            threshold->min_percentage.value_or((threshold->min * 100) / threshold->idle), threshold->max,
            threshold->max_percentage.value_or((threshold->max * 100) / threshold->idle));
+
+  if (errors > 0) {
+    ESP_LOGW(CALIBRATION, "Calibration finished with %d errors for zone %d", errors, id);
+    Roode::log_event("calibration_finished_with_errors");
+  }
+
   return true;
 }
 

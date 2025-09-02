@@ -76,6 +76,9 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
             <div id="progressPercent" style="margin-top:4px">0%</div>
           </div>
         </div>
+        <div class="hr"></div>
+        <button class="btn" id="btnLog">Show Log</button>
+        <pre id="logBox" class="mono" style="display:none;max-height:200px;overflow:auto;background:#0f1520;border:1px solid var(--line);padding:8px;border-radius:8px;margin-top:8px"></pre>
       </div>
 
       <!-- Current Settings -->
@@ -179,12 +182,14 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
   };
   const fmtDur = s => {
     if(!Number.isFinite(s)) return '—';
-    const m = Math.floor(s/60), sec = s%60;
-    return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+    if(s < 60) return s.toFixed(1) + ' s';
+    const m = Math.floor(s/60);
+    const sec = Math.round(s%60);
+    return `${m}m ${sec}s`;
   };
 
   // State
-  let current = null, preview = null, status = null, sessions = [];
+  let current = null, preview = null, status = null, sessions = [], logVisible = false;
 
   // Fetch JSON with graceful fallback
   async function getJSON(url){
@@ -217,7 +222,7 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
   function renderStatus(){
     const st = status || {state:'Idle', id:'—', step:'—', progress:0, remaining:0};
     $('#statusText').innerHTML = 'Status: <b>'+st.state+'</b>';
-    $('#timeRemaining').textContent = Number.isFinite(st.remaining) ? fmtDur(Math.round(st.remaining)) : '—';
+    $('#timeRemaining').textContent = Number.isFinite(st.remaining) ? fmtDur(st.remaining) : '—';
     $('#stepText').textContent = st.step || '—';
     const prog = st.progress || 0;
     $('#progressBar').style.width = prog + '%';
@@ -232,17 +237,17 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     }
   }
   function renderCurrent(){
-    if(!current) return;
-    $('#curRoiSize').textContent = (current.roi_width&&current.roi_height) ? `${current.roi_width} × ${current.roi_height}` : '—';
-    $('#curRoiCenter').textContent = current.roi_center ? `(${current.roi_center.x}, ${current.roi_center.y})` : '—';
-    $('#curEntry').textContent = current.entry_center ? `(${current.entry_center.x}, ${current.entry_center.y})` : '—';
-    $('#curExit').textContent = current.exit_center ? `(${current.exit_center.x}, ${current.exit_center.y})` : '—';
-    $('#curMode').textContent = current.ranging_mode || '—';
-    $('#curMin').textContent = current.min_threshold!=null ? current.min_threshold+'%' : '—';
-    $('#curMax').textContent = current.max_threshold!=null ? current.max_threshold+'%' : '—';
-    $('#curSampling').textContent = current.sampling || '—';
-    $('#curFw').textContent = current.firmware || '—';
-    const last = current.last_calibration;
+    const c = current || {};
+    $('#curRoiSize').textContent = (c.roi_width&&c.roi_height) ? `${c.roi_width} × ${c.roi_height}` : '—';
+    $('#curRoiCenter').textContent = c.roi_center ? `(${c.roi_center.x}, ${c.roi_center.y})` : '—';
+    $('#curEntry').textContent = c.entry_center ? `(${c.entry_center.x}, ${c.entry_center.y})` : '—';
+    $('#curExit').textContent = c.exit_center ? `(${c.exit_center.x}, ${c.exit_center.y})` : '—';
+    $('#curMode').textContent = c.ranging_mode || '—';
+    $('#curMin').textContent = c.min_threshold!=null ? c.min_threshold+'%' : '—';
+    $('#curMax').textContent = c.max_threshold!=null ? c.max_threshold+'%' : '—';
+    $('#curSampling').textContent = c.sampling || '—';
+    $('#curFw').textContent = c.firmware || '—';
+    const last = c.last_calibration;
     $('#lastCal').textContent = 'Last calibration: ' + (last ? new Date(last).toLocaleString() : 'Not run yet');
   }
   function renderPreview(){
@@ -301,9 +306,17 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     return grids[idx] || 'Analyzing';
   }
 
+  async function fetchLog(){
+    if(!status || !status.id) return;
+    const sess = await getJSON(`/api/scan/session/${encodeURIComponent(status.id)}`).catch(()=>null);
+    const txt = (sess && sess.data) ? sess.data : '';
+    $('#logBox').textContent = txt;
+  }
+
   // Polling
   async function poll(){
     try {
+      const wasScanning = status && status.state === 'Scanning';
       const [cur, stat, list, prev] = await Promise.all([
         getJSON('/api/settings/current').catch(()=>null),
         getJSON('/api/scan/status').catch(()=>null),
@@ -311,21 +324,24 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
         getJSON('/api/roi/preview').catch(()=>null)
       ]);
       if(cur) current = cur;
-      if(stat) {
+      if(stat){
         status = {
           state: stat.running ? 'Scanning' : 'Idle',
           id: stat.session_id || '—',
           step: stat.running ? describeStep(stat.step) : '—',
-          progress: (stat.progress || 0) * 100,
+          progress: stat.running ? (stat.progress || 0) * 100 : 0,
           remaining: stat.time_remaining,
           last_calibration: stat.last_calibration
         };
+      } else {
+        status = {state:'Idle', id:status?.id || '—', step:'—', progress:0, remaining:0};
       }
+      if(wasScanning && status.state !== 'Scanning') showSuccess('Calibration complete');
       if(list) sessions = list.sessions || list;
-      // Only show preview if we have one (typically after completion)
       preview = prev || null;
 
       renderStatus(); renderCurrent(); renderPreview(); renderSessions();
+      if(logVisible) fetchLog();
     } catch(e) {
       showError(e.message);
     }
@@ -353,6 +369,12 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     } finally {
       btn.disabled = false;
     }
+  });
+  $('#btnLog').addEventListener('click', async ()=>{
+    logVisible = !logVisible;
+    $('#logBox').style.display = logVisible ? 'block' : 'none';
+    $('#btnLog').textContent = logVisible ? 'Hide Log' : 'Show Log';
+    if(logVisible) await fetchLog();
   });
   $('#btnApply').addEventListener('click', async (e)=>{
     const btn = e.target;

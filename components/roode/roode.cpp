@@ -26,6 +26,8 @@ static bool scan_running = false;
 static bool scan_cancel_requested = false;
 
 static std::string format_timestamp(uint32_t sec_since_boot) {
+  if (sec_since_boot == 0)
+    return std::string();
   uint32_t now_sec = millis() / 1000;
   time_t epoch = time(nullptr) - (now_sec - sec_since_boot);
   struct tm tm_time;

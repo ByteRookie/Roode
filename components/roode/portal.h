@@ -215,6 +215,12 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     $('#stepText').textContent = st.step || '—';
     $('#progressBar').style.width = (st.progress||0)+'%';
     $('#btnCancel').style.display = (st.state==='Scanning') ? 'inline-block' : 'none';
+    if (st.last_calibration !== undefined) {
+      const txt = st.last_calibration
+        ? new Date(st.last_calibration).toLocaleString()
+        : 'Not run yet';
+      $('#lastCal').textContent = 'Last calibration: ' + txt;
+    }
   }
   function renderCurrent(){
     if(!current) return;
@@ -227,7 +233,8 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
     $('#curMax').textContent = current.max_threshold!=null ? current.max_threshold+'%' : '—';
     $('#curSampling').textContent = current.sampling || '—';
     $('#curFw').textContent = current.firmware || '—';
-    if(current.last_calibration) $('#lastCal').textContent = 'Last calibration: ' + new Date(current.last_calibration).toLocaleString();
+    const last = current.last_calibration;
+    $('#lastCal').textContent = 'Last calibration: ' + (last ? new Date(last).toLocaleString() : 'Not run yet');
   }
   function renderPreview(){
     const apply = $('#btnApply');
@@ -286,7 +293,15 @@ inline const char portal_html[] PROGMEM = R"PORTAL(
       getJSON('/api/roi/preview')
     ]);
     if(cur) current = cur;
-    if(stat) status = stat;
+    if(stat) {
+      status = {
+        state: stat.running ? 'Scanning' : 'Idle',
+        id: stat.session_id || '—',
+        step: stat.step || '—',
+        progress: stat.progress || 0,
+        last_calibration: stat.last_calibration
+      };
+    }
     if(list) sessions = list;
     // Only show preview if we have one (typically after completion)
     preview = prev || null;

@@ -21,7 +21,16 @@ void setup()
     // Start the offset calibration
     Serial.println("Place a target, 17 % grey, at 140 mm from the sensor a");
     Serial.println("The calibration may take a few seconds. The offset correction is applied to the sensor at the end of calibration.");
-    Serial.readString();
+    const unsigned long serialTimeout = 10000; // Timeout after 10 seconds
+    unsigned long start = millis();
+    while (!Serial.available() && millis() - start < serialTimeout)
+    {
+        delay(10); // Feed the watchdog while waiting for user input
+    }
+    while (Serial.available())
+    {
+        Serial.read(); // Clear any received data
+    }
     int16_t foundOffset;
     sensor_status = sensor.CalibrateOffset(140, &foundOffset);
     if (sensor_status == VL53L1_ERROR_NONE)

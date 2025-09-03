@@ -74,6 +74,7 @@ void Zone::reset_roi(uint8_t default_center) {
 bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts, int *error_count) {
   // Preserve previous thresholds in case calibration fails
   Threshold previous = *threshold;
+  constexpr uint32_t SENSOR_BOOT_DELAY_MS = 100;
 
   // Ensure the sensor has completed booting before starting calibration
   VL53L1_Error status = distanceSensor->wait_for_boot();
@@ -84,7 +85,7 @@ bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts, in
       *error_count = number_attempts;
     return false;
   }
-  delay(100);
+  delay(SENSOR_BOOT_DELAY_MS);
   App.feed_wdt();
 
   std::vector<int> zone_distances;
@@ -108,7 +109,7 @@ bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts, in
       reset_count++;
       distanceSensor->init();
       distanceSensor->wait_for_boot();
-      delay(100);
+      delay(SENSOR_BOOT_DELAY_MS);
       App.feed_wdt();
       if (reset_count >= MAX_SENSOR_RESETS) {
         ESP_LOGE(CALIBRATION, "Calibration aborted after %d sensor resets", reset_count);

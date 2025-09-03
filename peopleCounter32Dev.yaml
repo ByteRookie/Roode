@@ -34,7 +34,7 @@ api:
         - lambda: "id(roode_platform)->recalibration();"
 
 ota:
-  platform: esphome
+  platform: esphome  # Use native ESPHome OTA updater
   password: !secret ota_password
 
 web_server:
@@ -111,7 +111,7 @@ binary_sensor:
   - platform: status
     name: $friendly_name API Status
   - platform: roode
-    presence:
+    presence:  # renamed from presence_sensor
       name: $friendly_name presence
     sensor_xshut_state:
       name: $friendly_name xshut state

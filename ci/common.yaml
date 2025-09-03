@@ -26,7 +26,7 @@ number:
 
 binary_sensor:
   - platform: roode
-    presence:
+    presence:  # renamed from presence_sensor
       name: $friendly_name presence
 
 sensor:

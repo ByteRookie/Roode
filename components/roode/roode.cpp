@@ -1,7 +1,7 @@
 #include "roode.h"
 #include "Arduino.h"
 #ifdef CONFIG_IDF_TARGET_ESP32
-#include "esp_task_wdt.h"
+#include "esp_task_wdt.h"  // Access to the ESP32 task watchdog
 #endif
 #include <string>
 #include <optional>
@@ -301,6 +301,7 @@ void Roode::loop() {
   } else {
     invalid_read_count_ = 0;
   }
+  // Attempt to recover the sensor when repeated invalid distance values are observed
   if (invalid_read_count_ > invalid_distance_limit_ && (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
     ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
     restart_sensor();
@@ -376,6 +377,7 @@ void Roode::path_tracking(Zone *zone) {
     if (presence_sensor != nullptr) {
       presence_sensor->publish_state(true);
     }
+    // Expose occupancy for the specific zone when configured
     if (zone->id == 0 && entry_presence_sensor != nullptr) {
       entry_presence_sensor->publish_state(true);
     }
@@ -387,6 +389,7 @@ void Roode::path_tracking(Zone *zone) {
     }
   }
   if (CurrentZoneStatus == NOBODY) {
+    // Clear zone-specific occupancy sensors once motion has left the area
     if (zone->id == 0 && entry_presence_sensor != nullptr) {
       entry_presence_sensor->publish_state(false);
     }
@@ -779,11 +782,13 @@ void Roode::restart_sensor() {
 
 void Roode::sensor_task(void *param) {
   auto *self = static_cast<Roode *>(param);
+  // Register this task with the watchdog when running on ESP32
 #ifdef CONFIG_IDF_TARGET_ESP32
   esp_task_wdt_add(nullptr);
 #endif
   for (;;) {
 #ifdef CONFIG_IDF_TARGET_ESP32
+    // Feed the watchdog to prevent unwanted resets
     esp_task_wdt_reset();
 #endif
     self->use_sensor_task_ = true;
@@ -803,6 +808,7 @@ void Roode::sensor_task(void *param) {
     } else {
       self->invalid_read_count_ = 0;
     }
+    // Similar recovery check for the asynchronous sensor task
     if (self->invalid_read_count_ > self->invalid_distance_limit_ &&
         (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
       ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");

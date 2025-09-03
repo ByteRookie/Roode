@@ -616,6 +616,8 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Feature text sensor | Reports enabled and fallback features for diagnostics |
 | Manual adjustment counter | Tracks user corrections to the people count |
 | Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
+| Zone presence sensors | Optional binary sensors report occupancy in entry and exit zones |
+| ESP32 watchdog keepalive | Dedicated task feeds the watchdog and restarts hung sensors |
 | Polling timeout recovery | Restarts the sensor if no data arrives for `restart_timeout` |
 | Consecutive failure counter | Soft-resets the sensor after 10 read errors |
 | Consecutive invalid distance recovery | Restarts the sensor after too many suspect readings |

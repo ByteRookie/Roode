@@ -19,4 +19,5 @@ CONFIG_SCHEMA = sensor.sensor_schema(
 
 
 async def to_code(config):
+    # Register the VL53L1X distance sensor with ESPHome
     await sensor.new_sensor(config)

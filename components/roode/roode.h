@@ -99,9 +99,18 @@ class Roode : public PollingComponent {
   void set_cpu_usage_sensor(sensor::Sensor *sens) { cpu_usage_sensor = sens; }
   void set_ram_free_sensor(sensor::Sensor *sens) { ram_free_sensor = sens; }
   void set_flash_free_sensor(sensor::Sensor *sens) { flash_free_sensor = sens; }
-  void set_presence_binary_sensor(binary_sensor::BinarySensor *presence_sensor_) { presence_sensor = presence_sensor_; }
-  void set_entry_presence_binary_sensor(binary_sensor::BinarySensor *sensor) { entry_presence_sensor = sensor; }
-  void set_exit_presence_binary_sensor(binary_sensor::BinarySensor *sensor) { exit_presence_sensor = sensor; }
+  void set_presence_binary_sensor(binary_sensor::BinarySensor *presence_sensor_) {
+    // Overall sensor indicating that any zone is occupied
+    presence_sensor = presence_sensor_;
+  }
+  void set_entry_presence_binary_sensor(binary_sensor::BinarySensor *sensor) {
+    // Optional sensor dedicated to the entry zone
+    entry_presence_sensor = sensor;
+  }
+  void set_exit_presence_binary_sensor(binary_sensor::BinarySensor *sensor) {
+    // Optional sensor dedicated to the exit zone
+    exit_presence_sensor = sensor;
+  }
   void set_version_text_sensor(text_sensor::TextSensor *version_sensor_) { version_sensor = version_sensor_; }
   void set_entry_exit_event_text_sensor(text_sensor::TextSensor *entry_exit_event_sensor_) {
     entry_exit_event_sensor = entry_exit_event_sensor_;
@@ -159,9 +168,9 @@ class Roode : public PollingComponent {
   sensor::Sensor *cpu_usage_sensor{nullptr};
   sensor::Sensor *ram_free_sensor{nullptr};
   sensor::Sensor *flash_free_sensor{nullptr};
-  binary_sensor::BinarySensor *presence_sensor{nullptr};
-  binary_sensor::BinarySensor *entry_presence_sensor{nullptr};
-  binary_sensor::BinarySensor *exit_presence_sensor{nullptr};
+  binary_sensor::BinarySensor *presence_sensor{nullptr};           // True when any zone is occupied
+  binary_sensor::BinarySensor *entry_presence_sensor{nullptr};     // Occupancy for the entry zone
+  binary_sensor::BinarySensor *exit_presence_sensor{nullptr};      // Occupancy for the exit zone
   binary_sensor::BinarySensor *xshut_state_binary_sensor{nullptr};
   text_sensor::TextSensor *version_sensor{nullptr};
   text_sensor::TextSensor *entry_exit_event_sensor{nullptr};

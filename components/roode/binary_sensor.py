@@ -11,11 +11,11 @@ from . import Roode, CONF_ROODE_ID
 
 DEPENDENCIES = ["roode"]
 
-CONF_PRESENCE = "presence"
+CONF_PRESENCE = "presence"  # Top-level presence sensor
 CONF_XSHUT_STATE = "sensor_xshut_state"
-CONF_ZONES = "zones"
-CONF_ENTRY = "entry"
-CONF_EXIT = "exit"
+CONF_ZONES = "zones"  # Container for per-zone sensors
+CONF_ENTRY = "entry"  # Key for the entry zone
+CONF_EXIT = "exit"  # Key for the exit zone
 TYPES = [CONF_PRESENCE, CONF_XSHUT_STATE]
 
 CONFIG_SCHEMA = cv.Schema(
@@ -35,6 +35,7 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.GenerateID(): cv.declare_id(binary_sensor.BinarySensor),
             }
         ),
+        # Optional per-zone configuration allowing separate entry/exit presence sensors
         cv.Optional(CONF_ZONES): cv.Schema(
             {
                 cv.Optional(CONF_ENTRY): cv.Schema(
@@ -96,6 +97,7 @@ async def to_code(config):
     hub = await cg.get_variable(config[CONF_ROODE_ID])
     for key in TYPES:
         await setup_conf(config, key, hub)
+    # Handle optional entry/exit presence sensors
     if CONF_ZONES in config:
         zones = config[CONF_ZONES]
         if CONF_ENTRY in zones and CONF_PRESENCE in zones[CONF_ENTRY]:

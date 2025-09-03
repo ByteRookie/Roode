@@ -65,6 +65,7 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
  * This is needed to do initial calibration of thresholds & ROI.
  */
 void Zone::reset_roi(uint8_t default_center) {
+  // Apply overrides when provided, otherwise fall back to sensible defaults
   roi->width = roi_override->width ? roi_override->width : 6;
   roi->height = roi_override->height ? roi_override->height : 16;
   roi->center = roi_override->center ? roi_override->center : default_center;
@@ -111,6 +112,7 @@ void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Or
   // center of the two zones
   int function_of_the_distance = 16 * (1 - (0.15 * 2) / (0.34 * (min(entry_threshold, exit_threshold) / 1000)));
   int ROI_size = min(8, max(4, function_of_the_distance));
+  // Use the calculated ROI size unless an override has been specified
   this->roi->width = this->roi_override->width ? this->roi_override->width : ROI_size;
   this->roi->height = this->roi_override->height ? this->roi_override->height : ROI_size * 2;
   if (this->roi_override->center) {

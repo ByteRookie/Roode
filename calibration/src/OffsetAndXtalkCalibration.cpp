@@ -1,7 +1,7 @@
 #include "VL53L1X_ULD.h"
 
 VL53L1X_ULD sensor;
-bool dataReady;
+uint8_t dataReady;
 
 void setup()
 {
@@ -76,6 +76,7 @@ void setup()
 }
 void loop()
 {
+    sensor.CheckForDataReady(&dataReady);
     if (dataReady)
     {
         // Get the results
@@ -87,5 +88,9 @@ void loop()
         dataReady = false;
 
         Serial.println("Distance in mm: " + String(distance));
+    }
+    else
+    {
+        delay(1); // Small delay to avoid busy-waiting
     }
 }

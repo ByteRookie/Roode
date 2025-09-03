@@ -47,6 +47,8 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   void set_sensor_id(uint8_t id) { sensor_id_ = id; }
   void set_desired_address(uint8_t addr) { desired_address_ = addr; }
   void restart();
+  VL53L1_Error init();
+  VL53L1_Error wait_for_boot();
 
   void set_xshut_pin(GPIOPin *pin) { this->xshut_pin = pin; }
   void set_interrupt_pin(InternalGPIOPin *pin) { this->interrupt_pin = pin; }
@@ -62,7 +64,7 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   VL53L1X_ULD sensor;
   optional<GPIOPin *> xshut_pin{};
   optional<InternalGPIOPin *> interrupt_pin{};
-  const RangingMode * ranging_mode{};
+  const RangingMode *ranging_mode{};
   /** Mode from user config, which can be get/set independently of current mode */
   optional<const RangingMode *> ranging_mode_override{};
   optional<int16_t> offset{};
@@ -74,8 +76,6 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   uint8_t desired_address_{0x29};
   static std::vector<VL53L1X *> sensors;
 
-  VL53L1_Error init();
-  VL53L1_Error wait_for_boot();
   VL53L1_Error get_device_state(uint8_t *device_state);
   /**
    * Validate optional pins and log their status.
@@ -96,4 +96,3 @@ class VL53L1X : public i2c::I2CDevice, public Component {
 
 }  // namespace vl53l1x
 }  // namespace esphome
-

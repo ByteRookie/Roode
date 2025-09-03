@@ -75,10 +75,24 @@ bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts, in
   // Preserve previous thresholds in case calibration fails
   Threshold previous = *threshold;
 
+  // Ensure the sensor has completed booting before starting calibration
+  VL53L1_Error status = distanceSensor->wait_for_boot();
+  if (status != VL53L1_ERROR_NONE) {
+    ESP_LOGW(CALIBRATION, "Sensor not ready for calibration. status: %d", status);
+    Roode::log_event("calibration_boot_failed");
+    if (error_count != nullptr)
+      *error_count = number_attempts;
+    return false;
+  }
+  delay(100);
+  App.feed_wdt();
+
   std::vector<int> zone_distances;
   zone_distances.reserve(number_attempts);
   int sum = 0;
   int errors = 0;
+  int reset_count = 0;
+  constexpr int MAX_SENSOR_RESETS = 3;
 
   for (int i = 0; i < number_attempts; i++) {
     bool success = false;
@@ -88,11 +102,23 @@ bool Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts, in
         success = true;
         break;
       }
-      // log and delay before retrying to give the sensor time to recover
+      // log, attempt to reinitialize the sensor, and delay before retrying
       ESP_LOGW(CALIBRATION, "Distance read failed during calibration. status: %d (retry %d)", sensor_status, retry + 1);
       Roode::log_event("calibration_read_retry");
-      delay(50);
+      reset_count++;
+      distanceSensor->init();
+      distanceSensor->wait_for_boot();
+      delay(100);
       App.feed_wdt();
+      if (reset_count >= MAX_SENSOR_RESETS) {
+        ESP_LOGE(CALIBRATION, "Calibration aborted after %d sensor resets", reset_count);
+        Roode::log_event("calibration_reset_limit");
+        if (error_count != nullptr)
+          *error_count = errors + (number_attempts - i);
+        *threshold = previous;
+        distanceSensor->restart();
+        return false;
+      }
     }
     if (!success) {
       errors++;

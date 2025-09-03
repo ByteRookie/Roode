@@ -3,106 +3,117 @@
 VL53L1X_ULD sensor;
 uint8_t dataReady;
 
-void setup()
-{
-    Serial.begin(115200);
-    Wire.begin();
-
-    VL53L1_Error sensor_status = sensor.Begin();
-    if (sensor_status != VL53L1_ERROR_NONE)
-    {
-        Serial.println("Could not initialize the sensor, error code: " + String(sensor_status));
-        while (1)
-        {
-        }
-    }
-    Serial.println("Sensor initialized");
-
-    // Start the offset calibration
-    Serial.println("Place a target, 17 % grey, at 140 mm from the sensor a");
-    Serial.println("The calibration may take a few seconds. The offset correction is applied to the sensor at the end of calibration.");
-    const unsigned long serialTimeout = 10000; // Timeout after 10 seconds
-    unsigned long start = millis();
-    while (!Serial.available() && millis() - start < serialTimeout)
-    {
-        delay(10); // Feed the watchdog while waiting for user input
-    }
-    while (Serial.available())
-    {
-        Serial.read(); // Clear any received data
-    }
-    int16_t foundOffset;
-    sensor_status = sensor.CalibrateOffset(140, &foundOffset);
-    if (sensor_status == VL53L1_ERROR_NONE)
-    {
-        Serial.println("Calibrated offset: " + String(foundOffset));
-        sensor_status = sensor.SetOffsetInMm(foundOffset);
-        if (sensor_status == VL53L1_ERROR_NONE)
-        {
-            Serial.printf("Offset %d set and active\n", foundOffset);
-        }
-        else
-        {
-            Serial.printf("Failed to set offset, error code: %d\n", sensor_status);
-        }
-    }
-    else
-    {
-        Serial.printf("Offset calibration failed, error code: %d\n", sensor_status);
-    }
-
-    /* The target distance : the distance where the sensor start to "under range"
-    Crosstalk calibration should be conducted in a dark environment, with no IR contribution.
-    The crosstalk calibration distance needs to be characterized as it depends on the system environment which
-    mainly includes:
-    • The cover glass material and optical properties
-    • The air gap value i.e. the distance between the sensor and the cover glass
-    Do a full sweep with the target from near to far, noting the resulting measurement.
-    At some point, the actual value and the measured value start to diverge. This is the crosstalk calibration
-    distance.
-    */
-    uint16_t CalibrationDistance = 140; // crosstalk calibration distance
-    uint16_t foundXTalk;
-    sensor_status = sensor.CalibrateXTalk(CalibrationDistance, &foundXTalk);
-    if (sensor_status == VL53L1_ERROR_NONE)
-    {
-        Serial.println("Calibrated crosstalk: " + String(foundXTalk));
-        sensor_status = sensor.SetXTalk(foundXTalk);
-        if (sensor_status == VL53L1_ERROR_NONE)
-        {
-            Serial.printf("Crosstalk %d set and active\n", foundXTalk);
-        }
-        else
-        {
-            Serial.printf("Failed to set crosstalk, error code: %d\n", sensor_status);
-        }
-    }
-    else
-    {
-        Serial.printf("Crosstalk calibration failed, error code: %d\n", sensor_status);
-    }
-    sensor.ClearInterrupt();
-    sensor.StopRanging();
-    sensor.Init();
-    sensor.StartRanging();
+bool recoverSensor() {
+  Serial.println("Attempting sensor recovery...");
+  VL53L1_Error status = sensor.StopRanging();
+  if (status != VL53L1_ERROR_NONE) {
+    Serial.printf("StopRanging failed, error code: %d\n", status);
+    return false;
+  }
+  status = sensor.Init();
+  if (status != VL53L1_ERROR_NONE) {
+    Serial.printf("Init failed, error code: %d\n", status);
+    return false;
+  }
+  return true;
 }
-void loop()
-{
-    sensor.CheckForDataReady(&dataReady);
-    if (dataReady)
-    {
-        // Get the results
-        uint16_t distance;
-        sensor.GetDistanceInMm(&distance);
 
-        // After reading the results reset the interrupt to be able to take another measurement
-        sensor.ClearInterrupt();
-        dataReady = false;
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
 
-        Serial.println("Distance in mm: " + String(distance));
+  VL53L1_Error sensor_status = sensor.Begin();
+  if (sensor_status != VL53L1_ERROR_NONE) {
+    Serial.println("Could not initialize the sensor, error code: " + String(sensor_status));
+    while (1) {
     }
-    else
-    {
-        delay(1); // Small delay to avoid busy-waiting
+  }
+  Serial.println("Sensor initialized");
+
+  // Start the offset calibration
+  Serial.println("Place a target, 17 % grey, at 140 mm from the sensor a");
+  Serial.println("The calibration may take a few seconds. The offset correction is applied to the sensor at the end of "
+                 "calibration.");
+  const unsigned long serialTimeout = 10000;  // Timeout after 10 seconds
+  unsigned long start = millis();
+  while (!Serial.available() && millis() - start < serialTimeout) {
+    delay(10);  // Feed the watchdog while waiting for user input
+  }
+  while (Serial.available()) {
+    Serial.read();  // Clear any received data
+  }
+  int16_t foundOffset;
+  sensor_status = sensor.CalibrateOffset(140, &foundOffset);
+  if (sensor_status != VL53L1_ERROR_NONE) {
+    Serial.printf("Offset calibration failed, error code: %d\n", sensor_status);
+    if (!recoverSensor()) {
+      Serial.println("Recovery failed, aborting calibration.");
+      return;
     }
+  } else {
+    Serial.println("Calibrated offset: " + String(foundOffset));
+    sensor_status = sensor.SetOffsetInMm(foundOffset);
+    if (sensor_status != VL53L1_ERROR_NONE) {
+      Serial.printf("Failed to set offset, error code: %d\n", sensor_status);
+      if (!recoverSensor()) {
+        Serial.println("Recovery failed, aborting calibration.");
+        return;
+      }
+    } else {
+      Serial.printf("Offset %d set and active\n", foundOffset);
+    }
+  }
+
+  /* The target distance : the distance where the sensor start to "under range"
+  Crosstalk calibration should be conducted in a dark environment, with no IR contribution.
+  The crosstalk calibration distance needs to be characterized as it depends on the system environment which
+  mainly includes:
+  • The cover glass material and optical properties
+  • The air gap value i.e. the distance between the sensor and the cover glass
+  Do a full sweep with the target from near to far, noting the resulting measurement.
+  At some point, the actual value and the measured value start to diverge. This is the crosstalk calibration
+  distance.
+  */
+  uint16_t CalibrationDistance = 140;  // crosstalk calibration distance
+  uint16_t foundXTalk;
+  sensor_status = sensor.CalibrateXTalk(CalibrationDistance, &foundXTalk);
+  if (sensor_status != VL53L1_ERROR_NONE) {
+    Serial.printf("Crosstalk calibration failed, error code: %d\n", sensor_status);
+    if (!recoverSensor()) {
+      Serial.println("Recovery failed, aborting calibration.");
+      return;
+    }
+  } else {
+    Serial.println("Calibrated crosstalk: " + String(foundXTalk));
+    sensor_status = sensor.SetXTalk(foundXTalk);
+    if (sensor_status != VL53L1_ERROR_NONE) {
+      Serial.printf("Failed to set crosstalk, error code: %d\n", sensor_status);
+      if (!recoverSensor()) {
+        Serial.println("Recovery failed, aborting calibration.");
+        return;
+      }
+    } else {
+      Serial.printf("Crosstalk %d set and active\n", foundXTalk);
+    }
+  }
+  sensor.ClearInterrupt();
+  sensor.StopRanging();
+  sensor.Init();
+  sensor.StartRanging();
+}
+void loop() {
+  sensor.CheckForDataReady(&dataReady);
+  if (dataReady) {
+    // Get the results
+    uint16_t distance;
+    sensor.GetDistanceInMm(&distance);
+
+    // After reading the results reset the interrupt to be able to take another measurement
+    sensor.ClearInterrupt();
+    dataReady = false;
+
+    Serial.println("Distance in mm: " + String(distance));
+  } else {
+    delay(1);  // Small delay to avoid busy-waiting
+  }
 }

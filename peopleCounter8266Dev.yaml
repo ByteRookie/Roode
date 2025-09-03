@@ -54,7 +54,7 @@ vl53l1x:
     # ranging: longest # defaults to "auto" for formerly "calibration: true"
     # offset: 8
     # xtalk: 53406
-  # These pins are not yet implemented but they are passed into class now
+  # Configure XSHUT and interrupt pins for the sensor
   pins:
     xshut:
       number: GPIO3

@@ -72,6 +72,9 @@ void setup()
     {
         Serial.printf("Crosstalk calibration failed, error code: %d\n", sensor_status);
     }
+    sensor.ClearInterrupt();
+    sensor.StopRanging();
+    sensor.Init();
     sensor.StartRanging();
 }
 void loop()

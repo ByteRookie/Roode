@@ -11,8 +11,11 @@ from . import Roode, CONF_ROODE_ID
 
 DEPENDENCIES = ["roode"]
 
-CONF_PRESENCE = "presence_sensor"
+CONF_PRESENCE = "presence"  # Top-level presence sensor
 CONF_XSHUT_STATE = "sensor_xshut_state"
+CONF_ZONES = "zones"  # Container for per-zone sensors
+CONF_ENTRY = "entry"  # Key for the entry zone
+CONF_EXIT = "exit"  # Key for the exit zone
 TYPES = [CONF_PRESENCE, CONF_XSHUT_STATE]
 
 CONFIG_SCHEMA = cv.Schema(
@@ -30,6 +33,37 @@ CONFIG_SCHEMA = cv.Schema(
         ).extend(
             {
                 cv.GenerateID(): cv.declare_id(binary_sensor.BinarySensor),
+            }
+        ),
+        # Optional per-zone configuration allowing separate entry/exit presence sensors
+        cv.Optional(CONF_ZONES): cv.Schema(
+            {
+                cv.Optional(CONF_ENTRY): cv.Schema(
+                    {
+                        cv.Optional(CONF_PRESENCE): binary_sensor.binary_sensor_schema(
+                            binary_sensor.BinarySensor
+                        ).extend(
+                            {
+                                cv.GenerateID(): cv.declare_id(
+                                    binary_sensor.BinarySensor
+                                ),
+                            }
+                        )
+                    }
+                ),
+                cv.Optional(CONF_EXIT): cv.Schema(
+                    {
+                        cv.Optional(CONF_PRESENCE): binary_sensor.binary_sensor_schema(
+                            binary_sensor.BinarySensor
+                        ).extend(
+                            {
+                                cv.GenerateID(): cv.declare_id(
+                                    binary_sensor.BinarySensor
+                                ),
+                            }
+                        )
+                    }
+                ),
             }
         ),
     }
@@ -63,3 +97,16 @@ async def to_code(config):
     hub = await cg.get_variable(config[CONF_ROODE_ID])
     for key in TYPES:
         await setup_conf(config, key, hub)
+    # Handle optional entry/exit presence sensors
+    if CONF_ZONES in config:
+        zones = config[CONF_ZONES]
+        if CONF_ENTRY in zones and CONF_PRESENCE in zones[CONF_ENTRY]:
+            conf = zones[CONF_ENTRY][CONF_PRESENCE]
+            sens = cg.new_Pvariable(conf[CONF_ID])
+            await binary_sensor.register_binary_sensor(sens, conf)
+            cg.add(hub.set_entry_presence_binary_sensor(sens))
+        if CONF_EXIT in zones and CONF_PRESENCE in zones[CONF_EXIT]:
+            conf = zones[CONF_EXIT][CONF_PRESENCE]
+            sens = cg.new_Pvariable(conf[CONF_ID])
+            await binary_sensor.register_binary_sensor(sens, conf)
+            cg.add(hub.set_exit_presence_binary_sensor(sens))

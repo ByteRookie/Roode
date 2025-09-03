@@ -31,6 +31,7 @@ api:
         - lambda: "id(roode_platform)->recalibration();"
 
 ota:
+  platform: esphome  # Use native ESPHome OTA updater
   password: !secret ota_password
 
 web_server:
@@ -53,7 +54,7 @@ vl53l1x:
     # ranging: longest # defaults to "auto" for formerly "calibration: true"
     # offset: 8
     # xtalk: 53406
-  # These pins are not yet implemented but they are passed into class now
+  # Configure XSHUT and interrupt pins for the sensor
   pins:
     xshut:
       number: GPIO3
@@ -106,7 +107,7 @@ binary_sensor:
   - platform: status
     name: $friendly_name API Status
   - platform: roode
-    presence_sensor:
+    presence:  # renamed from presence_sensor
       name: $friendly_name presence
     sensor_xshut_state:
       name: $friendly_name xshut state

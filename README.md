@@ -1,6 +1,6 @@
 # RooDe
 
-[![GitHub release](https://img.shields.io/badge/release-1.6.0-blue?style=flat-square)](https://github.com/Lyr3x/Roode/releases/tag/1.6.0)
+[![GitHub release](https://img.shields.io/badge/release-1.7.0-blue?style=flat-square)](https://github.com/Lyr3x/Roode/releases/tag/1.7.0)
 
 [![Roode community](https://img.shields.io/discord/879407995837087804.svg?label=Discord&logo=Discord&colorB=7289da&style=for-the-badge)](https://discord.gg/hU9SvSXMHs)
 
@@ -369,10 +369,17 @@ This allows the current people count to be adjusted easily via Home Assistant.
 ```yaml
 binary_sensor:
   - platform: roode
-    presence_sensor:
+    presence:
       name: $friendly_name presence
     sensor_xshut_state:
       name: $friendly_name xshut state
+    zones:
+      entry:
+        presence:
+          name: $friendly_name entry occupied
+      exit:
+        presence:
+          name: $friendly_name exit occupied
 
 sensor:
   - platform: roode
@@ -457,8 +464,10 @@ calibration:6:01PM
 | Name | Type | Description |
 | ---- | ---- | ----------- |
 | `people_counter` | number | Adjustable tally of detected people |
-| `presence_sensor` | binary_sensor | True while movement is detected |
+| `presence` | binary_sensor | True while movement is detected |
 | `sensor_xshut_state` | binary_sensor | Current level of the XSHUT power pin |
+| `zones.entry.presence` | binary_sensor | Entry zone currently occupied |
+| `zones.exit.presence` | binary_sensor | Exit zone currently occupied |
 | `distance_entry` | sensor | Measured distance in the entry zone |
 | `distance_exit` | sensor | Measured distance in the exit zone |
 | `max_threshold_entry` | sensor | Upper detection threshold for entry zone |
@@ -612,6 +621,8 @@ sense objects toward the upper left, you should pick a center SPAD in the lower 
 | Feature text sensor | Reports enabled and fallback features for diagnostics |
 | Manual adjustment counter | Tracks user corrections to the people count |
 | Diagnostic sensors | Report INT/XSHUT pin states and other metrics |
+| Zone presence sensors | Optional binary sensors report occupancy in entry and exit zones |
+| ESP32 watchdog keepalive | Dedicated task feeds the watchdog and restarts hung sensors |
 | Polling timeout recovery | Restarts the sensor if no data arrives for `restart_timeout` |
 | Consecutive failure counter | Soft-resets the sensor after 10 read errors |
 | Consecutive invalid distance recovery | Restarts the sensor after too many suspect readings |

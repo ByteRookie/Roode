@@ -42,25 +42,36 @@ void setup() {
   while (Serial.available()) {
     Serial.read();  // Clear any received data
   }
+
+  constexpr uint16_t MIN_DISTANCE_MM = 40;
+  constexpr uint16_t MAX_DISTANCE_MM = 4000;
+  const uint16_t offset_distance = 140;  // distance used for offset calibration
   int16_t foundOffset;
-  sensor_status = sensor.CalibrateOffset(140, &foundOffset);
-  if (sensor_status != VL53L1_ERROR_NONE) {
-    Serial.printf("Offset calibration failed, error code: %d\n", sensor_status);
-    if (!recoverSensor()) {
-      Serial.println("Recovery failed, aborting calibration.");
-      return;
-    }
+
+  if (offset_distance < MIN_DISTANCE_MM || offset_distance > MAX_DISTANCE_MM) {
+    Serial.printf(
+        "Offset calibration distance %dmm out of range (%d-%d). Skipping offset calibration.\n",
+        offset_distance, MIN_DISTANCE_MM, MAX_DISTANCE_MM);
   } else {
-    Serial.println("Calibrated offset: " + String(foundOffset));
-    sensor_status = sensor.SetOffsetInMm(foundOffset);
+    sensor_status = sensor.CalibrateOffset(offset_distance, &foundOffset);
     if (sensor_status != VL53L1_ERROR_NONE) {
-      Serial.printf("Failed to set offset, error code: %d\n", sensor_status);
+      Serial.printf("Offset calibration failed, error code: %d\n", sensor_status);
       if (!recoverSensor()) {
         Serial.println("Recovery failed, aborting calibration.");
         return;
       }
     } else {
-      Serial.printf("Offset %d set and active\n", foundOffset);
+      Serial.println("Calibrated offset: " + String(foundOffset));
+      sensor_status = sensor.SetOffsetInMm(foundOffset);
+      if (sensor_status != VL53L1_ERROR_NONE) {
+        Serial.printf("Failed to set offset, error code: %d\n", sensor_status);
+        if (!recoverSensor()) {
+          Serial.println("Recovery failed, aborting calibration.");
+          return;
+        }
+      } else {
+        Serial.printf("Offset %d set and active\n", foundOffset);
+      }
     }
   }
 
@@ -76,24 +87,31 @@ void setup() {
   */
   uint16_t CalibrationDistance = 140;  // crosstalk calibration distance
   uint16_t foundXTalk;
-  sensor_status = sensor.CalibrateXTalk(CalibrationDistance, &foundXTalk);
-  if (sensor_status != VL53L1_ERROR_NONE) {
-    Serial.printf("Crosstalk calibration failed, error code: %d\n", sensor_status);
-    if (!recoverSensor()) {
-      Serial.println("Recovery failed, aborting calibration.");
-      return;
-    }
+
+  if (CalibrationDistance < MIN_DISTANCE_MM || CalibrationDistance > MAX_DISTANCE_MM) {
+    Serial.printf(
+        "Crosstalk calibration distance %dmm out of range (%d-%d). Skipping crosstalk calibration.\n",
+        CalibrationDistance, MIN_DISTANCE_MM, MAX_DISTANCE_MM);
   } else {
-    Serial.println("Calibrated crosstalk: " + String(foundXTalk));
-    sensor_status = sensor.SetXTalk(foundXTalk);
+    sensor_status = sensor.CalibrateXTalk(CalibrationDistance, &foundXTalk);
     if (sensor_status != VL53L1_ERROR_NONE) {
-      Serial.printf("Failed to set crosstalk, error code: %d\n", sensor_status);
+      Serial.printf("Crosstalk calibration failed, error code: %d\n", sensor_status);
       if (!recoverSensor()) {
         Serial.println("Recovery failed, aborting calibration.");
         return;
       }
     } else {
-      Serial.printf("Crosstalk %d set and active\n", foundXTalk);
+      Serial.println("Calibrated crosstalk: " + String(foundXTalk));
+      sensor_status = sensor.SetXTalk(foundXTalk);
+      if (sensor_status != VL53L1_ERROR_NONE) {
+        Serial.printf("Failed to set crosstalk, error code: %d\n", sensor_status);
+        if (!recoverSensor()) {
+          Serial.println("Recovery failed, aborting calibration.");
+          return;
+        }
+      } else {
+        Serial.printf("Crosstalk %d set and active\n", foundXTalk);
+      }
     }
   }
   sensor.ClearInterrupt();

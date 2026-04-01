@@ -1,4 +1,5 @@
 #include "zone.h"
+#include "roode.h"
 #include <algorithm>
 
 namespace esphome {
@@ -27,11 +28,18 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
   }
 
   last_distance = result.value();
-  if (sensor_status != VL53L1_ERROR_NONE || result.value() == 0 || result.value() > 4000) {
+  uint16_t dist_to_filter = result.value();
+
+  if (sensor_status != VL53L1_ERROR_NONE) {
     return sensor_status;
   }
 
-  samples[sample_idx_] = result.value();
+  // If the room is empty, feed the baseline idle distance into the filter so it clears out
+  if (dist_to_filter == 0 || dist_to_filter > 4000) {
+    dist_to_filter = threshold->idle;
+  }
+
+  samples[sample_idx_] = dist_to_filter;
   sample_idx_ = (sample_idx_ + 1) % max_samples;
   if (sample_count_ < max_samples)
     sample_count_++;
@@ -79,17 +87,28 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   zone_distances.reserve(number_attempts);
   int sum = 0;
   for (int i = 0; i < number_attempts; i++) {
+#ifdef CONFIG_IDF_TARGET_ESP32
+    if (Roode::i2c_mutex_ != nullptr)
+      xSemaphoreTake(Roode::i2c_mutex_, portMAX_DELAY);
+#endif
     this->readDistance(distanceSensor);
+#ifdef CONFIG_IDF_TARGET_ESP32
+    if (Roode::i2c_mutex_ != nullptr)
+      xSemaphoreGive(Roode::i2c_mutex_);
+#endif
     if (sensor_status != VL53L1_ERROR_NONE) {
       ESP_LOGW(CALIBRATION, "Distance read failed during calibration. status: %d", sensor_status);
-      break;
+      continue;
     }
-    zone_distances.push_back(this->getDistance());
-    sum += zone_distances.back();
+    uint16_t dist = this->getDistance();
+    if (dist > 0 && dist <= 4000) {
+      zone_distances.push_back(dist);
+      sum += dist;
+    }
   };
-  if (zone_distances.empty()) {
-    threshold->idle = 0;
-    ESP_LOGW(CALIBRATION, "Calibration failed: no valid distances recorded");
+  if (zone_distances.size() < (size_t) number_attempts) {
+    ESP_LOGW(CALIBRATION, "Calibration failed: only %d valid distances recorded (needed %d). Retaining previous baseline.",
+             zone_distances.size(), number_attempts);
   } else {
     int avg = sum / zone_distances.size();
     threshold->idle = avg;
@@ -99,18 +118,17 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
     threshold->min_percentage = min_pct;
     threshold->max = (avg * max_pct) / 100;
     threshold->min = (avg * min_pct) / 100;
+    ESP_LOGI(CALIBRATION, "Calibrated threshold for zone. zoneId: %d, idle: %d, min: %d (%d%%), max: %d (%d%%)", id,
+             threshold->idle, threshold->min,
+             threshold->min_percentage.value_or((threshold->min * 100) / threshold->idle), threshold->max,
+             threshold->max_percentage.value_or((threshold->max * 100) / threshold->idle));
   }
-
-  ESP_LOGI(CALIBRATION, "Calibrated threshold for zone. zoneId: %d, idle: %d, min: %d (%d%%), max: %d (%d%%)", id,
-           threshold->idle, threshold->min,
-           threshold->min_percentage.value_or((threshold->min * 100) / threshold->idle), threshold->max,
-           threshold->max_percentage.value_or((threshold->max * 100) / threshold->idle));
 }
 
 void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Orientation orientation) {
   // the value of the average distance is used for computing the optimal size of the ROI and consequently also the
   // center of the two zones
-  int function_of_the_distance = 16 * (1 - (0.15 * 2) / (0.34 * (min(entry_threshold, exit_threshold) / 1000)));
+  int function_of_the_distance = 16 * (1 - (0.15 * 2) / (0.34 * (min(entry_threshold, exit_threshold) / 1000.0f)));
   int ROI_size = min(8, max(4, function_of_the_distance));
   // Use the calculated ROI size unless an override has been specified
   this->roi->width = this->roi_override->width ? this->roi_override->width : ROI_size;

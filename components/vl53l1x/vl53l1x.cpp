@@ -166,7 +166,11 @@ VL53L1_Error VL53L1X::wait_for_boot() {
       ESP_LOGD(TAG, "Finished waiting for boot. Device state: %d", device_state);
       return VL53L1_ERROR_NONE;
     }
+#ifndef CONFIG_IDF_TARGET_ESP32
     App.feed_wdt();
+#else
+    vTaskDelay(1);
+#endif
   }
 
   ESP_LOGW(TAG, "Timed out waiting for boot. state: %d", device_state);
@@ -286,7 +290,11 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
       }
     }
     delay(1);
+#ifndef CONFIG_IDF_TARGET_ESP32
     App.feed_wdt();
+#else
+    vTaskDelay(1);
+#endif
   }
   if (use_int && !dataReady) {
     roode::Roode::log_event("int_pin_missed_sensor_" + std::to_string(sensor_id_));
@@ -309,7 +317,11 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
         return {};
       }
       delay(1);
-      App.feed_wdt();
+  #ifndef CONFIG_IDF_TARGET_ESP32
+    App.feed_wdt();
+#else
+    vTaskDelay(1);
+#endif
     }
   }
   if (!dataReady) {
@@ -441,7 +453,11 @@ bool VL53L1X::validate_interrupt() {
         ok = true;
         break;
       }
-      App.feed_wdt();
+  #ifndef CONFIG_IDF_TARGET_ESP32
+    App.feed_wdt();
+#else
+    vTaskDelay(1);
+#endif
     }
     if (!ok)
       ESP_LOGD(TAG, "Interrupt pin did not change state during validation");
@@ -508,6 +524,15 @@ void VL53L1X::record_failure() {
   }
 }
 
+
+optional<uint16_t> VL53L1X::get_signal_rate() {
+  uint16_t signal_rate;
+  auto status = this->sensor.GetSignalRate(&signal_rate);
+  if (status != VL53L1_ERROR_NONE) {
+    return {};
+  }
+  return {signal_rate};
+}
 
 }  // namespace vl53l1x
 }  // namespace esphome

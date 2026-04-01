@@ -40,6 +40,7 @@ CONF_RESTART_TIMEOUT = "restart_timeout"
 CONF_CPU_OPTIMIZATION = "cpu_optimization"
 CONF_ACTIVATE = "activate"
 CONF_DEACTIVATE = "deactivate"
+CONF_PORTAL_PASSWORD = "portal_password"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -104,6 +105,7 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional(CONF_DEACTIVATE, default=0.50): cv.percentage,
             }
         ),
+        cv.Optional(CONF_PORTAL_PASSWORD, default=""): cv.string,
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
                 cv.Optional(CONF_INVERT, default=False): cv.boolean,
@@ -118,6 +120,7 @@ CONFIG_SCHEMA = cv.Schema(
 async def to_code(config: Dict):
     roode = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(roode, config)
+    cg.add_library("bblanchon/ArduinoJson", "6.18.5")
 
     sens = await cg.get_variable(config[CONF_SENSOR])
     cg.add(roode.set_tof_sensor(sens))
@@ -131,6 +134,7 @@ async def to_code(config: Dict):
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
     cg.add(roode.set_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT]))
     cg.add(roode.set_restart_timeout(config[CONF_RESTART_TIMEOUT]))
+    cg.add(roode.set_portal_password(config[CONF_PORTAL_PASSWORD]))
     cpu_conf = config.get(CONF_CPU_OPTIMIZATION, {})
     cg.add(
         roode.set_cpu_optimization_thresholds(

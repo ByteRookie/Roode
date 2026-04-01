@@ -1,6 +1,8 @@
 #pragma once
 #include <math.h>
 #include <string>
+#include <map>
+#include <vector>
 #include "Arduino.h"
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -21,7 +23,7 @@ namespace esphome {
 namespace roode {
 #define NOBODY 0
 #define SOMEONE 1
-#define VERSION "1.7.0"
+#define VERSION "1.8.0"
 static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
@@ -138,6 +140,7 @@ class Roode : public PollingComponent {
   }
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
+  void set_portal_password(const std::string &password) { portal_password_ = password; }
   void set_cpu_optimization_thresholds(float activate, float deactivate) {
     cpu_opt_activate_threshold_ = activate;
     cpu_opt_deactivate_threshold_ = deactivate;
@@ -152,6 +155,9 @@ class Roode : public PollingComponent {
   Zone *entry = new Zone(0);
   Zone *exit = new Zone(1);
   static void log_event(const std::string &msg);
+#ifdef CONFIG_IDF_TARGET_ESP32
+  static SemaphoreHandle_t i2c_mutex_;
+#endif
 
  protected:
   TofSensor *distanceSensor;
@@ -194,6 +200,7 @@ class Roode : public PollingComponent {
   bool calibration_persistence_{false};
   bool fail_safe_triggered_{false};
   uint32_t last_calibration_ts_{0};
+  uint32_t last_calibration_millis_{0};
   uint32_t auto_calibration_interval_sec_{4 * 60 * 60};
 
   FilterMode filter_mode_{FILTER_MIN};
@@ -223,8 +230,64 @@ class Roode : public PollingComponent {
 
   std::string last_status_text_{};
 
+  // Thread safety flags for Core 1 -> Core 0 communication
+  volatile bool presence_update_pending_{false};
+  volatile bool presence_state_{false};
+  volatile bool entry_presence_update_pending_{false};
+  volatile bool entry_presence_state_{false};
+  volatile bool exit_presence_update_pending_{false};
+  volatile bool exit_presence_state_{false};
+  volatile bool sensor_status_update_pending_{false};
+  VL53L1_Error pending_sensor_status_{VL53L1_ERROR_NONE};
+  volatile bool status_text_update_pending_{false};
+  volatile char pending_status_text_[32] = {0};
+  volatile bool feature_list_update_pending_{false};
+  volatile bool calibration_save_pending_[2]{false, false};
+  volatile bool entry_exit_event_pending_{false};
+  volatile char pending_entry_exit_event_[16] = {0};
+  volatile bool people_counter_update_pending_{false};
+  float pending_people_counter_value_{0};
+  volatile bool manual_adjustment_update_pending_{false};
+  int pending_manual_adjustment_count_{0};
+  volatile bool metrics_update_pending_{false};
+  float pending_loop_time_{0};
+  float pending_cpu_usage_{0};
+  float pending_ram_free_{0};
+  float pending_flash_free_{0};
+  volatile bool config_update_pending_{false};
+  uint16_t pending_max_th_[2]{0, 0};
+  uint16_t pending_min_th_[2]{0, 0};
+  uint8_t pending_roi_h_[2]{0, 0};
+  uint8_t pending_roi_w_[2]{0, 0};
+
+  int PathTrack[4] = {0, 0, 0, 0};
+  int PathTrackFillingSize = 1;
+  int LeftPreviousStatus = NOBODY;
+  int RightPreviousStatus = NOBODY;
+  int AllZonesCurrentStatus = 0;
+  int AnEventHasOccured = 0;
+
+  struct ScanSession {
+    std::string id;
+    uint32_t ts;
+    uint8_t trials;
+    uint32_t duration_sec;
+    size_t size_bytes;
+  };
+  std::vector<ScanSession> sessions_;
+  std::map<std::string, std::vector<uint16_t>> scan_results_;
+  enum ScanState { SCAN_IDLE, SCANNING, SCAN_CANCELLED };
+  volatile ScanState scan_state_{SCAN_IDLE};
+  std::string active_scan_id_{""};
+  uint8_t scan_progress_{0};
+  std::string scan_step_{""};
+  uint32_t scan_start_ts_{0};
+
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
+  void register_portal_routes_();
+  bool portal_registered_{false};
+  std::string portal_password_{};
   void path_tracking(Zone *zone);
   bool handle_sensor_status();
   void update_status_text(const std::string &status);

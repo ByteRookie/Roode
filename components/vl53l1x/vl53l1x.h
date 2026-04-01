@@ -1,5 +1,6 @@
 #pragma once
 #include <math.h>
+#include <Wire.h>
 
 #include "VL53L1X_ULD.h"
 #include <vector>
@@ -54,6 +55,7 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   void set_timeout(uint16_t val) { this->timeout = val; }
 
   bool is_interrupt_enabled() const { return interrupt_active_ && interrupt_pin.has_value(); }
+  optional<uint16_t> get_signal_rate();
 
  protected:
   VL53L1X_ULD sensor;

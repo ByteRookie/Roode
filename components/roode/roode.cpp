@@ -4,8 +4,10 @@
 #include "esp_task_wdt.h"  // Access to the ESP32 task watchdog
 #endif
 #include "esphome/components/web_server_base/web_server_base.h"
+#ifdef USE_WEB_SERVER
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#endif
 #include <string>
 #include <optional>
 #include <vector>

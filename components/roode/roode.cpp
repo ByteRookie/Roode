@@ -512,6 +512,7 @@ void Roode::setup() {
     this->mark_failed();
     update_status_text("offline");
     ESP_LOGE(TAG, "Roode cannot be setup without a valid VL53L1X sensor");
+    register_portal_routes_();
     return;
   }
 

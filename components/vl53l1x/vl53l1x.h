@@ -1,6 +1,8 @@
 #pragma once
 #include <math.h>
+#ifdef USE_ARDUINO
 #include <Wire.h>
+#endif
 
 #include "VL53L1X_ULD.h"
 #include <vector>

@@ -112,6 +112,7 @@ CONFIG_SCHEMA = (
 
 async def to_code(config: Dict):
     cg.add_library("rneurink", "1.2.3", "VL53L1X_ULD")
+    cg.add_library("Wire", "")
 
     vl53l1x = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(vl53l1x, config)

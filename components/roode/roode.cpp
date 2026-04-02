@@ -387,7 +387,7 @@ static const char *const portal_html = R"PORTAL(
 bool Roode::log_fallback_events_ = false;
 Roode *Roode::instance_ = nullptr;
 #ifdef CONFIG_IDF_TARGET_ESP32
-SemaphoreHandle_t Roode::i2c_mutex_ = xSemaphoreCreateMutex();
+SemaphoreHandle_t Roode::i2c_mutex_ = xSemaphoreCreateRecursiveMutex();
 #endif
 void Roode::log_event(const std::string &msg) {
   if (!log_fallback_events_) {
@@ -1192,8 +1192,34 @@ void Roode::updateCounter(int delta) {
 }
 void Roode::recalibration() { calibrate_zones(); }
 
+bool Roode::pause_sensor_task_if_needed_() {
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (!use_sensor_task_ || sensor_task_handle_ == nullptr)
+    return false;
+  if (xTaskGetCurrentTaskHandle() == sensor_task_handle_)
+    return false;
+  i2c_lock();
+  vTaskSuspend(sensor_task_handle_);
+  return true;
+#else
+  return false;
+#endif
+}
+
+void Roode::resume_sensor_task_if_needed_(bool paused) {
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (paused && sensor_task_handle_ != nullptr) {
+    vTaskResume(sensor_task_handle_);
+    i2c_unlock();
+  }
+#else
+  (void) paused;
+#endif
+}
+
 void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
+  bool paused = pause_sensor_task_if_needed_();
   Zone *z = zone_id == 0 ? entry : exit;
   z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
   z->calibrateThreshold(distanceSensor, 50);
@@ -1223,6 +1249,7 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   last_calibration_ts_ =
       std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
+  resume_sensor_task_if_needed_(paused);
 }
 
 void Roode::apply_cpu_optimizations(float cpu) {
@@ -1337,6 +1364,7 @@ void Roode::calibrate_zones() {
     ESP_LOGW(TAG, "Skipping zone calibration: sensor is offline");
     return;
   }
+  bool paused = pause_sensor_task_if_needed_();
   ESP_LOGI(SETUP, "Calibrating sensor zones");
 
   entry->reset_roi(orientation_ == Parallel ? 167 : 195);
@@ -1372,6 +1400,7 @@ void Roode::calibrate_zones() {
   last_calibration_ts_ =
       std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
+  resume_sensor_task_if_needed_(paused);
 }
 
 void Roode::calibrateDistance() {
@@ -1554,13 +1583,13 @@ void Roode::sensor_task(void *param) {
           roi.height = 4;
           roi.center = (y * 2 + 1) * 16 + (x * 2 + 1); // Approx center of 2x2 SPAD block in 16x16 grid
 #ifdef CONFIG_IDF_TARGET_ESP32
-          xSemaphoreTake(i2c_mutex_, portMAX_DELAY);
+          i2c_lock();
 #endif
           VL53L1_Error status;
           self->distanceSensor->read_distance(&roi, status);
           auto rate = self->distanceSensor->get_signal_rate();
 #ifdef CONFIG_IDF_TARGET_ESP32
-          xSemaphoreGive(i2c_mutex_);
+          i2c_unlock();
 #endif
           scan_data.push_back(rate.value_or(0));
           self->scan_progress_ = (scan_data.size() * 100) / 64;
@@ -1594,20 +1623,20 @@ void Roode::sensor_task(void *param) {
         (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
       ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", self->restart_timeout_ms_ / 1000);
 #ifdef CONFIG_IDF_TARGET_ESP32
-      xSemaphoreTake(i2c_mutex_, portMAX_DELAY);
+      i2c_lock();
 #endif
       self->restart_sensor();
 #ifdef CONFIG_IDF_TARGET_ESP32
-      xSemaphoreGive(i2c_mutex_);
+      i2c_unlock();
 #endif
     }
     unsigned long start = micros();
 #ifdef CONFIG_IDF_TARGET_ESP32
-    xSemaphoreTake(i2c_mutex_, portMAX_DELAY);
+    i2c_lock();
 #endif
     VL53L1_Error status = self->current_zone->readDistance(self->distanceSensor);
 #ifdef CONFIG_IDF_TARGET_ESP32
-    xSemaphoreGive(i2c_mutex_);
+    i2c_unlock();
 #endif
     if (status == VL53L1_ERROR_NONE) {
       self->last_loop_update_ts_ = millis();
@@ -1621,11 +1650,11 @@ void Roode::sensor_task(void *param) {
         (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
       ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
 #ifdef CONFIG_IDF_TARGET_ESP32
-      xSemaphoreTake(i2c_mutex_, portMAX_DELAY);
+      i2c_lock();
 #endif
       self->restart_sensor();
 #ifdef CONFIG_IDF_TARGET_ESP32
-      xSemaphoreGive(i2c_mutex_);
+      i2c_unlock();
 #endif
     }
     self->AnEventHasOccured = 0;

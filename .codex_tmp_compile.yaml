@@ -1,0 +1,62 @@
+substitutions:
+  devicename: codex-compile
+
+external_components:
+  source: ./components
+
+esphome:
+  name: ${devicename}
+
+esp32:
+  board: esp-wrover-kit
+  framework:
+    type: arduino
+
+logger:
+
+wifi:
+  ssid: "compile-only"
+  password: "compile-only"
+
+web_server:
+  port: 80
+
+i2c:
+  sda: 21
+  scl: 22
+
+vl53l1x:
+  calibration:
+    ranging: short
+
+roode:
+  id: roode_platform
+  force_single_core: true
+  sampling: 2
+  roi: { height: 16, width: 6 }
+  detection_thresholds:
+    min: 0%
+    max: 95%
+
+number:
+  - platform: roode
+    people_counter:
+      name: "people counter"
+
+binary_sensor:
+  - platform: roode
+    presence:
+      name: "presence"
+
+sensor:
+  - platform: roode
+    id: roode_sensors
+    distance_entry:
+      name: "distance zone 0"
+    distance_exit:
+      name: "distance zone 1"
+
+text_sensor:
+  - platform: roode
+    version:
+      name: "version"

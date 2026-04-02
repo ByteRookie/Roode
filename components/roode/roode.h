@@ -157,6 +157,13 @@ class Roode : public PollingComponent {
   static void log_event(const std::string &msg);
 #ifdef CONFIG_IDF_TARGET_ESP32
   static SemaphoreHandle_t i2c_mutex_;
+  static bool i2c_lock(TickType_t timeout = portMAX_DELAY) {
+    return i2c_mutex_ == nullptr || xSemaphoreTakeRecursive(i2c_mutex_, timeout) == pdTRUE;
+  }
+  static void i2c_unlock() {
+    if (i2c_mutex_ != nullptr)
+      xSemaphoreGiveRecursive(i2c_mutex_);
+  }
 #endif
 
  protected:
@@ -294,6 +301,8 @@ class Roode : public PollingComponent {
   void calibrateDistance();
   void calibrate_zones();
   void publish_feature_list();
+  bool pause_sensor_task_if_needed_();
+  void resume_sensor_task_if_needed_(bool paused);
   const RangingMode *determine_ranging_mode(uint16_t average_entry_zone_distance, uint16_t average_exit_zone_distance);
   void publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax);
   void updateCounter(int delta);

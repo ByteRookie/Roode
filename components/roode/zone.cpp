@@ -88,13 +88,11 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   int sum = 0;
   for (int i = 0; i < number_attempts; i++) {
 #ifdef CONFIG_IDF_TARGET_ESP32
-    if (Roode::i2c_mutex_ != nullptr)
-      xSemaphoreTake(Roode::i2c_mutex_, portMAX_DELAY);
+    Roode::i2c_lock();
 #endif
     this->readDistance(distanceSensor);
 #ifdef CONFIG_IDF_TARGET_ESP32
-    if (Roode::i2c_mutex_ != nullptr)
-      xSemaphoreGive(Roode::i2c_mutex_);
+    Roode::i2c_unlock();
 #endif
     if (sensor_status != VL53L1_ERROR_NONE) {
       ESP_LOGW(CALIBRATION, "Distance read failed during calibration. status: %d", sensor_status);

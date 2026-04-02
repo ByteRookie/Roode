@@ -1,13 +1,30 @@
 #include "vl53l1x.h"
 #include "../roode/roode.h"
+#include <array>
+#include <cstring>
 #include <cstdio>
 
 namespace esphome {
 namespace vl53l1x {
 
 std::vector<VL53L1X *> VL53L1X::sensors{};
+thread_local VL53L1X *VL53L1X::active_sensor_ = nullptr;
+
+namespace {
+
+class ScopedActiveSensor {
+ public:
+  explicit ScopedActiveSensor(VL53L1X *sensor) : previous_(VL53L1X::get_active_sensor()) { VL53L1X::set_active_sensor(sensor); }
+  ~ScopedActiveSensor() { VL53L1X::set_active_sensor(previous_); }
+
+ protected:
+  VL53L1X *previous_;
+};
+
+}  // namespace
 
 VL53L1X::~VL53L1X() {
+  ScopedActiveSensor scoped(this);
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->digital_write(false);
     ESP_LOGD(TAG, "XShut pin set LOW - powering down sensor");
@@ -34,31 +51,11 @@ void VL53L1X::dump_config() {
   LOG_PIN("  XShut Pin: ", this->xshut_pin.value());
 }
 
-bool VL53L1X::initialize_arduino_i2c_bridge_() {
-#if defined(USE_ARDUINO) && defined(USE_ESP32)
-  ESP_LOGD(TAG, "Initializing Arduino Wire on SDA=%u, SCL=%u @ %u Hz", arduino_i2c_sda_pin_, arduino_i2c_scl_pin_,
-           arduino_i2c_frequency_);
-  bool wire_ok = Wire.begin(arduino_i2c_sda_pin_, arduino_i2c_scl_pin_, arduino_i2c_frequency_);
-  if (!wire_ok) {
-    ESP_LOGE(TAG, "Wire.begin failed");
-    return false;
-  }
-  Wire.setClock(arduino_i2c_frequency_);
-  return true;
-#else
-  return true;
-#endif
-}
-
 void VL53L1X::setup() {
   ESP_LOGD(TAG, "Beginning setup");
+  ScopedActiveSensor scoped(this);
 
   sensors.push_back(this);
-
-  if (!this->initialize_arduino_i2c_bridge_()) {
-    this->mark_failed();
-    return;
-  }
 
   for (auto *s : sensors) {
     if (s != this && s->xshut_pin.has_value()) {
@@ -116,53 +113,10 @@ void VL53L1X::setup() {
 
   if (this->is_failed()) return;
 
-  if (desired_address_ != 0x29 && desired_address_ != address_) {
-#ifdef CONFIG_IDF_TARGET_ESP32
-    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreTake(roode::Roode::i2c_mutex_, portMAX_DELAY);
-#endif
-    status = this->sensor.SetI2CAddress(desired_address_ << 1);
-#ifdef CONFIG_IDF_TARGET_ESP32
-    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreGive(roode::Roode::i2c_mutex_);
-#endif
-    if (status == VL53L1_ERROR_NONE) {
-      char buf[5];
-      snprintf(buf, sizeof(buf), "%02X", desired_address_);
-      roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + "_addr = 0x" + std::string(buf));
-    } else {
-      ESP_LOGE(TAG, "Failed to change address. Error: %d", status);
-    }
-  }
-
-  if (this->offset.has_value()) {
-    ESP_LOGI(TAG, "Setting offset calibration to %d", this->offset.value());
-#ifdef CONFIG_IDF_TARGET_ESP32
-    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreTake(roode::Roode::i2c_mutex_, portMAX_DELAY);
-#endif
-    status = this->sensor.SetOffsetInMm(this->offset.value());
-#ifdef CONFIG_IDF_TARGET_ESP32
-    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreGive(roode::Roode::i2c_mutex_);
-#endif
-    if (status != VL53L1_ERROR_NONE) {
-      ESP_LOGE(TAG, "Could not set offset calibration, error code: %d", status);
-      this->mark_failed();
-      return;
-    }
-  }
-
-  if (this->xtalk.has_value()) {
-    ESP_LOGI(TAG, "Setting crosstalk calibration to %d", this->xtalk.value());
-#ifdef CONFIG_IDF_TARGET_ESP32
-    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreTake(roode::Roode::i2c_mutex_, portMAX_DELAY);
-#endif
-    status = this->sensor.SetXTalk(this->xtalk.value());
-#ifdef CONFIG_IDF_TARGET_ESP32
-    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreGive(roode::Roode::i2c_mutex_);
-#endif
-    if (status != VL53L1_ERROR_NONE) {
-      ESP_LOGE(TAG, "Could not set crosstalk calibration, error code: %d", status);
-      this->mark_failed();
-      return;
-    }
+  status = this->apply_runtime_configuration_();
+  if (status != VL53L1_ERROR_NONE) {
+    this->mark_failed();
+    return;
   }
 
   if (!this->check_features()) {
@@ -173,17 +127,38 @@ void VL53L1X::setup() {
   ESP_LOGI(TAG, "Setup complete");
 }
 
+int8_t VL53L1X::uld_write_register(uint8_t address, uint16_t register_address, const uint8_t *data, size_t len) {
+  if (this->bus_ == nullptr || len > 64) {
+    return 1;
+  }
+  std::array<uint8_t, 66> buffer{};
+  buffer[0] = register_address >> 8;
+  buffer[1] = register_address & 0xFF;
+  if (len > 0) {
+    memcpy(buffer.data() + 2, data, len);
+  }
+  return this->bus_->write_readv(address, buffer.data(), len + 2, nullptr, 0) == i2c::ERROR_OK ? 0 : 1;
+}
+
+int8_t VL53L1X::uld_read_register(uint8_t address, uint16_t register_address, uint8_t *data, size_t len) {
+  if (this->bus_ == nullptr || len > 64) {
+    return 1;
+  }
+  std::array<uint8_t, 2> buffer{{static_cast<uint8_t>(register_address >> 8), static_cast<uint8_t>(register_address & 0xFF)}};
+  return this->bus_->write_readv(address, buffer.data(), buffer.size(), data, len) == i2c::ERROR_OK ? 0 : 1;
+}
+
 VL53L1_Error VL53L1X::init() {
   ESP_LOGD(TAG, "Trying to initialize at address 0x%02X", address_);
 
   VL53L1_Error status;
 
 #ifdef CONFIG_IDF_TARGET_ESP32
-  if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreTake(roode::Roode::i2c_mutex_, portMAX_DELAY);
+  roode::Roode::i2c_lock();
 #endif
   uint16_t current_addr = sensor.GetI2CAddress() >> 1;
 #ifdef CONFIG_IDF_TARGET_ESP32
-  if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreGive(roode::Roode::i2c_mutex_);
+  roode::Roode::i2c_unlock();
 #endif
 
   ESP_LOGD(TAG, "Current ULD driver address: 0x%02X", current_addr);
@@ -192,7 +167,7 @@ VL53L1_Error VL53L1X::init() {
   if (address_ != current_addr) {
     ESP_LOGD(TAG, "Address mismatch. Checking if sensor is at 0x29...");
 #ifdef CONFIG_IDF_TARGET_ESP32
-    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreTake(roode::Roode::i2c_mutex_, portMAX_DELAY);
+    roode::Roode::i2c_lock();
 #endif
     status = sensor.SetI2CAddress(0x29 << 1); // Try to talk to 0x29
     if (status == VL53L1_ERROR_NONE) {
@@ -200,7 +175,7 @@ VL53L1_Error VL53L1X::init() {
        status = sensor.SetI2CAddress(address_ << 1);
     }
 #ifdef CONFIG_IDF_TARGET_ESP32
-    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreGive(roode::Roode::i2c_mutex_);
+    roode::Roode::i2c_unlock();
 #endif
     if (status != VL53L1_ERROR_NONE) {
       ESP_LOGW(TAG, "Could not find sensor at 0x%02X or 0x29", address_);
@@ -214,13 +189,93 @@ VL53L1_Error VL53L1X::init() {
 
   ESP_LOGD(TAG, "Found device, initializing...");
 #ifdef CONFIG_IDF_TARGET_ESP32
-  if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreTake(roode::Roode::i2c_mutex_, portMAX_DELAY);
+  roode::Roode::i2c_lock();
 #endif
   status = sensor.Init();
 #ifdef CONFIG_IDF_TARGET_ESP32
-  if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreGive(roode::Roode::i2c_mutex_);
+  roode::Roode::i2c_unlock();
 #endif
   return status;
+}
+
+VL53L1_Error VL53L1X::apply_runtime_configuration_() {
+  VL53L1_Error status = VL53L1_ERROR_NONE;
+
+#ifdef CONFIG_IDF_TARGET_ESP32
+  roode::Roode::i2c_lock();
+#endif
+  if (desired_address_ != 0x29 && desired_address_ != address_) {
+    status = this->sensor.SetI2CAddress(desired_address_ << 1);
+    if (status == VL53L1_ERROR_NONE) {
+      char buf[5];
+      snprintf(buf, sizeof(buf), "%02X", desired_address_);
+      roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + "_addr = 0x" + std::string(buf));
+    } else {
+      ESP_LOGE(TAG, "Failed to change address. Error: %d", status);
+      goto done;
+    }
+  }
+
+  if (this->offset.has_value()) {
+    ESP_LOGI(TAG, "Setting offset calibration to %d", this->offset.value());
+    status = this->sensor.SetOffsetInMm(this->offset.value());
+    if (status != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Could not set offset calibration, error code: %d", status);
+      goto done;
+    }
+  }
+
+  if (this->xtalk.has_value()) {
+    ESP_LOGI(TAG, "Setting crosstalk calibration to %d", this->xtalk.value());
+    status = this->sensor.SetXTalk(this->xtalk.value());
+    if (status != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Could not set crosstalk calibration, error code: %d", status);
+      goto done;
+    }
+  }
+
+  last_roi = nullptr;
+  if (this->ranging_mode != nullptr) {
+    status = this->sensor.SetDistanceMode(this->ranging_mode->mode);
+    if (status != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Could not restore distance mode: %d, error code: %d", this->ranging_mode->mode, status);
+      goto done;
+    }
+    status = this->sensor.SetTimingBudgetInMs(this->ranging_mode->timing_budget);
+    if (status != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Could not restore timing budget: %d ms, error code: %d", this->ranging_mode->timing_budget,
+               status);
+      goto done;
+    }
+    status = this->sensor.SetInterMeasurementInMs(this->ranging_mode->delay_between_measurements);
+    if (status != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Could not restore measurement delay: %d ms, error code: %d",
+               this->ranging_mode->delay_between_measurements, status);
+      goto done;
+    }
+  }
+
+done:
+#ifdef CONFIG_IDF_TARGET_ESP32
+  roode::Roode::i2c_unlock();
+#endif
+  return status;
+}
+
+VL53L1_Error VL53L1X::reinitialize_after_hard_reset_() {
+  auto status = this->init();
+  if (status != VL53L1_ERROR_NONE) {
+    ESP_LOGE(TAG, "Sensor reinitialization failed with error code: %d", status);
+    return status;
+  }
+
+  status = this->apply_runtime_configuration_();
+  if (status != VL53L1_ERROR_NONE) {
+    ESP_LOGE(TAG, "Restoring runtime configuration failed with error code: %d", status);
+    return status;
+  }
+
+  return VL53L1_ERROR_NONE;
 }
 
 VL53L1_Error VL53L1X::wait_for_boot() {
@@ -269,11 +324,15 @@ VL53L1_Error VL53L1X::get_device_state(uint8_t *device_state) {
 }
 
 void VL53L1X::set_ranging_mode(const RangingMode *mode) {
+  ScopedActiveSensor scoped(this);
   if (this->is_failed()) {
     ESP_LOGE(TAG, "Cannot set ranging mode while component is failed");
     return;
   }
 
+#ifdef CONFIG_IDF_TARGET_ESP32
+  roode::Roode::i2c_lock();
+#endif
   auto status = this->sensor.SetDistanceMode(mode->mode);
   if (status != VL53L1_ERROR_NONE) {
     ESP_LOGE(TAG, "Could not set distance mode: %d, error code: %d", mode->mode, status);
@@ -290,10 +349,14 @@ void VL53L1X::set_ranging_mode(const RangingMode *mode) {
   }
 
   this->ranging_mode = mode;
+#ifdef CONFIG_IDF_TARGET_ESP32
+  roode::Roode::i2c_unlock();
+#endif
   ESP_LOGI(TAG, "Set ranging mode: %s", mode->name);
 }
 
 optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
+  ScopedActiveSensor scoped(this);
   if (this->is_failed()) {
     ESP_LOGW(TAG, "Cannot read distance while component is failed");
     record_failure();
@@ -402,10 +465,14 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
       roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
       roode::Roode::log_event("xshut_reinitialize");
       ESP_LOGD(TAG, "XShut pin set HIGH - reset complete");
-      this->wait_for_boot();
-      roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
-      roode::Roode::log_event("sensor.recovered_via_xshut");
-      recovery_count_++;
+      auto recovery_status = this->reinitialize_after_hard_reset_();
+      if (recovery_status == VL53L1_ERROR_NONE) {
+        roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
+        roode::Roode::log_event("sensor.recovered_via_xshut");
+        recovery_count_++;
+      } else {
+        status = recovery_status;
+      }
     }
     record_failure();
     return {};
@@ -453,12 +520,12 @@ bool VL53L1X::check_features() {
     delay(10);
     this->xshut_pin.value()->digital_write(true);
     ESP_LOGD(TAG, "XShut pin set HIGH - validation reset complete");
-    xshut_ok = (this->wait_for_boot() == VL53L1_ERROR_NONE);
+    xshut_ok = (this->reinitialize_after_hard_reset_() == VL53L1_ERROR_NONE);
     if (!xshut_ok) {
       ESP_LOGE(TAG, "XShut pin validation failed, disabling power cycle support");
       this->xshut_pin.reset();
       ESP_LOGW(TAG, "XShut pin disabled due to validation failure");
-      if (this->wait_for_boot() != VL53L1_ERROR_NONE) {
+      if (this->reinitialize_after_hard_reset_() != VL53L1_ERROR_NONE) {
         this->mark_failed();
         return false;
       }
@@ -503,6 +570,7 @@ bool VL53L1X::check_features() {
 }
 
 bool VL53L1X::validate_interrupt() {
+  ScopedActiveSensor scoped(this);
   bool ok = false;
   if (!this->interrupt_pin.has_value())
     return false;
@@ -529,6 +597,7 @@ bool VL53L1X::validate_interrupt() {
 }
 
 void VL53L1X::restart() {
+  ScopedActiveSensor scoped(this);
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->digital_write(false);
     roode::Roode::log_event("xshut_pulse_off_sensor_" + std::to_string(sensor_id_));
@@ -539,17 +608,23 @@ void VL53L1X::restart() {
     roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
     roode::Roode::log_event("xshut_reinitialize");
     ESP_LOGD(TAG, "XShut pin set HIGH - restart complete");
-    this->wait_for_boot();
-    roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
-    roode::Roode::log_event("sensor.recovered_via_xshut");
-    recovery_count_++;
+    if (this->reinitialize_after_hard_reset_() == VL53L1_ERROR_NONE) {
+      roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
+      roode::Roode::log_event("sensor.recovered_via_xshut");
+      recovery_count_++;
+    } else {
+      this->mark_failed();
+    }
   } else {
     ESP_LOGW(TAG, "Restarting sensor without XSHUT pin");
-    this->init();
+    if (this->reinitialize_after_hard_reset_() != VL53L1_ERROR_NONE) {
+      this->mark_failed();
+    }
   }
 }
 
 void VL53L1X::soft_reset() {
+  ScopedActiveSensor scoped(this);
 
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->digital_write(false);
@@ -565,13 +640,18 @@ void VL53L1X::soft_reset() {
 
     ESP_LOGD(TAG, "XShut pin set HIGH - reset complete");
 
-    this->wait_for_boot();
-    roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
-    roode::Roode::log_event("sensor.recovered_via_xshut");
-    recovery_count_++;
+    if (this->reinitialize_after_hard_reset_() == VL53L1_ERROR_NONE) {
+      roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
+      roode::Roode::log_event("sensor.recovered_via_xshut");
+      recovery_count_++;
+    } else {
+      this->mark_failed();
+    }
   } else {
     ESP_LOGW(TAG, "Restarting sensor without XSHUT pin");
-    this->init();
+    if (this->reinitialize_after_hard_reset_() != VL53L1_ERROR_NONE) {
+      this->mark_failed();
+    }
   }
 }
 
@@ -587,6 +667,7 @@ void VL53L1X::record_failure() {
 
 
 optional<uint16_t> VL53L1X::get_signal_rate() {
+  ScopedActiveSensor scoped(this);
   uint16_t signal_rate;
   auto status = this->sensor.GetSignalRate(&signal_rate);
   if (status != VL53L1_ERROR_NONE) {

@@ -13,6 +13,8 @@ from esphome.const import (
     CONF_ADDRESS,
     CONF_OFFSET,
     CONF_PINS,
+    CONF_SCL,
+    CONF_SDA,
     CONF_TIMEOUT,
 )
 import esphome.pins as pins
@@ -126,6 +128,8 @@ async def to_code(config: Dict):
         entry for entry in CORE.config[CONF_I2C] if entry[CONF_ID] == i2c_id
     )
     frequency = i2c_config[CONF_FREQUENCY]
+    cg.add(vl53l1x.set_arduino_i2c_pins(i2c_config[CONF_SDA], i2c_config[CONF_SCL]))
+    cg.add(vl53l1x.set_arduino_i2c_frequency(int(frequency)))
     if frequency == 50000:  # default
         i2c_var = await cg.get_variable(i2c_id)
         cg.add(i2c_var.set_frequency(400000))

@@ -28,7 +28,7 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   void dump_config() override;
   ~VL53L1X();
   /** This connects directly to a sensor */
-  float get_setup_priority() const override { return setup_priority::DATA; };
+  float get_setup_priority() const override { return setup_priority::BUS + 1.0f; };
 
   optional<uint16_t> read_distance(ROI *roi, VL53L1_Error &error);
   void set_ranging_mode(const RangingMode *mode);
@@ -55,6 +55,13 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   void set_offset(int16_t val) { this->offset = val; }
   void set_xtalk(uint16_t val) { this->xtalk = val; }
   void set_timeout(uint16_t val) { this->timeout = val; }
+  void set_arduino_i2c_pins(uint8_t sda, uint8_t scl) {
+    arduino_i2c_sda_pin_ = sda;
+    arduino_i2c_scl_pin_ = scl;
+  }
+  void set_arduino_i2c_frequency(uint32_t frequency) {
+    arduino_i2c_frequency_ = frequency;
+  }
 
   bool is_interrupt_enabled() const { return interrupt_active_ && interrupt_pin.has_value(); }
   optional<uint16_t> get_signal_rate();
@@ -93,8 +100,12 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   uint8_t interrupt_miss_count_{0};
   uint32_t last_interrupt_retry_{0};
   uint8_t consecutive_failures_{0};
+  uint8_t arduino_i2c_sda_pin_{21};
+  uint8_t arduino_i2c_scl_pin_{22};
+  uint32_t arduino_i2c_frequency_{400000};
+
+  bool initialize_arduino_i2c_bridge_();
 };
 
 }  // namespace vl53l1x
 }  // namespace esphome
-

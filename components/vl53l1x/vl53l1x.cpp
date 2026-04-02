@@ -34,17 +34,31 @@ void VL53L1X::dump_config() {
   LOG_PIN("  XShut Pin: ", this->xshut_pin.value());
 }
 
+bool VL53L1X::initialize_arduino_i2c_bridge_() {
+#if defined(USE_ARDUINO) && defined(USE_ESP32)
+  ESP_LOGD(TAG, "Initializing Arduino Wire on SDA=%u, SCL=%u @ %u Hz", arduino_i2c_sda_pin_, arduino_i2c_scl_pin_,
+           arduino_i2c_frequency_);
+  bool wire_ok = Wire.begin(arduino_i2c_sda_pin_, arduino_i2c_scl_pin_, arduino_i2c_frequency_);
+  if (!wire_ok) {
+    ESP_LOGE(TAG, "Wire.begin failed");
+    return false;
+  }
+  Wire.setClock(arduino_i2c_frequency_);
+  return true;
+#else
+  return true;
+#endif
+}
+
 void VL53L1X::setup() {
   ESP_LOGD(TAG, "Beginning setup");
 
   sensors.push_back(this);
 
-#ifdef CONFIG_IDF_TARGET_ESP32
-  // Force Arduino Wire to initialize on the configured pins to resolve IDF conflict
-  ESP_LOGD(TAG, "Forcing Arduino Wire initialization on SDA=21, SCL=22");
-  bool wire_ok = Wire.begin(21, 22);
-  ESP_LOGD(TAG, "Wire.begin result: %s", wire_ok ? "success" : "failed");
-#endif
+  if (!this->initialize_arduino_i2c_bridge_()) {
+    this->mark_failed();
+    return;
+  }
 
   for (auto *s : sensors) {
     if (s != this && s->xshut_pin.has_value()) {

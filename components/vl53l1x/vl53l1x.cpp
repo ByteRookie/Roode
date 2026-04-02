@@ -38,6 +38,14 @@ void VL53L1X::setup() {
   ESP_LOGD(TAG, "Beginning setup");
 
   sensors.push_back(this);
+
+#ifdef CONFIG_IDF_TARGET_ESP32
+  // Force Arduino Wire to initialize on the configured pins to resolve IDF conflict
+  ESP_LOGD(TAG, "Forcing Arduino Wire initialization on SDA=21, SCL=22");
+  bool wire_ok = Wire.begin(21, 22);
+  ESP_LOGD(TAG, "Wire.begin result: %s", wire_ok ? "success" : "failed");
+#endif
+
   for (auto *s : sensors) {
     if (s != this && s->xshut_pin.has_value()) {
       s->xshut_pin.value()->digital_write(false);
@@ -56,7 +64,7 @@ void VL53L1X::setup() {
     roode::Roode::log_event("xshut_sensor_" + std::to_string(sensor_id_) + "_on");
     roode::Roode::log_event("xshut_toggled_on");
     roode::Roode::log_event("xshut_toggled");
-    delay(2);
+    delay(200); // Increased for stability
   }
 
   if (this->interrupt_pin.has_value()) {
@@ -65,14 +73,43 @@ void VL53L1X::setup() {
     ESP_LOGD(TAG, "Interrupt pin configured");
   }
 
+  // Set a longer timeout for initial boot
+  uint16_t original_timeout = this->timeout;
+  this->timeout = 5000;
+
   auto status = this->init();
+
+  // Restore original timeout
+  this->timeout = original_timeout;
+
   if (status != VL53L1_ERROR_NONE) {
+    ESP_LOGE(TAG, "Sensor initialization failed with error code: %d", status);
     this->mark_failed();
-    return;
+  } else {
+    ESP_LOGD(TAG, "Device initialized successfully");
   }
-  ESP_LOGD(TAG, "Device initialized");
-  if (desired_address_ != 0x29) {
+
+  // IMPORTANT: Power back up all other sensors regardless of success/failure
+  for (auto *s : sensors) {
+    if (s != this && s->xshut_pin.has_value()) {
+      s->xshut_pin.value()->digital_write(true);
+      roode::Roode::log_event("xshut_sensor_" + std::to_string(s->sensor_id_) + "_on");
+      roode::Roode::log_event("xshut_toggled_on");
+      roode::Roode::log_event("xshut_toggled");
+      delay(50);
+    }
+  }
+
+  if (this->is_failed()) return;
+
+  if (desired_address_ != 0x29 && desired_address_ != address_) {
+#ifdef CONFIG_IDF_TARGET_ESP32
+    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreTake(roode::Roode::i2c_mutex_, portMAX_DELAY);
+#endif
     status = this->sensor.SetI2CAddress(desired_address_ << 1);
+#ifdef CONFIG_IDF_TARGET_ESP32
+    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreGive(roode::Roode::i2c_mutex_);
+#endif
     if (status == VL53L1_ERROR_NONE) {
       char buf[5];
       snprintf(buf, sizeof(buf), "%02X", desired_address_);
@@ -84,7 +121,13 @@ void VL53L1X::setup() {
 
   if (this->offset.has_value()) {
     ESP_LOGI(TAG, "Setting offset calibration to %d", this->offset.value());
+#ifdef CONFIG_IDF_TARGET_ESP32
+    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreTake(roode::Roode::i2c_mutex_, portMAX_DELAY);
+#endif
     status = this->sensor.SetOffsetInMm(this->offset.value());
+#ifdef CONFIG_IDF_TARGET_ESP32
+    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreGive(roode::Roode::i2c_mutex_);
+#endif
     if (status != VL53L1_ERROR_NONE) {
       ESP_LOGE(TAG, "Could not set offset calibration, error code: %d", status);
       this->mark_failed();
@@ -94,7 +137,13 @@ void VL53L1X::setup() {
 
   if (this->xtalk.has_value()) {
     ESP_LOGI(TAG, "Setting crosstalk calibration to %d", this->xtalk.value());
+#ifdef CONFIG_IDF_TARGET_ESP32
+    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreTake(roode::Roode::i2c_mutex_, portMAX_DELAY);
+#endif
     status = this->sensor.SetXTalk(this->xtalk.value());
+#ifdef CONFIG_IDF_TARGET_ESP32
+    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreGive(roode::Roode::i2c_mutex_);
+#endif
     if (status != VL53L1_ERROR_NONE) {
       ESP_LOGE(TAG, "Could not set crosstalk calibration, error code: %d", status);
       this->mark_failed();
@@ -107,31 +156,40 @@ void VL53L1X::setup() {
     return;
   }
 
-  for (auto *s : sensors) {
-    if (s != this && s->xshut_pin.has_value()) {
-      s->xshut_pin.value()->digital_write(true);
-      roode::Roode::log_event("xshut_sensor_" + std::to_string(s->sensor_id_) + "_on");
-      roode::Roode::log_event("xshut_toggled_on");
-      roode::Roode::log_event("xshut_toggled");
-      delay(2);
-    }
-  }
-
   ESP_LOGI(TAG, "Setup complete");
 }
 
 VL53L1_Error VL53L1X::init() {
-  ESP_LOGD(TAG, "Trying to initialize");
+  ESP_LOGD(TAG, "Trying to initialize at address 0x%02X", address_);
 
   VL53L1_Error status;
 
-  // If address is non-default, set and try again.
-  if (address_ != (sensor.GetI2CAddress() >> 1)) {
-    ESP_LOGD(TAG, "Setting different address");
-    status = sensor.SetI2CAddress(address_ << 1);
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreTake(roode::Roode::i2c_mutex_, portMAX_DELAY);
+#endif
+  uint16_t current_addr = sensor.GetI2CAddress() >> 1;
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreGive(roode::Roode::i2c_mutex_);
+#endif
+
+  ESP_LOGD(TAG, "Current ULD driver address: 0x%02X", current_addr);
+
+  // Emergency re-addressing: if we expect 0x66 but sensor is at 0x29
+  if (address_ != current_addr) {
+    ESP_LOGD(TAG, "Address mismatch. Checking if sensor is at 0x29...");
+#ifdef CONFIG_IDF_TARGET_ESP32
+    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreTake(roode::Roode::i2c_mutex_, portMAX_DELAY);
+#endif
+    status = sensor.SetI2CAddress(0x29 << 1); // Try to talk to 0x29
+    if (status == VL53L1_ERROR_NONE) {
+       ESP_LOGI(TAG, "Sensor found at 0x29. Moving to 0x%02X...", address_);
+       status = sensor.SetI2CAddress(address_ << 1);
+    }
+#ifdef CONFIG_IDF_TARGET_ESP32
+    if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreGive(roode::Roode::i2c_mutex_);
+#endif
     if (status != VL53L1_ERROR_NONE) {
-      ESP_LOGE(TAG, "Failed to change address. Error: %d", status);
-      return status;
+      ESP_LOGW(TAG, "Could not find sensor at 0x%02X or 0x29", address_);
     }
   }
 
@@ -141,12 +199,13 @@ VL53L1_Error VL53L1X::init() {
   }
 
   ESP_LOGD(TAG, "Found device, initializing...");
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreTake(roode::Roode::i2c_mutex_, portMAX_DELAY);
+#endif
   status = sensor.Init();
-  if (status != VL53L1_ERROR_NONE) {
-    ESP_LOGE(TAG, "Could not initialize device, error code: %d", status);
-    return status;
-  }
-
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (roode::Roode::i2c_mutex_ != nullptr) xSemaphoreGive(roode::Roode::i2c_mutex_);
+#endif
   return status;
 }
 
@@ -154,12 +213,14 @@ VL53L1_Error VL53L1X::wait_for_boot() {
   // Wait for firmware to copy NVM device_state into registers
   delayMicroseconds(1200);
 
-  uint8_t device_state;
+  uint8_t device_state = 0;
   VL53L1_Error status;
   auto start = millis();
+  ESP_LOGD(TAG, "Waiting for boot, timeout: %dms", timeout);
   while ((millis() - start) < this->timeout) {
     status = get_device_state(&device_state);
     if (status != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "get_device_state failed: %d", status);
       return status;
     }
     if ((device_state & 0x01) == 0x01) {
@@ -170,7 +231,7 @@ VL53L1_Error VL53L1X::wait_for_boot() {
     delay(1);
   }
 
-  ESP_LOGW(TAG, "Timed out waiting for boot. state: %d", device_state);
+  ESP_LOGW(TAG, "Timed out waiting for boot. Current state: %d", device_state);
   return VL53L1_ERROR_TIME_OUT;
 }
 

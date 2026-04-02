@@ -509,11 +509,8 @@ void Roode::setup() {
   ESP_LOGI(SETUP, "Using sampling with sampling size: %d", samples);
 
   if (this->distanceSensor->is_failed()) {
-    this->mark_failed();
     update_status_text("offline");
-    ESP_LOGE(TAG, "Roode cannot be setup without a valid VL53L1X sensor");
-    register_portal_routes_();
-    return;
+    ESP_LOGW(TAG, "Roode sensor is offline, but proceeding with portal registration.");
   }
 
   // Initialize filtering options before calibrating so threshold sampling uses
@@ -1336,6 +1333,10 @@ const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_dis
 }
 
 void Roode::calibrate_zones() {
+  if (this->distanceSensor->is_failed()) {
+    ESP_LOGW(TAG, "Skipping zone calibration: sensor is offline");
+    return;
+  }
   ESP_LOGI(SETUP, "Calibrating sensor zones");
 
   entry->reset_roi(orientation_ == Parallel ? 167 : 195);
@@ -1374,6 +1375,9 @@ void Roode::calibrate_zones() {
 }
 
 void Roode::calibrateDistance() {
+  if (this->distanceSensor->is_failed()) {
+    return;
+  }
   auto *const initial = distanceSensor->get_ranging_mode_override().value_or(Ranging::Longest);
   distanceSensor->set_ranging_mode(initial);
 

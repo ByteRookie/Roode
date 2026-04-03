@@ -568,8 +568,6 @@ void Roode::setup() {
       }
     }
     if (loaded) {
-      entry->reset_roi(orientation_ == Parallel ? 167 : 195);
-      exit->reset_roi(orientation_ == Parallel ? 231 : 60);
       entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
       exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
       auto *mode = determine_ranging_mode(entry->threshold->idle, exit->threshold->idle);
@@ -1299,9 +1297,8 @@ void Roode::path_tracking(Zone *zone) {
     if (AllZonesCurrentStatus == 0) {
       ESP_LOGD(TAG, "Nobody anywhere, sequence length: %d", PathTrackFillingSize);
       if (PathTrackFillingSize >= 3) {
-        // Entry: [..., 2, 3, 1, 0]
-        if (PathTrackFillingSize >= 3 && PathTrack[PathTrackFillingSize-3] == 2 && 
-            PathTrack[PathTrackFillingSize-2] == 3 && PathTrack[PathTrackFillingSize-1] == 1) {
+        // Entry: [..., 2, 3, 1] -> 0
+        if (PathTrack[PathTrackFillingSize-3] == 2 && PathTrack[PathTrackFillingSize-2] == 3 && PathTrack[PathTrackFillingSize-1] == 1) {
           ESP_LOGI("Roode pathTracking", "Entry detected.");
           this->updateCounter(1);
           last_valid_crossing_ts_ = millis();
@@ -1315,9 +1312,8 @@ void Roode::path_tracking(Zone *zone) {
             }
           }
         } 
-        // Exit: [..., 1, 3, 2, 0]
-        else if (PathTrackFillingSize >= 3 && PathTrack[PathTrackFillingSize-3] == 1 && 
-                 PathTrack[PathTrackFillingSize-2] == 3 && PathTrack[PathTrackFillingSize-1] == 2) {
+        // Exit: [..., 1, 3, 2] -> 0
+        else if (PathTrack[PathTrackFillingSize-3] == 1 && PathTrack[PathTrackFillingSize-2] == 3 && PathTrack[PathTrackFillingSize-1] == 2) {
           ESP_LOGI("Roode pathTracking", "Exit detected.");
           this->updateCounter(-1);
           last_valid_crossing_ts_ = millis();
@@ -1418,14 +1414,14 @@ const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_dis
                                                  uint16_t average_exit_zone_distance) {
   uint16_t max_dist = std::max(average_entry_zone_distance, average_exit_zone_distance);
   if (max_dist <= short_distance_threshold)
-    return &RANGING_SHORT;
+    return esphome::vl53l1x::Ranging::Short;
   if (max_dist <= medium_distance_threshold)
-    return &RANGING_MEDIUM;
+    return esphome::vl53l1x::Ranging::Medium;
   if (max_dist <= medium_long_distance_threshold)
-    return &RANGING_MEDIUM_LONG;
+    return esphome::vl53l1x::Ranging::Long;
   if (max_dist <= long_distance_threshold)
-    return &RANGING_LONG;
-  return &RANGING_LONGEST;
+    return esphome::vl53l1x::Ranging::Longer;
+  return esphome::vl53l1x::Ranging::Longest;
 }
 
 void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {

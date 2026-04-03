@@ -110,10 +110,12 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
       sum += dist;
     }
   };
-  if (zone_distances.size() < (size_t) number_attempts) {
+  // Require at least 70% valid readings (or minimum 10) to proceed with calibration
+  size_t min_valid = std::max((size_t)10, (size_t)(number_attempts * 7 / 10));
+  if (zone_distances.size() < min_valid) {
     if (debug_mode_) {
       ESP_LOGW(CALIBRATION, "Calibration failed: only %d valid distances recorded (needed %d). Retaining previous baseline.",
-               zone_distances.size(), number_attempts);
+               zone_distances.size(), min_valid);
     }
   } else {
     int avg = sum / zone_distances.size();

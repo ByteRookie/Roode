@@ -104,6 +104,7 @@ class Roode;
 class PortalSwitch : public switch_::Switch, public Component {
  public:
   void set_parent(Roode *parent) { parent_ = parent; }
+  void setup() override;
   void write_state(bool state) override;
   void dump_config() override;
  protected:
@@ -194,6 +195,8 @@ class Roode : public PollingComponent {
   void set_force_single_core(bool val) { force_single_core_ = val; }
   void set_auto_calibration_interval_sec(uint32_t sec) { auto_calibration_interval_sec_ = sec; }
   void set_manual_presence(bool val) { manual_presence_ = val; }
+  void set_active_sensors(uint32_t mask) { active_sensors_ = mask; }
+  bool is_portal_enabled() const { return portal_enabled_; }
 
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();

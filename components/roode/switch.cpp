@@ -4,6 +4,12 @@
 namespace esphome {
 namespace roode {
 
+void PortalSwitch::setup() {
+  if (parent_ != nullptr) {
+    this->publish_state(parent_->is_portal_enabled());
+  }
+}
+
 void PortalSwitch::write_state(bool state) {
   this->publish_state(state);
   if (parent_ != nullptr) {

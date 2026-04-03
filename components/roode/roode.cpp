@@ -63,15 +63,26 @@ void Roode::setup() {
 #endif
   settings_prefs_ = global_preferences->make_preference<RoodeSettings>(0xB0);
   RoodeSettings s; if (settings_prefs_.load(&s)) {
-    samples = s.sampling; polling_interval_ms_ = s.polling_interval; invert_direction_ = s.invert_direction;
-    filter_mode_ = s.filter_mode; filter_window_ = s.filter_window; active_sensors_ = s.active_sensors;
-    debug_mode_ = s.debug_mode; entry->roi->center = exit->roi->center = s.roi_center;
-    entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
-    auto_calibration_interval_sec_ = s.auto_calibration_interval; restart_timeout_ms_ = s.restart_timeout;
+    samples = s.sampling; orientation_ = s.orientation; invert_direction_ = s.invert_direction;
+    calibration_persistence_ = s.calibration_persistence; filter_mode_ = s.filter_mode; filter_window_ = s.filter_window;
+    log_fallback_events_ = s.log_fallback_events; force_single_core_ = s.force_single_core;
+    invalid_distance_limit_ = s.invalid_limit; restart_timeout_ms_ = s.restart_timeout;
     cpu_opt_activate_threshold_ = s.cpu_activate; cpu_opt_deactivate_threshold_ = s.cpu_deactivate;
-    manual_presence_ = s.manual_presence; invalid_distance_limit_ = s.invalid_limit;
-    lux_threshold_ = s.lux_threshold; sun_elevation_threshold_enabled_ = s.sun_elevation_threshold_enabled;
-    sun_elevation_threshold_ = s.sun_elevation_threshold;
+    active_sensors_ = s.active_sensors; debug_mode_ = s.debug_mode;
+    
+    entry->roi->height = s.entry_roi_height; entry->roi->width = s.entry_roi_width; entry->roi->center = s.entry_roi_center;
+    entry->threshold->min = s.entry_min_threshold; entry->threshold->max = s.entry_max_threshold;
+    exit->roi->height = s.exit_roi_height; exit->roi->width = s.exit_roi_width; exit->roi->center = s.exit_roi_center;
+    exit->threshold->min = s.exit_min_threshold; exit->threshold->max = s.exit_max_threshold;
+    
+    use_lux_ = s.use_lux; use_sun_ = s.use_sun;
+    
+    if (distanceSensor) {
+      distanceSensor->set_sensor_id(s.sensor_id);
+      distanceSensor->set_timeout(s.timeout);
+      distanceSensor->set_ranging_mode_override((RangingMode)s.ranging_mode);
+    }
+    entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
   }
 #ifdef CONFIG_IDF_TARGET_ESP32
   if (!force_single_core_) {
@@ -90,57 +101,58 @@ void Roode::register_portal_routes_() {
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/settings/current", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;
-    JsonDocument doc; doc["sa"] = samples; doc["pi"] = polling_interval_ms_; doc["debug"] = debug_mode_;
-    doc["m"] = active_sensors_; doc["status"] = (distanceSensor && !distanceSensor->is_failed()) ? "OK" : "Offline";
-    doc["ts"] = (time(nullptr) > 1000000); doc["inv"] = invert_direction_; doc["fm"] = (int)filter_mode_;
-    doc["fw"] = filter_window_; doc["min"] = entry->threshold->min; doc["max"] = entry->threshold->max;
-    doc["ac"] = auto_calibration_interval_sec_; doc["il"] = invalid_distance_limit_; doc["rt"] = restart_timeout_ms_;
-    doc["lt"] = lux_threshold_; doc["se"] = sun_elevation_threshold_enabled_; doc["st"] = sun_elevation_threshold_;
-    doc["pres"] = manual_presence_; doc["rc"] = entry->roi->center; doc["rw"] = entry->roi->width; doc["rh"] = entry->roi->height;
-    doc["ec"] = entry->roi->center; doc["xc"] = exit->roi->center;
+    JsonDocument doc; 
+    doc["sa"] = samples; doc["or"] = (int)orientation_; doc["inv"] = invert_direction_;
+    doc["cp"] = calibration_persistence_; doc["fm"] = (int)filter_mode_; doc["fw"] = filter_window_;
+    doc["ul"] = use_lux_; doc["us"] = use_sun_;
+    doc["sid"] = distanceSensor ? distanceSensor->get_sensor_id() : 1;
+    doc["addr"] = distanceSensor ? distanceSensor->get_address() : 0x29;
+    doc["to"] = distanceSensor ? distanceSensor->get_timeout() : 2000;
+    doc["rm"] = distanceSensor ? (int)distanceSensor->get_ranging_mode() : 0;
+    doc["debug"] = debug_mode_; doc["sc"] = force_single_core_;
+    doc["il"] = invalid_distance_limit_; doc["rt"] = (int)restart_timeout_ms_;
+    doc["m"] = active_sensors_;
+    if (lux_sensor_) doc["lux_val"] = lux_sensor_->state;
+    doc["ts"] = (time(nullptr) > 1000000);
+    doc["erh"] = entry->roi->height; doc["erw"] = entry->roi->width; doc["erc"] = entry->roi->center;
+    doc["emin"] = entry->threshold->min; doc["emax"] = entry->threshold->max;
+    doc["xrh"] = exit->roi->height; doc["xrw"] = exit->roi->width; doc["xrc"] = exit->roi->center;
+    doc["xmin"] = exit->threshold->min; doc["xmax"] = exit->threshold->max;
+    
     std::string out; serializeJson(doc, out); r->send(200, "application/json", out.c_str());
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/settings/update", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;
-    RoodeSettings s;
-    s.sampling = r->hasParam("sa") ? atoi(r->getParam("sa")->value().c_str()) : samples;
-    s.polling_interval = r->hasParam("pi") ? atoi(r->getParam("pi")->value().c_str()) : polling_interval_ms_;
-    s.debug_mode = r->hasParam("debug") ? (r->getParam("debug")->value() == "true") : debug_mode_;
-    s.active_sensors = r->hasParam("m") ? strtoul(r->getParam("m")->value().c_str(), NULL, 10) : active_sensors_;
-    s.invert_direction = r->hasParam("inv") ? (r->getParam("inv")->value() == "true") : invert_direction_;
-    s.filter_mode = r->hasParam("fm") ? (FilterMode)atoi(r->getParam("fm")->value().c_str()) : filter_mode_;
-    s.filter_window = r->hasParam("fw") ? atoi(r->getParam("fw")->value().c_str()) : filter_window_;
-    s.auto_calibration_interval = r->hasParam("ac") ? strtoul(r->getParam("ac")->value().c_str(), NULL, 10) : auto_calibration_interval_sec_;
-    s.invalid_limit = r->hasParam("il") ? atoi(r->getParam("il")->value().c_str()) : invalid_distance_limit_;
-    s.restart_timeout = r->hasParam("rt") ? atoi(r->getParam("rt")->value().c_str()) : restart_timeout_ms_;
-    s.lux_threshold = r->hasParam("lt") ? atof(r->getParam("lt")->value().c_str()) : lux_threshold_;
-    s.sun_elevation_threshold_enabled = r->hasParam("se") ? (r->getParam("se")->value() == "true") : sun_elevation_threshold_enabled_;
-    s.sun_elevation_threshold = r->hasParam("st") ? atof(r->getParam("st")->value().c_str()) : sun_elevation_threshold_;
-    s.manual_presence = r->hasParam("pres") ? (r->getParam("pres")->value() == "true") : manual_presence_;
+    RoodeSettings s; if (!settings_prefs_.load(&s)) memset(&s, 0, sizeof(s));
+    if (r->hasParam("sa")) s.sampling = samples = atoi(r->getParam("sa")->value().c_str());
+    if (r->hasParam("or")) s.orientation = orientation_ = (Orientation)atoi(r->getParam("or")->value().c_str());
+    if (r->hasParam("inv")) s.invert_direction = invert_direction_ = (r->getParam("inv")->value() == "true");
+    if (r->hasParam("cp")) s.calibration_persistence = calibration_persistence_ = (r->getParam("cp")->value() == "true");
+    if (r->hasParam("fm")) s.filter_mode = filter_mode_ = (FilterMode)atoi(r->getParam("fm")->value().c_str());
+    if (r->hasParam("fw")) s.filter_window = filter_window_ = atoi(r->getParam("fw")->value().c_str());
+    if (r->hasParam("ul")) s.use_lux = use_lux_ = (r->getParam("ul")->value() == "true");
+    if (r->hasParam("us")) s.use_sun = use_sun_ = (r->getParam("us")->value() == "true");
+    if (r->hasParam("sid")) s.sensor_id = atoi(r->getParam("sid")->value().c_str());
+    if (r->hasParam("to")) s.timeout = atoi(r->getParam("to")->value().c_str());
+    if (r->hasParam("rm")) s.ranging_mode = atoi(r->getParam("rm")->value().c_str());
+    if (r->hasParam("debug")) s.debug_mode = debug_mode_ = (r->getParam("debug")->value() == "true");
+    if (r->hasParam("sc")) s.force_single_core = force_single_core_ = (r->getParam("sc")->value() == "true");
+    if (r->hasParam("il")) s.invalid_limit = invalid_distance_limit_ = atoi(r->getParam("il")->value().c_str());
+    if (r->hasParam("rt")) s.restart_timeout = restart_timeout_ms_ = atoi(r->getParam("rt")->value().c_str());
+    if (r->hasParam("m")) s.active_sensors = active_sensors_ = strtoul(r->getParam("m")->value().c_str(), NULL, 10);
     
-    s.roi_center = entry->roi->center; s.roi_width = entry->roi->width; s.roi_height = entry->roi->height;
-    s.entry_center = entry->roi->center; s.exit_center = exit->roi->center;
-    s.min_threshold = entry->threshold->min; s.max_threshold = entry->threshold->max;
+    s.entry_roi_height = entry->roi->height; s.entry_roi_width = entry->roi->width; s.entry_roi_center = entry->roi->center;
+    s.entry_min_threshold = entry->threshold->min; s.entry_max_threshold = entry->threshold->max;
+    s.exit_roi_height = exit->roi->height; s.exit_roi_width = exit->roi->width; s.exit_roi_center = exit->roi->center;
+    s.exit_min_threshold = exit->threshold->min; s.exit_max_threshold = exit->threshold->max;
     s.cpu_activate = cpu_opt_activate_threshold_; s.cpu_deactivate = cpu_opt_deactivate_threshold_;
 
-    samples = s.sampling; polling_interval_ms_ = s.polling_interval; debug_mode_ = s.debug_mode;
-    active_sensors_ = s.active_sensors; invert_direction_ = s.invert_direction;
-    filter_mode_ = s.filter_mode; filter_window_ = s.filter_window;
-    auto_calibration_interval_sec_ = s.auto_calibration_interval;
-    invalid_distance_limit_ = s.invalid_limit; restart_timeout_ms_ = s.restart_timeout;
-    lux_threshold_ = s.lux_threshold; sun_elevation_threshold_enabled_ = s.sun_elevation_threshold_enabled;
-    sun_elevation_threshold_ = s.sun_elevation_threshold; manual_presence_ = s.manual_presence;
-    entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
-
-    settings_prefs_.save(&s); global_preferences->sync(); r->send(200, "application/json", "{\"ok\":true}");
-  }));
-  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/presence/toggle", [this](roode_web::AsyncWebServerRequest *r) {
-    if (!require_portal_auth_(r, "application/json")) return;
-    if (r->hasParam("state")) {
-      manual_presence_ = (r->getParam("state")->value() == "true");
-      RoodeSettings s; if (settings_prefs_.load(&s)) { s.manual_presence = manual_presence_; settings_prefs_.save(&s); global_preferences->sync(); }
+    if (distanceSensor) {
+      distanceSensor->set_sensor_id(s.sensor_id); distanceSensor->set_timeout(s.timeout);
+      distanceSensor->set_ranging_mode_override((RangingMode)s.ranging_mode);
     }
-    r->send(200, "application/json", "{\"ok\":true}");
+    entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
+    settings_prefs_.save(&s); global_preferences->sync(); r->send(200, "application/json", "{\"ok\":true}");
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/start", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;
@@ -173,17 +185,24 @@ void Roode::register_portal_routes_() {
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/roi/preview", [this](roode_web::AsyncWebServerRequest *r) {
     if (!has_recommended_settings_) { r->send(200, "application/json", "null"); return; }
-    JsonDocument d; d["roi"] = recommended_settings_.roi_center; d["con"] = (int)recommended_settings_.max_threshold;
+    JsonDocument d; d["roi"] = recommended_settings_.entry_roi_center; d["con"] = (int)recommended_settings_.entry_max_threshold;
     std::string out; serializeJson(d, out); r->send(200, "application/json", out.c_str());
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/roi/apply", [this](roode_web::AsyncWebServerRequest *r) {
-    entry->roi->center = exit->roi->center = recommended_settings_.roi_center;
+    entry->roi->center = exit->roi->center = recommended_settings_.entry_roi_center;
+    entry->threshold->max = exit->threshold->max = recommended_settings_.entry_max_threshold;
     recalibration(); r->send(200, "application/json", "{\"ok\":true}");
   }));
 #endif
 }
 
 void Roode::update() {
+  if (lux_sensor_ && !std::isnan(lux_sensor_->state)) {
+    rolling_lux_.push_back(lux_sensor_->state);
+    if (rolling_lux_.size() > 60) rolling_lux_.erase(rolling_lux_.begin());
+    float sum = 0; for (float f : rolling_lux_) sum += f;
+    lux_avg_ = sum / rolling_lux_.size();
+  }
   if (active_sensors_ & 0x01 && distance_entry) distance_entry->publish_state(entry->getDistance());
   if (active_sensors_ & 0x02 && distance_exit) distance_exit->publish_state(exit->getDistance());
   update_metrics();
@@ -210,9 +229,11 @@ void Roode::loop() {
 }
 
 VL53L1_Error Roode::read_and_track_zone_(Zone *zone, bool ut) {
-  if (lux_sensor_ && lux_sensor_->state < lux_threshold_) return VL53L1_ERROR_NONE;
+  if (use_lux_ && lux_sensor_ && !std::isnan(lux_sensor_->state)) {
+    if (lux_sensor_->state < (lux_avg_ * 0.5f)) return VL53L1_ERROR_NONE;
+  }
 #ifdef USE_SUN
-  if (sun_elevation_threshold_enabled_ && sun_ && sun_->elevation->state < sun_elevation_threshold_) return VL53L1_ERROR_NONE;
+  if (use_sun_ && sun_ && sun_->elevation->state < 0.0f) return VL53L1_ERROR_NONE;
 #endif
   if (manual_presence_) return VL53L1_ERROR_NONE;
 
@@ -272,24 +293,19 @@ void Roode::sensor_task(void *p) {
       }
       
       if (self->scan_phase_ == PHASE_EMPTY) {
-        self->active_session_.ts = h.ts;
-        self->active_session_.background = h;
-        self->active_session_.complete = false;
+        self->active_session_.ts = h.ts; self->active_session_.background = h; self->active_session_.complete = false;
       } else if (self->scan_phase_ == PHASE_PERSON) {
-        self->active_session_.person = h;
-        self->active_session_.complete = true;
+        self->active_session_.person = h; self->active_session_.complete = true;
         self->sessions_.push_back(self->active_session_);
         
-        // Calculate recommended ROI using background and person scans
         uint8_t bi = 0; int32_t md = 0;
         for(uint8_t i=0; i<64; i++) {
           int32_t delta = (int32_t)self->active_session_.background.distances[i] - (int32_t)self->active_session_.person.distances[i];
           if (delta > md) { md = delta; bi = i; }
         }
-        self->recommended_settings_.roi_center = ((bi/8)*2+1)*16 + ((bi%8)*2+1);
-        self->recommended_settings_.max_threshold = (uint16_t)md; self->has_recommended_settings_ = true;
+        self->recommended_settings_.entry_roi_center = ((bi/8)*2+1)*16 + ((bi%8)*2+1);
+        self->recommended_settings_.entry_max_threshold = (uint16_t)md; self->has_recommended_settings_ = true;
       }
-      
       self->scan_state_ = SCAN_IDLE; continue;
     }
     self->read_and_track_zone_(self->entry, true); self->read_and_track_zone_(self->exit, false);

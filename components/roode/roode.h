@@ -49,29 +49,45 @@ static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
 
 struct RoodeSettings {
-  uint8_t roi_width;
-  uint8_t roi_height;
-  uint8_t roi_center;
-  uint8_t entry_center;
-  uint8_t exit_center;
-  uint16_t min_threshold;
-  uint16_t max_threshold;
+  // VL53L1X Hardware
+  uint8_t sensor_id;
+  uint16_t i2c_address;
+  uint32_t timeout;
+  uint8_t ranging_mode;
+  uint16_t offset;
+  uint32_t crosstalk;
+  
+  // Roode Core
   uint8_t sampling;
-  uint16_t polling_interval;
-  bool invert_direction;
+  Orientation orientation;
+  bool calibration_persistence;
   FilterMode filter_mode;
   uint8_t filter_window;
-  uint32_t active_sensors;
-  bool debug_mode;
-  uint32_t auto_calibration_interval;
+  bool log_fallback_events;
+  bool force_single_core;
+  uint8_t invalid_limit;
   uint16_t restart_timeout;
   float cpu_activate;
   float cpu_deactivate;
-  bool manual_presence;
-  uint8_t invalid_limit;
-  float lux_threshold;
-  bool sun_elevation_threshold_enabled;
-  float sun_elevation_threshold;
+  uint32_t active_sensors;
+  bool debug_mode;
+
+  // Zones
+  bool invert_direction;
+  uint8_t entry_roi_height;
+  uint8_t entry_roi_width;
+  uint8_t entry_roi_center;
+  uint16_t entry_min_threshold;
+  uint16_t entry_max_threshold;
+  uint8_t exit_roi_height;
+  uint8_t exit_roi_width;
+  uint8_t exit_roi_center;
+  uint16_t exit_min_threshold;
+  uint16_t exit_max_threshold;
+
+  // Lux/Sun
+  bool use_lux;
+  bool use_sun;
 } __attribute__((packed));
 
 enum ScanPhase { PHASE_IDLE, PHASE_EMPTY, PHASE_PERSON };
@@ -254,9 +270,10 @@ class Roode : public PollingComponent {
   uint32_t restart_timeout_ms_{30000};
   float cpu_opt_activate_threshold_{90.0f};
   float cpu_opt_deactivate_threshold_{50.0f};
-  float lux_threshold_{0.0f};
-  bool sun_elevation_threshold_enabled_{false};
-  float sun_elevation_threshold_{0.0f};
+  float lux_avg_{0.0f};
+  std::vector<float> rolling_lux_;
+  bool use_lux_{false};
+  bool use_sun_{false};
 
   FilterMode filter_mode_{FILTER_MIN};
   uint8_t filter_window_{5};

@@ -138,14 +138,9 @@ async def to_code(config: Dict):
     cg.add(roode.set_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT]))
     cg.add(roode.set_restart_timeout(config[CONF_RESTART_TIMEOUT]))
     cg.add(roode.set_portal_password(config[CONF_PORTAL_PASSWORD]))
-    cpu_conf = config.get(CONF_CPU_OPTIMIZATION, {})
-    cg.add(
-        roode.set_cpu_optimization_thresholds(
-            cpu_conf.get(CONF_ACTIVATE, 0.90) * 100.0,
-            cpu_conf.get(CONF_DEACTIVATE, 0.50) * 100.0,
-        )
-    )
-    cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
+    
+    # Active sensors bitmask init (all on by default)
+    cg.add(roode.set_active_sensors(0xFFFFFFFF))
 
     if CONF_PORTAL in config:
         sw = await switch.new_switch(config[CONF_PORTAL])

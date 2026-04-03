@@ -53,6 +53,24 @@ bool Roode::log_fallback_events_ = false;
 SemaphoreHandle_t Roode::i2c_mutex_ = nullptr;
 #endif
 
+static const RangingMode *ranging_modes[] = {
+  nullptr, // 0 = Auto
+  Ranging::Shortest,
+  Ranging::Short,
+  Ranging::Medium,
+  Ranging::Long,
+  Ranging::Longer,
+  Ranging::Longest
+};
+
+static uint8_t get_ranging_mode_index(const RangingMode *mode) {
+  if (!mode) return 0;
+  for (uint8_t i = 1; i < 7; i++) {
+    if (ranging_modes[i] == mode) return i;
+  }
+  return 0;
+}
+
 void Roode::log_event(const std::string &msg) { if (instance_ && instance_->debug_mode_) ESP_LOGI(TAG, "%s", msg.c_str()); }
 void Roode::dump_config() { ESP_LOGCONFIG(TAG, "Roode v%s", VERSION); }
 Roode::~Roode() { instance_ = nullptr; }
@@ -78,9 +96,9 @@ void Roode::setup() {
     use_lux_ = s.use_lux; use_sun_ = s.use_sun;
     
     if (distanceSensor) {
-      distanceSensor->set_sensor_id(s.sensor_id);
-      distanceSensor->set_timeout(s.timeout);
-      distanceSensor->set_ranging_mode_override((RangingMode)s.ranging_mode);
+      if (s.sensor_id > 0) distanceSensor->set_sensor_id(s.sensor_id);
+      if (s.timeout > 0) distanceSensor->set_timeout(s.timeout);
+      if (s.ranging_mode < 7) distanceSensor->set_ranging_mode_override(ranging_modes[s.ranging_mode]);
     }
     entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
   }
@@ -108,7 +126,7 @@ void Roode::register_portal_routes_() {
     doc["sid"] = distanceSensor ? distanceSensor->get_sensor_id() : 1;
     doc["addr"] = distanceSensor ? distanceSensor->get_address() : 0x29;
     doc["to"] = distanceSensor ? distanceSensor->get_timeout() : 2000;
-    doc["rm"] = distanceSensor ? (int)distanceSensor->get_ranging_mode() : 0;
+    doc["rm"] = distanceSensor ? get_ranging_mode_index(distanceSensor->get_ranging_mode()) : 0;
     doc["debug"] = debug_mode_; doc["sc"] = force_single_core_;
     doc["il"] = invalid_distance_limit_; doc["rt"] = (int)restart_timeout_ms_;
     doc["m"] = active_sensors_;
@@ -148,16 +166,18 @@ void Roode::register_portal_routes_() {
     s.cpu_activate = cpu_opt_activate_threshold_; s.cpu_deactivate = cpu_opt_deactivate_threshold_;
 
     if (distanceSensor) {
-      distanceSensor->set_sensor_id(s.sensor_id); distanceSensor->set_timeout(s.timeout);
-      distanceSensor->set_ranging_mode_override((RangingMode)s.ranging_mode);
+      if (s.sensor_id > 0) distanceSensor->set_sensor_id(s.sensor_id);
+      if (s.timeout > 0) distanceSensor->set_timeout(s.timeout);
+      if (s.ranging_mode < 7) distanceSensor->set_ranging_mode_override(ranging_modes[s.ranging_mode]);
     }
     entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
     settings_prefs_.save(&s); global_preferences->sync(); r->send(200, "application/json", "{\"ok\":true}");
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/start", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;
+    scan_state_ = SCANNING; scan_progress_ = 0;
     scan_phase_ = r->hasParam("phase") ? (ScanPhase)atoi(r->getParam("phase")->value().c_str()) : PHASE_EMPTY;
-    scan_state_ = SCANNING; scan_progress_ = 0; r->send(200, "application/json", "{\"ok\":true}");
+    r->send(200, "application/json", "{\"ok\":true}");
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/status", [this](roode_web::AsyncWebServerRequest *r) {
     JsonDocument d; d["s"] = scan_state_ == SCANNING ? "Scanning" : "Idle"; d["p"] = scan_progress_;

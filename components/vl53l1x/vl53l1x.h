@@ -42,16 +42,20 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   }
   int get_recovery_count() const { return recovery_count_; }
   void set_sensor_id(uint8_t id) { sensor_id_ = id; }
+  uint8_t get_sensor_id() const { return sensor_id_; }
   void set_desired_address(uint8_t addr) { desired_address_ = addr; }
+  uint8_t get_address() const { return address_; }
   void restart();
 
   void set_xshut_pin(GPIOPin *pin) { this->xshut_pin = pin; }
   void set_interrupt_pin(InternalGPIOPin *pin) { this->interrupt_pin = pin; }
   optional<const RangingMode *> get_ranging_mode_override() { return this->ranging_mode_override; }
   void set_ranging_mode_override(const RangingMode *mode) { this->ranging_mode_override = {mode}; }
+  const RangingMode *get_ranging_mode() const { return ranging_mode; }
   void set_offset(int16_t val) { this->offset = val; }
   void set_xtalk(uint16_t val) { this->xtalk = val; }
   void set_timeout(uint16_t val) { this->timeout = val; }
+  uint16_t get_timeout() const { return timeout; }
   static void set_active_sensor(VL53L1X *sensor) { active_sensor_ = sensor; }
   static VL53L1X *get_active_sensor() { return active_sensor_; }
   int8_t uld_write_register(uint8_t address, uint16_t register_address, const uint8_t *data, size_t len);

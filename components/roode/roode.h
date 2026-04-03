@@ -11,6 +11,9 @@
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
+#ifdef USE_WEBSERVER
+#include "esphome/components/web_server_base/web_server_base.h"
+#endif
 #include "../vl53l1x/vl53l1x.h"
 #include "esphome/core/preferences.h"
 #include "orientation.h"
@@ -293,6 +296,12 @@ class Roode : public PollingComponent {
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
   void register_portal_routes_();
+#ifdef USE_WEBSERVER
+  bool portal_request_authorized_(web_server_idf::AsyncWebServerRequest *request) const;
+  bool require_portal_auth_(web_server_idf::AsyncWebServerRequest *request, const char *content_type) const;
+  void send_portal_login_(web_server_idf::AsyncWebServerRequest *request) const;
+#endif
+  VL53L1_Error read_and_track_zone_(Zone *zone, bool update_timestamp);
   bool portal_registered_{false};
   std::string portal_password_{};
   void path_tracking(Zone *zone);

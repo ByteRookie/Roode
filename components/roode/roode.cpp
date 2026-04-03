@@ -4,8 +4,7 @@
 #include "esp_task_wdt.h"  // Access to the ESP32 task watchdog
 #endif
 #include "esphome/components/web_server_base/web_server_base.h"
-#ifdef USE_WEB_SERVER
-#include <ESPAsyncWebServer.h>
+#ifdef USE_WEBSERVER
 #include <ArduinoJson.h>
 #endif
 #include <string>
@@ -16,6 +15,53 @@
 
 namespace esphome {
 namespace roode {
+
+static const char *const portal_login_html = R"LOGIN(
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Roode Portal Login</title>
+  <style>
+    :root {
+      --bg:#0b0f14; --panel:#121821; --text:#e6edf3; --muted:#9fb0c3; --acc:#57a6ff; --line:#1f2835;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg:#f6f8fa; --panel:#ffffff; --text:#24292f; --muted:#57606a; --acc:#0969da; --line:#d0d7de;
+      }
+    }
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif}
+    .card{width:min(420px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}
+    h1{margin:0 0 8px;font-size:20px}
+    p{margin:0 0 16px;color:var(--muted)}
+    label{display:block;margin-bottom:8px;font-weight:600}
+    input{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:transparent;color:inherit}
+    button{margin-top:12px;width:100%;padding:12px 14px;border:0;border-radius:10px;background:var(--acc);color:#fff;font-weight:700;cursor:pointer}
+    .hint{margin-top:12px;font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <form class="card" id="loginForm">
+    <h1>Roode Calibration Portal</h1>
+    <p>Enter the portal password to open calibration tools and live zone diagnostics.</p>
+    <label for="token">Portal password</label>
+    <input id="token" name="token" type="password" autocomplete="current-password" autofocus />
+    <button type="submit">Open Portal</button>
+    <div class="hint">The password stays on the URL so the portal can authenticate its API requests.</div>
+  </form>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', function (event) {
+      event.preventDefault();
+      const token = document.getElementById('token').value || '';
+      location.href = '/portal?token=' + encodeURIComponent(token);
+    });
+  </script>
+</body>
+</html>
+)LOGIN";
 
 static const char *const portal_html = R"PORTAL(
 <!doctype html>
@@ -104,6 +150,9 @@ static const char *const portal_html = R"PORTAL(
           <div class="k">Max Threshold</div><div id="curMax">—</div>
           <div class="k">Sampling</div><div id="curSampling">—</div>
           <div class="k">Firmware</div><div id="curFw">—</div>
+          <div class="k">Live Distance</div><div id="curLive">—</div>
+          <div class="k">Zone State</div><div id="curZones">—</div>
+          <div class="k">People Counter</div><div id="curCount">—</div>
         </div>
         <div class="chips">
           <button class="btn" id="btnCopyJSON">Copy as JSON</button>
@@ -243,6 +292,11 @@ static const char *const portal_html = R"PORTAL(
     $('#curMax').textContent = current.max_threshold!=null ? current.max_threshold+'%' : '—';
     $('#curSampling').textContent = current.sampling || '—';
     $('#curFw').textContent = current.firmware || '—';
+    $('#curLive').textContent = (current.distance_entry_mm!=null && current.distance_exit_mm!=null)
+      ? `${current.distance_entry_mm} mm / ${current.distance_exit_mm} mm`
+      : '—';
+    $('#curZones').textContent = `${current.entry_active ? 'Entry active' : 'Entry idle'} · ${current.exit_active ? 'Exit active' : 'Exit idle'}`;
+    $('#curCount').textContent = current.people_counter!=null ? current.people_counter : '—';
     if(current.last_calibration) $('#lastCal').textContent = 'Last calibration: ' + new Date(current.last_calibration).toLocaleString();
   }
   function renderPreview(){
@@ -625,46 +679,112 @@ void Roode::setup() {
   update_status_text("ok");
 }
 
+#ifdef USE_WEBSERVER
+bool Roode::portal_request_authorized_(web_server_idf::AsyncWebServerRequest *request) const {
+  if (this->portal_password_.empty())
+    return true;
+  auto header = request->get_header("X-Portal-Token");
+  if (header.has_value() && header.value() == this->portal_password_)
+    return true;
+  auto *token = request->getParam("token");
+  if (token != nullptr && token->value() == this->portal_password_)
+    return true;
+  return false;
+}
+
+void Roode::send_portal_login_(web_server_idf::AsyncWebServerRequest *request) const {
+  ESP_LOGD(TAG, "Portal auth required, serving login page");
+  request->send(200, "text/html", portal_login_html);
+}
+
+bool Roode::require_portal_auth_(web_server_idf::AsyncWebServerRequest *request, const char *content_type) const {
+  if (this->portal_request_authorized_(request))
+    return true;
+  ESP_LOGD(TAG, "Portal auth rejected for content-type=%s", content_type == nullptr ? "<null>" : content_type);
+  if (content_type != nullptr && std::string(content_type) == "text/html") {
+    this->send_portal_login_(request);
+  } else if (content_type != nullptr && std::string(content_type) == "application/json") {
+    request->send(409, content_type, "{\"error\":\"portal_auth_required\"}");
+  } else {
+    request->send(409, content_type == nullptr ? "text/plain" : content_type, "Unauthorized");
+  }
+  return false;
+}
+#endif
+
+#ifdef USE_WEBSERVER
+namespace {
+class LambdaRequestHandler : public web_server_idf::AsyncWebHandler {
+ public:
+  enum MatchType { EXACT, PREFIX };
+  using Callback = std::function<void(web_server_idf::AsyncWebServerRequest *request)>;
+
+  LambdaRequestHandler(http_method method, std::string uri, Callback callback, MatchType match_type = EXACT)
+      : method_(method), uri_(std::move(uri)), callback_(std::move(callback)), match_type_(match_type) {}
+
+  bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override {
+    if (request->method() != method_)
+      return false;
+    char url_buf[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
+    std::string request_url(request->url_to(url_buf));
+    bool match = match_type_ == PREFIX ? request_url.rfind(uri_, 0) == 0 : request_url == uri_;
+    if (match) {
+      ESP_LOGD(TAG, "Portal handler match: method=%d url=%s route=%s", (int) request->method(), request_url.c_str(),
+               uri_.c_str());
+    }
+    return match;
+  }
+
+  void handleRequest(web_server_idf::AsyncWebServerRequest *request) override {
+    char url_buf[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
+    auto url = request->url_to(url_buf);
+    ESP_LOGD(TAG, "Portal handler dispatch: method=%d url=%s", (int) request->method(), url.c_str());
+    callback_(request);
+  }
+
+ private:
+  http_method method_;
+  std::string uri_;
+  Callback callback_;
+  MatchType match_type_;
+};
+}  // namespace
+#endif
+
 void Roode::register_portal_routes_() {
-#ifdef USE_WEB_SERVER
+#ifdef USE_WEBSERVER
   if (this->portal_registered_)
     return;
-  auto *srv = web_server_base::global_web_server_base->get_server();
+  auto *base = web_server_base::global_web_server_base;
+  auto *srv = base->get_server();
   if (srv == nullptr) {
     ESP_LOGW(TAG, "Web server base null; portal routes not registered");
     this->set_timeout("portal_retry", 250, [this]() { this->register_portal_routes_(); });
     return;
   }
+  ESP_LOGI(TAG, "Registering portal routes on port %u", base->get_port());
 
-  // /portal -> serve HTML
-  auto *portal_handler = new AsyncCallbackWebHandler();
-  portal_handler->setUri("/portal");
-  portal_handler->setMethod(HTTP_GET);
-  portal_handler->onRequest([this](AsyncWebServerRequest *request) {
-    if (!this->portal_password_.empty()) {
-      bool auth = false;
-      if (request->hasHeader("X-Portal-Token") && request->header("X-Portal-Token") == this->portal_password_)
-        auth = true;
-      if (request->hasParam("token") && request->getParam("token")->value() == this->portal_password_)
-        auth = true;
-      if (!auth) {
-        request->send(403, "text/plain", "Forbidden");
-        return;
-      }
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/portal", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "text/html"))
+      return;
+    ESP_LOGD(TAG, "Serving /portal");
+    request->send(200, "text/html", portal_html);
+  }));
+
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/portal/", [](web_server_idf::AsyncWebServerRequest *request) {
+    std::string destination = "/portal";
+    if (request->hasParam("token")) {
+      destination += "?token=";
+      destination += request->getParam("token")->value().c_str();
     }
-    request->send_P(200, "text/html", portal_html);
-  });
-  srv->addHandler(portal_handler);
+    request->redirect(destination);
+  }));
 
-  // /portal/ -> redirect
-  auto *portal_slash = new AsyncCallbackWebHandler();
-  portal_slash->setUri("/portal/");
-  portal_slash->setMethod(HTTP_GET);
-  portal_slash->onRequest([](AsyncWebServerRequest *request) { request->redirect("/portal"); });
-  srv->addHandler(portal_slash);
-
-  // /api/settings/current
-  srv->on("/api/settings/current", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  base->add_handler_without_auth(
+      new LambdaRequestHandler(HTTP_GET, "/api/settings/current", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json"))
+      return;
+    ESP_LOGD(TAG, "Serving /api/settings/current");
     DynamicJsonDocument doc(1024);
     doc["roi_width"] = entry->roi->width;
     doc["roi_height"] = entry->roi->height;
@@ -683,25 +803,32 @@ void Roode::register_portal_routes_() {
     doc["sampling"] = samples;
     doc["firmware"] = VERSION;
     doc["last_calibration"] = last_calibration_ts_;
-    String output;
+    doc["distance_entry_mm"] = entry->getDistance();
+    doc["distance_exit_mm"] = exit->getDistance();
+    doc["entry_active"] = LeftPreviousStatus == SOMEONE;
+    doc["exit_active"] = RightPreviousStatus == SOMEONE;
+    doc["people_counter"] = people_counter != nullptr ? people_counter->state : 0.0f;
+    std::string output;
     serializeJson(doc, output);
-    request->send(200, "application/json", output);
-  });
+    request->send(request->beginResponse(200, "application/json", output));
+  }));
 
-  // /api/scan/status
-  srv->on("/api/scan/status", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/status", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json"))
+      return;
     DynamicJsonDocument doc(256);
     doc["state"] = scan_state_ == SCANNING ? "Scanning" : "Idle";
     doc["id"] = active_scan_id_;
     doc["step"] = scan_step_;
     doc["progress"] = scan_progress_;
-    String output;
+    std::string output;
     serializeJson(doc, output);
-    request->send(200, "application/json", output);
-  });
+    request->send(request->beginResponse(200, "application/json", output));
+  }));
 
-  // /api/scan/start
-  srv->on("/api/scan/start", HTTP_POST, [this](AsyncWebServerRequest *request) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/start", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json"))
+      return;
     if (scan_state_ == SCANNING) {
       request->send(409, "text/plain", "Scan already in progress");
       return;
@@ -713,45 +840,52 @@ void Roode::register_portal_routes_() {
     scan_start_ts_ = millis();
     DynamicJsonDocument doc(128);
     doc["id"] = active_scan_id_;
-    String output;
+    std::string output;
     serializeJson(doc, output);
-    request->send(200, "application/json", output);
-  });
+    request->send(request->beginResponse(200, "application/json", output));
+  }));
 
-  // /api/scan/cancel
-  srv->on("/api/scan/cancel", HTTP_POST, [this](AsyncWebServerRequest *request) {
+  base->add_handler_without_auth(
+      new LambdaRequestHandler(HTTP_POST, "/api/scan/cancel", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json"))
+      return;
     if (scan_state_ == SCANNING) {
       scan_state_ = SCAN_CANCELLED;
     }
     request->send(200, "text/plain", "Cancelled");
-  });
+  }));
 
-  // /api/roi/apply
-  srv->on("/api/roi/apply", HTTP_POST, [this](AsyncWebServerRequest *request) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/roi/apply", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json"))
+      return;
     // This endpoint typically receives recommended ROI from the portal
     // For now we just return OK
     request->send(200, "application/json", "{\"ok\":true}");
-  });
+  }));
 
-  // /api/roi/preview
-  srv->on("/api/roi/preview", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/roi/preview", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json"))
+      return;
     // Return a dummy preview for now
     request->send(200, "application/json", "null");
-  });
+  }));
 
-  // /api/scan/delete
-  srv->on("/api/scan/delete", HTTP_POST, [this](AsyncWebServerRequest *request) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/delete", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json"))
+      return;
     // Dummy delete
     request->send(200, "application/json", "{\"ok\":true}");
-  });
+  }));
 
-  // /api/export/all
-  srv->on("/api/export/all", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/export/all", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json"))
+      return;
     request->send(200, "application/json", "[]");
-  });
+  }));
 
-  // /api/scan/sessions
-  srv->on("/api/scan/sessions", HTTP_GET, [this](AsyncWebServerRequest *request) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/sessions", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json"))
+      return;
     DynamicJsonDocument doc(2048);
     JsonArray arr = doc.to<JsonArray>();
     for (const auto &s : sessions_) {
@@ -762,16 +896,15 @@ void Roode::register_portal_routes_() {
       obj["duration_sec"] = s.duration_sec;
       obj["size_bytes"] = s.size_bytes;
     }
-    String output;
+    std::string output;
     serializeJson(doc, output);
-    request->send(200, "application/json", output);
-  });
+    request->send(request->beginResponse(200, "application/json", output));
+  }));
 
-  // /api/scan/session/{id}
-  auto *session_handler = new AsyncCallbackWebHandler();
-  session_handler->setUri("/api/scan/session/.*");
-  session_handler->setMethod(HTTP_GET);
-  session_handler->onRequest([this](AsyncWebServerRequest *request) {
+  base->add_handler_without_auth(new LambdaRequestHandler(
+      HTTP_GET, "/api/scan/session/", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json"))
+      return;
     std::string uri = request->url().c_str();
     std::string id = uri.substr(uri.find_last_of('/') + 1);
     if (this->scan_results_.count(id)) {
@@ -783,14 +916,14 @@ void Roode::register_portal_routes_() {
       for (uint16_t val : this->scan_results_[id]) {
         data.add(val);
       }
-      String output;
+      std::string output;
       serializeJson(doc, output);
-      request->send(200, "application/json", output);
+      request->send(request->beginResponse(200, "application/json", output));
     } else {
       request->send(404, "text/plain", "Session not found");
     }
-  });
-  srv->addHandler(session_handler);
+  },
+      LambdaRequestHandler::PREFIX));
 
   this->portal_registered_ = true;
   ESP_LOGI(TAG, "Portal routes registered");
@@ -825,6 +958,26 @@ void Roode::update() {
       log_event("manual_adjust " + sign + std::to_string(diff) + " total=" + std::to_string(manual_adjustment_count_));
     }
   }
+}
+
+VL53L1_Error Roode::read_and_track_zone_(Zone *zone, bool update_timestamp) {
+  this->current_zone = zone;
+#ifdef CONFIG_IDF_TARGET_ESP32
+  i2c_lock();
+#endif
+  VL53L1_Error status = zone->readDistance(distanceSensor);
+#ifdef CONFIG_IDF_TARGET_ESP32
+  i2c_unlock();
+#endif
+  if (status == VL53L1_ERROR_NONE && update_timestamp) {
+    last_loop_update_ts_ = millis();
+    invalid_read_count_ = 0;
+  } else if (status != VL53L1_ERROR_NONE) {
+    invalid_read_count_++;
+  }
+  path_tracking(zone);
+  handle_sensor_status();
+  return status;
 }
 
 void Roode::loop() {
@@ -908,27 +1061,15 @@ void Roode::loop() {
     restart_sensor();
   }
   unsigned long start = micros();
-  VL53L1_Error status = this->current_zone->readDistance(distanceSensor);
-  if (status == VL53L1_ERROR_NONE) {
-    last_loop_update_ts_ = millis();
-    invalid_read_count_ = 0;
-  } else {
-    invalid_read_count_++;
-  }
-  uint16_t dist = this->current_zone->getDistance();
+  AnEventHasOccured = 0;
+  AllZonesCurrentStatus = 0;
+  this->read_and_track_zone_(this->entry, true);
+  this->read_and_track_zone_(this->exit, false);
   // Attempt to recover the sensor when repeated invalid distance values are observed
   if (invalid_read_count_ > invalid_distance_limit_ && (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
     ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
     restart_sensor();
   }
-  AnEventHasOccured = 0;
-  AllZonesCurrentStatus = 0;
-  path_tracking(this->current_zone);
-  handle_sensor_status();
-  this->current_zone = this->current_zone == this->entry ? this->exit : this->entry;
-  path_tracking(this->current_zone);
-  handle_sensor_status();
-  this->current_zone = this->current_zone == this->entry ? this->exit : this->entry;
   unsigned long end = micros();
   unsigned long delta = end - start;
   loop_time_sum_ += delta;
@@ -1631,20 +1772,10 @@ void Roode::sensor_task(void *param) {
 #endif
     }
     unsigned long start = micros();
-#ifdef CONFIG_IDF_TARGET_ESP32
-    i2c_lock();
-#endif
-    VL53L1_Error status = self->current_zone->readDistance(self->distanceSensor);
-#ifdef CONFIG_IDF_TARGET_ESP32
-    i2c_unlock();
-#endif
-    if (status == VL53L1_ERROR_NONE) {
-      self->last_loop_update_ts_ = millis();
-      self->invalid_read_count_ = 0;
-    } else {
-      self->invalid_read_count_++;
-    }
-    uint16_t dist = self->current_zone->getDistance();
+    self->AnEventHasOccured = 0;
+    self->AllZonesCurrentStatus = 0;
+    self->read_and_track_zone_(self->entry, true);
+    self->read_and_track_zone_(self->exit, false);
     // Attempt to recover the sensor when repeated invalid distance values are observed
     if (self->invalid_read_count_ > self->invalid_distance_limit_ &&
         (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
@@ -1657,14 +1788,6 @@ void Roode::sensor_task(void *param) {
       i2c_unlock();
 #endif
     }
-    self->AnEventHasOccured = 0;
-    self->AllZonesCurrentStatus = 0;
-    self->path_tracking(self->current_zone);
-    self->handle_sensor_status();
-    self->current_zone = self->current_zone == self->entry ? self->exit : self->entry;
-    self->path_tracking(self->current_zone);
-    self->handle_sensor_status();
-    self->current_zone = self->current_zone == self->entry ? self->exit : self->entry;
     unsigned long end = micros();
     unsigned long delta = end - start;
     self->loop_time_sum_ += delta;

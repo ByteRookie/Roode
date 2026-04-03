@@ -8,6 +8,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/components/sun/sun.h"
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
@@ -46,7 +47,10 @@ struct RoodeSettings {
   FilterMode filter_mode;
   uint8_t filter_window;
   uint32_t active_sensors;
+  bool debug_mode;
 } __attribute__((packed));
+
+enum ScanPhase { PHASE_IDLE, PHASE_EMPTY, PHASE_PERSON };
 
 class Roode;
 
@@ -145,6 +149,9 @@ class Roode : public PollingComponent {
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
   void set_portal_password(const std::string &password) { portal_password_ = password; }
   void set_portal_enabled(bool enabled) { portal_enabled_ = enabled; }
+  void set_debug_mode(bool debug) { debug_mode_ = debug; }
+  void set_lux_sensor(sensor::Sensor *lux) { lux_sensor_ = lux; }
+  void set_sun(sun::Sun *s) { sun_ = s; }
   void set_cpu_optimization_thresholds(float activate, float deactivate) {
     cpu_opt_activate_threshold_ = activate;
     cpu_opt_deactivate_threshold_ = deactivate;
@@ -177,6 +184,20 @@ class Roode : public PollingComponent {
   bool portal_enabled_{true};
   bool sensor_enabled_{true};
   uint32_t active_sensors_{0xFFFFFFFF};
+  bool debug_mode_{false};
+  ScanPhase scan_phase_{PHASE_IDLE};
+  sensor::Sensor *lux_sensor_{nullptr};
+  sun::Sun *sun_{nullptr};
+  
+  struct HistoricalScan {
+    uint32_t ts;
+    float lux;
+    std::vector<uint16_t> distances;
+    std::vector<uint16_t> rates;
+  };
+  std::vector<HistoricalScan> background_scans_;
+  std::vector<HistoricalScan> person_scans_;
+
   Zone *current_zone = entry;
 
   sensor::Sensor *distance_entry{nullptr};

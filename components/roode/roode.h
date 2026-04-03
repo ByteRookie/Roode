@@ -58,6 +58,12 @@ struct RoodeSettings {
 
 enum ScanPhase { PHASE_IDLE, PHASE_EMPTY, PHASE_PERSON };
 
+struct HistoricalScan {
+  uint32_t ts;
+  float lux;
+  std::vector<uint16_t> distances;
+};
+
 class Roode;
 
 class PortalSwitch : public switch_::Switch, public Component {
@@ -89,9 +95,9 @@ class Roode : public PollingComponent {
     exit->set_max_samples(size);
   }
 
-  void set_distance_entry(sensor::Sensor *s) { distance_entry_sensor = s; }
-  void set_distance_exit(sensor::Sensor *s) { distance_exit_sensor = s; }
-  void set_people_counter(number::Number *counter) { this->people_counter_sensor = counter; }
+  void set_distance_entry(sensor::Sensor *s) { distance_entry = s; }
+  void set_distance_exit(sensor::Sensor *s) { distance_exit = s; }
+  void set_people_counter(number::Number *counter) { this->people_counter = counter; }
   void set_max_threshold_entry_sensor(sensor::Sensor *s) { max_threshold_entry_sensor = s; }
   void set_max_threshold_exit_sensor(sensor::Sensor *s) { max_threshold_exit_sensor = s; }
   void set_min_threshold_entry_sensor(sensor::Sensor *s) { min_threshold_entry_sensor = s; }
@@ -165,9 +171,9 @@ class Roode : public PollingComponent {
   bool invert_direction_{false};
   uint16_t polling_interval_ms_{10};
   
-  sensor::Sensor *distance_entry_sensor{nullptr};
-  sensor::Sensor *distance_exit_sensor{nullptr};
-  number::Number *people_counter_sensor{nullptr};
+  sensor::Sensor *distance_entry{nullptr};
+  sensor::Sensor *distance_exit{nullptr};
+  number::Number *people_counter{nullptr};
   sensor::Sensor *max_threshold_entry_sensor{nullptr};
   sensor::Sensor *max_threshold_exit_sensor{nullptr};
   sensor::Sensor *min_threshold_entry_sensor{nullptr};
@@ -213,11 +219,6 @@ class Roode : public PollingComponent {
   sun::Sun *sun_{nullptr};
 #endif
 
-  struct HistoricalScan {
-    uint32_t ts;
-    float lux;
-    std::vector<uint16_t> distances;
-  };
   std::vector<HistoricalScan> background_scans_;
   std::vector<HistoricalScan> person_scans_;
 

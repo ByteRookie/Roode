@@ -1,4 +1,5 @@
 #include "roode.h"
+#include "roode_portal.h"
 #include "Arduino.h"
 #ifdef CONFIG_IDF_TARGET_ESP32
 #include "esp_task_wdt.h"
@@ -46,10 +47,6 @@ static const char *const portal_login_html = R"LOGIN(
 <!doctype html><html><head><meta charset="utf-8" /><title>Login</title><style>body{background:#0b0f14;color:#e6edf3;font-family:sans-serif;display:grid;place-items:center;min-height:100vh}form{background:#121821;padding:24px;border-radius:16px;border:1px solid #1f2835}input{width:100%;padding:12px;margin:12px 0;background:transparent;color:inherit;border:1px solid #1f2835;border-radius:8px}button{width:100%;padding:12px;background:#57a6ff;color:#fff;border:0;border-radius:8px;cursor:pointer}</style></head><body><form id="f"><h1>Roode</h1><input id="t" type="password" placeholder="Password" /><button type="submit">Login</button></form><script>document.getElementById('f').onsubmit=(e)=>{e.preventDefault();location.href='/portal?token='+encodeURIComponent(document.getElementById('t').value);};</script></body></html>
 )LOGIN";
 
-static const char *const portal_html = R"PORTAL(
-<!doctype html><html><head><meta charset="utf-8" /><title>Roode Portal</title><style>:root{--bg:#0b0f14;--panel:#121821;--text:#e6edf3;--muted:#9fb0c3;--acc:#57a6ff;--ok:#5bd19b;--err:#ff6b6b;--line:#1f2835}body{margin:0;background:var(--bg);color:var(--text);font-family:sans-serif}.wrap{max-width:800px;margin:24px auto;padding:0 16px}.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px}.tab{padding:8px 16px;cursor:pointer}.tab.active{color:var(--acc);border-bottom:2px solid var(--acc)}.tab-content{display:none}.tab-content.active{display:block}.progress{height:8px;background:#0f1520;border-radius:4px;overflow:hidden;margin:12px 0}.progress-bar{height:100%;background:var(--acc);width:0%}.btns{display:flex;gap:8px}button{padding:8px 16px;background:var(--line);color:inherit;border:0;border-radius:8px;cursor:pointer}button.primary{background:var(--acc);color:#fff}.kv{display:grid;grid-template-columns:140px 1fr;gap:4px}.muted{color:var(--muted);font-size:12px}</style></head><body><div class="wrap"><div class="card"><h1>Roode Portal</h1><div id="st">Sensor: <b>Idle</b> | HA Time: <b>No Sync</b></div></div><div class="tabs"><div class="tab active" data-t="c">Calibration</div><div class="tab" data-t="s">Settings</div><div class="tab" data-t="e">Entities</div></div><div id="c" class="tab-content active"><div class="card"><h2>Phase Calibration</h2><select id="ph"><option value="1">Background</option><option value="2">Person</option></select><div class="progress"><div id="pb" class="progress-bar"></div></div><div class="btns"><button id="start" class="primary">Start Scan</button></div></div><div class="card"><h2>Recommendation</h2><div class="kv"><div>Center:</div><div id="rc">—</div><div>Contrast:</div><div id="ct">—</div></div><button id="apply" class="primary" style="margin-top:12px" disabled>Apply ROI</button></div></div><div id="s" class="tab-content"><div class="card"><form id="sf"><label><input type="checkbox" name="d"> Debug Mode</label><br/><br/>Sampling:<br/><input type="number" name="sa" /><br/><br/>Interval:<br/><input type="number" name="pi" /><br/><br/><button type="submit" class="primary">Save</button></form></div></div><div id="e" class="tab-content"><div class="card" id="el"></div><button id="se" class="primary">Save Entities</button></div></div><script>const T=new URLSearchParams(location.search).get('token')||'';const H=T?{'X-Portal-Token':T}:{};const $=s=>document.querySelector(s);document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab,.tab-content').forEach(x=>x.classList.remove('active'));t.classList.add('active');$('#'+t.dataset.t).classList.add('active')});async function poll(){try{const [cur,stat,prev]=await Promise.all([fetch('/api/settings/current',{headers:H}).then(r=>r.json()),fetch('/api/scan/status',{headers:H}).then(r=>r.json()),fetch('/api/roi/preview',{headers:H}).then(r=>r.json())]);if(cur){$('#st').innerHTML=`Sensor: <b>${cur.status}</b> | HA Time: <b>${cur.ts?'Synced':'No Sync'}</b>`;const f=$('#sf');if(!f.dataset.d){f.d.checked=cur.debug;f.sa.value=cur.sa;f.pi.value=cur.pi}if(!$('#el').dataset.l){const m=['Zone 0','Zone 1','Presence','Counter','Metrics'];let h='';m.forEach((n,i)=>h+=`<label><input type="checkbox" data-b="${i}" ${cur.m&(1<<i)?'checked':''}> ${n}</label><br/>`);$('#el').innerHTML=h;$('#el').dataset.l=1}}if(stat){$('#pb').style.width=stat.p+'%';$('#start').disabled=stat.s==='Scanning'}if(prev&&prev.roi!==undefined){$('#rc').textContent=prev.roi;$('#ct').textContent=prev.con+'mm';$('#apply').disabled=false}}catch(e){}}setInterval(poll,2000);poll();$('#start').onclick=()=>{const p=new URLSearchParams();p.append('phase',$('#ph').value);if(T)p.append('token',T);fetch('/api/scan/start?'+p.toString(),{method:'POST',headers:H})};$('#apply').onclick=()=>fetch('/api/roi/apply',{method:'POST',headers:H});$('#sf').onsubmit=(e)=>{e.preventDefault();const p=new URLSearchParams();p.append('debug',e.target.d.checked);p.append('sa',e.target.sa.value);p.append('pi',e.target.pi.value);if(T)p.append('token',T);fetch('/api/settings/update?'+p.toString(),{method:'POST',headers:H})};$('#se').onclick=()=>{let m=0;document.querySelectorAll('#el input').forEach(i=>{if(i.checked)m|=(1<<i.dataset.b)});const p=new URLSearchParams();p.append('m',m);if(T)p.append('token',T);fetch('/api/settings/update?'+p.toString(),{method:'POST',headers:H})};</script></body></html>
-)PORTAL";
-
 Roode *Roode::instance_ = nullptr;
 bool Roode::log_fallback_events_ = false;
 #ifdef CONFIG_IDF_TARGET_ESP32
@@ -69,6 +66,11 @@ void Roode::setup() {
     samples = s.sampling; polling_interval_ms_ = s.polling_interval; invert_direction_ = s.invert_direction;
     filter_mode_ = s.filter_mode; filter_window_ = s.filter_window; active_sensors_ = s.active_sensors;
     debug_mode_ = s.debug_mode; entry->roi->center = exit->roi->center = s.roi_center;
+    auto_calibration_interval_sec_ = s.auto_calibration_interval; restart_timeout_ms_ = s.restart_timeout;
+    cpu_opt_activate_threshold_ = s.cpu_activate; cpu_opt_deactivate_threshold_ = s.cpu_deactivate;
+    manual_presence_ = s.manual_presence; invalid_distance_limit_ = s.invalid_limit;
+    lux_threshold_ = s.lux_threshold; sun_elevation_threshold_enabled_ = s.sun_elevation_threshold_enabled;
+    sun_elevation_threshold_ = s.sun_elevation_threshold;
   }
 #ifdef CONFIG_IDF_TARGET_ESP32
   if (!force_single_core_) {
@@ -89,18 +91,54 @@ void Roode::register_portal_routes_() {
     if (!require_portal_auth_(r, "application/json")) return;
     JsonDocument doc; doc["sa"] = samples; doc["pi"] = polling_interval_ms_; doc["debug"] = debug_mode_;
     doc["m"] = active_sensors_; doc["status"] = (distanceSensor && !distanceSensor->is_failed()) ? "OK" : "Offline";
-    doc["ts"] = (time(nullptr) > 1000000); std::string out; serializeJson(doc, out); r->send(200, "application/json", out.c_str());
+    doc["ts"] = (time(nullptr) > 1000000); doc["inv"] = invert_direction_; doc["fm"] = (int)filter_mode_;
+    doc["fw"] = filter_window_; doc["min"] = entry->threshold->min; doc["max"] = entry->threshold->max;
+    doc["ac"] = auto_calibration_interval_sec_; doc["il"] = invalid_distance_limit_; doc["rt"] = restart_timeout_ms_;
+    doc["lt"] = lux_threshold_; doc["se"] = sun_elevation_threshold_enabled_; doc["st"] = sun_elevation_threshold_;
+    doc["pres"] = manual_presence_; doc["rc"] = entry->roi->center; doc["rw"] = entry->roi->width; doc["rh"] = entry->roi->height;
+    doc["ec"] = entry->roi->center; doc["xc"] = exit->roi->center;
+    std::string out; serializeJson(doc, out); r->send(200, "application/json", out.c_str());
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/settings/update", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;
-    RoodeSettings s; s.sampling = r->hasParam("sa") ? atoi(r->getParam("sa")->value().c_str()) : samples;
+    RoodeSettings s;
+    s.sampling = r->hasParam("sa") ? atoi(r->getParam("sa")->value().c_str()) : samples;
     s.polling_interval = r->hasParam("pi") ? atoi(r->getParam("pi")->value().c_str()) : polling_interval_ms_;
     s.debug_mode = r->hasParam("debug") ? (r->getParam("debug")->value() == "true") : debug_mode_;
     s.active_sensors = r->hasParam("m") ? strtoul(r->getParam("m")->value().c_str(), NULL, 10) : active_sensors_;
+    s.invert_direction = r->hasParam("inv") ? (r->getParam("inv")->value() == "true") : invert_direction_;
+    s.filter_mode = r->hasParam("fm") ? (FilterMode)atoi(r->getParam("fm")->value().c_str()) : filter_mode_;
+    s.filter_window = r->hasParam("fw") ? atoi(r->getParam("fw")->value().c_str()) : filter_window_;
+    s.auto_calibration_interval = r->hasParam("ac") ? strtoul(r->getParam("ac")->value().c_str(), NULL, 10) : auto_calibration_interval_sec_;
+    s.invalid_limit = r->hasParam("il") ? atoi(r->getParam("il")->value().c_str()) : invalid_distance_limit_;
+    s.restart_timeout = r->hasParam("rt") ? atoi(r->getParam("rt")->value().c_str()) : restart_timeout_ms_;
+    s.lux_threshold = r->hasParam("lt") ? atof(r->getParam("lt")->value().c_str()) : lux_threshold_;
+    s.sun_elevation_threshold_enabled = r->hasParam("se") ? (r->getParam("se")->value() == "true") : sun_elevation_threshold_enabled_;
+    s.sun_elevation_threshold = r->hasParam("st") ? atof(r->getParam("st")->value().c_str()) : sun_elevation_threshold_;
+    s.manual_presence = r->hasParam("pres") ? (r->getParam("pres")->value() == "true") : manual_presence_;
+    
     s.roi_center = entry->roi->center; s.roi_width = entry->roi->width; s.roi_height = entry->roi->height;
-    s.filter_mode = filter_mode_; s.filter_window = filter_window_; s.invert_direction = invert_direction_;
-    samples = s.sampling; polling_interval_ms_ = s.polling_interval; debug_mode_ = s.debug_mode; active_sensors_ = s.active_sensors;
+    s.entry_center = entry->roi->center; s.exit_center = exit->roi->center;
+    s.min_threshold = entry->threshold->min; s.max_threshold = entry->threshold->max;
+    s.cpu_activate = cpu_opt_activate_threshold_; s.cpu_deactivate = cpu_opt_deactivate_threshold_;
+
+    samples = s.sampling; polling_interval_ms_ = s.polling_interval; debug_mode_ = s.debug_mode;
+    active_sensors_ = s.active_sensors; invert_direction_ = s.invert_direction;
+    filter_mode_ = s.filter_mode; filter_window_ = s.filter_window;
+    auto_calibration_interval_sec_ = s.auto_calibration_interval;
+    invalid_distance_limit_ = s.invalid_limit; restart_timeout_ms_ = s.restart_timeout;
+    lux_threshold_ = s.lux_threshold; sun_elevation_threshold_enabled_ = s.sun_elevation_threshold_enabled;
+    sun_elevation_threshold_ = s.sun_elevation_threshold; manual_presence_ = s.manual_presence;
+
     settings_prefs_.save(&s); global_preferences->sync(); r->send(200, "application/json", "{\"ok\":true}");
+  }));
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/presence/toggle", [this](roode_web::AsyncWebServerRequest *r) {
+    if (!require_portal_auth_(r, "application/json")) return;
+    if (r->hasParam("state")) {
+      manual_presence_ = (r->getParam("state")->value() == "true");
+      RoodeSettings s; if (settings_prefs_.load(&s)) { s.manual_presence = manual_presence_; settings_prefs_.save(&s); global_preferences->sync(); }
+    }
+    r->send(200, "application/json", "{\"ok\":true}");
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/start", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;
@@ -150,6 +188,13 @@ void Roode::loop() {
 }
 
 VL53L1_Error Roode::read_and_track_zone_(Zone *zone, bool ut) {
+  // Check lux and sun thresholds
+  if (lux_sensor_ && lux_sensor_->state < lux_threshold_) return VL53L1_ERROR_NONE;
+#ifdef USE_SUN
+  if (sun_elevation_threshold_enabled_ && sun_ && sun_->elevation->state < sun_elevation_threshold_) return VL53L1_ERROR_NONE;
+#endif
+  if (manual_presence_) return VL53L1_ERROR_NONE; // If manual presence is on, skip sensor read
+
 #ifdef CONFIG_IDF_TARGET_ESP32
   i2c_lock();
 #endif

@@ -63,6 +63,15 @@ struct RoodeSettings {
   uint8_t filter_window;
   uint32_t active_sensors;
   bool debug_mode;
+  uint32_t auto_calibration_interval;
+  uint16_t restart_timeout;
+  float cpu_activate;
+  float cpu_deactivate;
+  bool manual_presence;
+  uint8_t invalid_limit;
+  float lux_threshold;
+  bool sun_elevation_threshold_enabled;
+  float sun_elevation_threshold;
 } __attribute__((packed));
 
 enum ScanPhase { PHASE_IDLE, PHASE_EMPTY, PHASE_PERSON };
@@ -160,6 +169,8 @@ class Roode : public PollingComponent {
 #endif
   void set_portal_switch(switch_::Switch *sw) { portal_switch = sw; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
+  void set_auto_calibration_interval_sec(uint32_t sec) { auto_calibration_interval_sec_ = sec; }
+  void set_manual_presence(bool val) { manual_presence_ = val; }
 
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
@@ -228,6 +239,7 @@ class Roode : public PollingComponent {
   CalibrationPrefs calibration_data_[2];
   ESPPreferenceObject calibration_prefs_[2];
   bool calibration_persistence_{false};
+  bool manual_presence_{false};
   uint32_t last_calibration_ts_{0};
   uint32_t last_calibration_millis_{0};
   uint32_t auto_calibration_interval_sec_{0};
@@ -235,6 +247,9 @@ class Roode : public PollingComponent {
   uint32_t restart_timeout_ms_{30000};
   float cpu_opt_activate_threshold_{90.0f};
   float cpu_opt_deactivate_threshold_{50.0f};
+  float lux_threshold_{0.0f};
+  bool sun_elevation_threshold_enabled_{false};
+  float sun_elevation_threshold_{0.0f};
 
   FilterMode filter_mode_{FILTER_MIN};
   uint8_t filter_window_{5};

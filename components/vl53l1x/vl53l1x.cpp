@@ -218,13 +218,25 @@ VL53L1_Error VL53L1X::init() {
   }
 
   // If found at a different address than configured, relocate the sensor.
-  // The override is still active (pointing at found_at), so SetI2CAddress writes to found_at
-  // and the sensor physically moves to address_. The ULD cache also updates.
+  // The override is still active (pointing at found_at).
+  //
+  // IMPORTANT: VL53L1X_ULD._i2c_address defaults to 0x52 (= 0x29 << 1).
+  // SetI2CAddress() has an early-exit: "if (new_address == _i2c_address) return OK".
+  // Calling SetI2CAddress(address_ << 1 = 0x52) would hit this guard and do nothing —
+  // the sensor stays at found_at and the override gets cleared → all I/O fails with -13.
+  //
+  // Fix: first sync the ULD's cache to found_at by calling SetI2CAddress(found_at << 1).
+  // That call won't early-exit (found_at<<1 != 0x52 when found_at=0x66).
+  // It writes "stay at found_at" to the hardware (no-op), but advances _i2c_address to found_at<<1.
+  // Now SetI2CAddress(address_ << 1) won't early-exit either, and actually relocates the sensor.
   if (found_at != address_) {
     ESP_LOGI(TAG, "Relocating sensor from 0x%02X to configured address 0x%02X", found_at, address_);
 #ifdef CONFIG_IDF_TARGET_ESP32
     roode::Roode::i2c_lock();
 #endif
+    // Step 1: sync ULD cache → found_at (override still = found_at, so writes go to found_at)
+    sensor.SetI2CAddress(found_at << 1);
+    // Step 2: now relocate the sensor from found_at to address_
     status = sensor.SetI2CAddress(address_ << 1);
 #ifdef CONFIG_IDF_TARGET_ESP32
     roode::Roode::i2c_unlock();
@@ -232,7 +244,8 @@ VL53L1_Error VL53L1X::init() {
     if (status != VL53L1_ERROR_NONE) {
       ESP_LOGE(TAG, "Failed to relocate sensor address, error: %d", status);
     } else {
-      ESP_LOGI(TAG, "Sensor now at 0x%02X", address_);
+      delay(2);  // Allow sensor time to switch addresses
+      ESP_LOGI(TAG, "Sensor relocated to 0x%02X", address_);
     }
   }
 

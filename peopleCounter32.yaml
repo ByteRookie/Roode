@@ -3,11 +3,10 @@ substitutions:
   friendly_name: $devicename
 
 external_components:
-  refresh: always
-  source:
-    type: git
-    url: https://github.com/Lyr3x/Roode
-    ref: master
+  - source:
+      type: git
+      url: https://github.com/Lyr3x/Roode
+      ref: master
 
 esphome:
   name: $devicename
@@ -29,7 +28,8 @@ wifi:
 captive_portal:
 
 api:
-  password: !secret api_password
+  encryption:
+    key: !secret api_encryption_key
   reboot_timeout: 60min
   services:
     - service: recalibrate
@@ -37,7 +37,8 @@ api:
         - lambda: "id(roode_platform)->recalibration();"
 
 ota:
-  password: !secret ota_password
+  - platform: esphome
+    password: !secret ota_password
 
 web_server:
   port: 80
@@ -64,8 +65,7 @@ vl53l1x:
   pins:
     xshut:
       number: GPIO3
-      mode: OUTPUT_PULLUP
-      ignore_strapping_warning: true
+      mode: OUTPUT
     interrupt:
       number: GPIO1
       mode: INPUT_PULLUP

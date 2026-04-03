@@ -140,8 +140,7 @@ vl53l1x:
     # Shutdown/Enable pin used to change the I2C address and recover the sensor if needed.
     xshut:
       number: GPIO3
-      mode: OUTPUT_PULLUP
-      ignore_strapping_warning: true
+      mode: OUTPUT
     # Interrupt pin with internal pull-up for the data ready signal
     interrupt:
       number: GPIO1

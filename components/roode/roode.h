@@ -17,7 +17,16 @@
 #include "esphome/core/log.h"
 #ifdef USE_WEBSERVER
 #include "esphome/components/web_server_base/web_server_base.h"
-#include "esphome/components/web_server_idf/web_server_idf.h"
+#ifdef CONFIG_IDF_TARGET_ESP32
+namespace roode_web = esphome::web_server_idf;
+using RoodeHttpMethod = ::http_method;
+#else
+namespace roode_web {
+  using AsyncWebServerRequest = ::AsyncWebServerRequest;
+  using AsyncWebHandler = ::AsyncWebHandler;
+}
+using RoodeHttpMethod = WebRequestMethod;
+#endif
 #endif
 #include "esphome/components/switch/switch.h"
 #include "../vl53l1x/vl53l1x.h"
@@ -96,9 +105,9 @@ class Roode : public PollingComponent {
     exit->set_max_samples(size);
   }
 
-  void set_distance_entry(sensor::Sensor *s) { distance_entry_sensor = s; }
-  void set_distance_exit(sensor::Sensor *s) { distance_exit_sensor = s; }
-  void set_people_counter(number::Number *counter) { this->people_counter_sensor = counter; }
+  void set_distance_entry(sensor::Sensor *s) { distance_entry = s; }
+  void set_distance_exit(sensor::Sensor *s) { distance_exit = s; }
+  void set_people_counter(number::Number *counter) { this->people_counter = counter; }
   void set_max_threshold_entry_sensor(sensor::Sensor *s) { max_threshold_entry_sensor = s; }
   void set_max_threshold_exit_sensor(sensor::Sensor *s) { max_threshold_exit_sensor = s; }
   void set_min_threshold_entry_sensor(sensor::Sensor *s) { min_threshold_entry_sensor = s; }
@@ -115,13 +124,23 @@ class Roode : public PollingComponent {
   void set_presence_binary_sensor(binary_sensor::BinarySensor *s) { presence_sensor = s; }
   void set_entry_presence_binary_sensor(binary_sensor::BinarySensor *s) { entry_presence_sensor = s; }
   void set_exit_presence_binary_sensor(binary_sensor::BinarySensor *s) { exit_presence_sensor = s; }
+  void set_sensor_xshut_state_binary_sensor(binary_sensor::BinarySensor *s) { xshut_state_sensor = s; }
   void set_version_text_sensor(text_sensor::TextSensor *s) { version_sensor = s; }
   void set_entry_exit_event_text_sensor(text_sensor::TextSensor *s) { entry_exit_event_sensor = s; }
   void set_sensor_status_text_sensor(text_sensor::TextSensor *s) { status_text_sensor = s; }
   void set_manual_adjustment_sensor(sensor::Sensor *s) { manual_adjustment_sensor = s; }
   void set_interrupt_status_sensor(sensor::Sensor *s) { interrupt_status_sensor = s; }
+  void set_enabled_features_text_sensor(text_sensor::TextSensor *s) { enabled_features_sensor = s; }
 
+  void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
+  void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
+  void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
+  void set_cpu_optimization_thresholds(float activate, float deactivate) {
+    cpu_opt_activate_threshold_ = activate;
+    cpu_opt_deactivate_threshold_ = deactivate;
+  }
+  
   void set_filter_mode(FilterMode mode) {
     filter_mode_ = mode;
     entry->set_filter_mode(mode);
@@ -172,9 +191,9 @@ class Roode : public PollingComponent {
   bool invert_direction_{false};
   uint16_t polling_interval_ms_{10};
   
-  sensor::Sensor *distance_entry_sensor{nullptr};
-  sensor::Sensor *distance_exit_sensor{nullptr};
-  number::Number *people_counter_sensor{nullptr};
+  sensor::Sensor *distance_entry{nullptr};
+  sensor::Sensor *distance_exit{nullptr};
+  number::Number *people_counter{nullptr};
   sensor::Sensor *max_threshold_entry_sensor{nullptr};
   sensor::Sensor *max_threshold_exit_sensor{nullptr};
   sensor::Sensor *min_threshold_entry_sensor{nullptr};
@@ -191,9 +210,11 @@ class Roode : public PollingComponent {
   binary_sensor::BinarySensor *presence_sensor{nullptr};
   binary_sensor::BinarySensor *entry_presence_sensor{nullptr};
   binary_sensor::BinarySensor *exit_presence_sensor{nullptr};
+  binary_sensor::BinarySensor *xshut_state_sensor{nullptr};
   text_sensor::TextSensor *version_sensor{nullptr};
   text_sensor::TextSensor *entry_exit_event_sensor{nullptr};
   text_sensor::TextSensor *status_text_sensor{nullptr};
+  text_sensor::TextSensor *enabled_features_sensor{nullptr};
   sensor::Sensor *manual_adjustment_sensor{nullptr};
   sensor::Sensor *interrupt_status_sensor{nullptr};
 
@@ -210,6 +231,10 @@ class Roode : public PollingComponent {
   uint32_t last_calibration_ts_{0};
   uint32_t last_calibration_millis_{0};
   uint32_t auto_calibration_interval_sec_{0};
+  uint8_t invalid_distance_limit_{10};
+  uint32_t restart_timeout_ms_{30000};
+  float cpu_opt_activate_threshold_{90.0f};
+  float cpu_opt_deactivate_threshold_{50.0f};
 
   FilterMode filter_mode_{FILTER_MIN};
   uint8_t filter_window_{5};
@@ -235,7 +260,9 @@ class Roode : public PollingComponent {
   int AllZonesCurrentStatus = 0;
 
   bool force_single_core_{false};
+#ifdef CONFIG_IDF_TARGET_ESP32
   TaskHandle_t sensor_task_handle_{nullptr};
+#endif
   bool use_sensor_task_{false};
 
   ESPPreferenceObject settings_prefs_;
@@ -249,20 +276,23 @@ class Roode : public PollingComponent {
 
   std::string portal_password_{};
   bool portal_registered_{false};
+  static bool log_fallback_events_;
   static Roode *instance_;
 
   void register_portal_routes_();
 #ifdef USE_WEBSERVER
-  bool portal_request_authorized_(web_server_idf::AsyncWebServerRequest *request) const;
-  bool require_portal_auth_(web_server_idf::AsyncWebServerRequest *request, const char *content_type) const;
-  void send_portal_login_(web_server_idf::AsyncWebServerRequest *request) const;
+  bool portal_request_authorized_(roode_web::AsyncWebServerRequest *request) const;
+  bool require_portal_auth_(roode_web::AsyncWebServerRequest *request, const char *content_type) const;
+  void send_portal_login_(roode_web::AsyncWebServerRequest *request) const;
 #endif
   VL53L1_Error read_and_track_zone_(Zone *zone, bool update_timestamp);
   void path_tracking(Zone *zone);
   bool handle_sensor_status();
   void update_status_text(const std::string &status);
   const RangingMode *determine_ranging_mode(uint16_t ae, uint16_t ax);
+#ifdef CONFIG_IDF_TARGET_ESP32
   static void sensor_task(void *param);
+#endif
   void restart_sensor();
   uint32_t loop_window_start_{0};
   uint64_t loop_time_sum_{0};

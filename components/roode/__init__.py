@@ -120,7 +120,7 @@ CONFIG_SCHEMA = cv.Schema(
 async def to_code(config: Dict):
     roode = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(roode, config)
-    cg.add_library("bblanchon/ArduinoJson", "6.18.5")
+    cg.add_library("bblanchon/ArduinoJson", None)
 
     sens = await cg.get_variable(config[CONF_SENSOR])
     cg.add(roode.set_tof_sensor(sens))

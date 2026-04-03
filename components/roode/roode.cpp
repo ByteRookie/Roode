@@ -18,21 +18,26 @@ namespace roode {
 
 #ifdef USE_WEBSERVER
 namespace {
-class LambdaRequestHandler : public web_server_idf::AsyncWebHandler {
+class LambdaRequestHandler : public roode_web::AsyncWebHandler {
  public:
   enum MatchType { EXACT, PREFIX };
-  using Callback = std::function<void(web_server_idf::AsyncWebServerRequest *request)>;
-  LambdaRequestHandler(http_method method, std::string uri, Callback callback, MatchType match_type = EXACT)
+  using Callback = std::function<void(roode_web::AsyncWebServerRequest *request)>;
+  LambdaRequestHandler(RoodeHttpMethod method, std::string uri, Callback callback, MatchType match_type = EXACT)
       : method_(method), uri_(std::move(uri)), callback_(std::move(callback)), match_type_(match_type) {}
-  bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override {
+  bool canHandle(roode_web::AsyncWebServerRequest *request) const override {
     if (request->method() != method_) return false;
-    char url_buf[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
-    std::string request_url(request->url_to(url_buf));
+    std::string request_url;
+#ifdef CONFIG_IDF_TARGET_ESP32
+    char url_buf[roode_web::AsyncWebServerRequest::URL_BUF_SIZE];
+    request_url = request->url_to(url_buf);
+#else
+    request_url = request->url().c_str();
+#endif
     return match_type_ == PREFIX ? request_url.rfind(uri_, 0) == 0 : request_url == uri_;
   }
-  void handleRequest(web_server_idf::AsyncWebServerRequest *request) override { callback_(request); }
+  void handleRequest(roode_web::AsyncWebServerRequest *request) override { callback_(request); }
  private:
-  http_method method_; std::string uri_; Callback callback_; MatchType match_type_;
+  RoodeHttpMethod method_; std::string uri_; Callback callback_; MatchType match_type_;
 };
 }
 #endif
@@ -46,6 +51,7 @@ static const char *const portal_html = R"PORTAL(
 )PORTAL";
 
 Roode *Roode::instance_ = nullptr;
+bool Roode::log_fallback_events_ = false;
 #ifdef CONFIG_IDF_TARGET_ESP32
 SemaphoreHandle_t Roode::i2c_mutex_ = nullptr;
 #endif
@@ -76,16 +82,16 @@ void Roode::setup() {
 void Roode::register_portal_routes_() {
 #ifdef USE_WEBSERVER
   auto *base = web_server_base::global_web_server_base;
-  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/portal", [this](web_server_idf::AsyncWebServerRequest *r) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/portal", [this](roode_web::AsyncWebServerRequest *r) {
     if (require_portal_auth_(r, "text/html")) r->send(200, "text/html", portal_html);
   }));
-  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/settings/current", [this](web_server_idf::AsyncWebServerRequest *r) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/settings/current", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;
     JsonDocument doc; doc["sa"] = samples; doc["pi"] = polling_interval_ms_; doc["debug"] = debug_mode_;
     doc["m"] = active_sensors_; doc["status"] = (distanceSensor && !distanceSensor->is_failed()) ? "OK" : "Offline";
     doc["ts"] = (time(nullptr) > 1000000); std::string out; serializeJson(doc, out); r->send(200, "application/json", out.c_str());
   }));
-  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/settings/update", [this](web_server_idf::AsyncWebServerRequest *r) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/settings/update", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;
     RoodeSettings s; s.sampling = r->hasParam("sa") ? atoi(r->getParam("sa")->value().c_str()) : samples;
     s.polling_interval = r->hasParam("pi") ? atoi(r->getParam("pi")->value().c_str()) : polling_interval_ms_;
@@ -96,21 +102,21 @@ void Roode::register_portal_routes_() {
     samples = s.sampling; polling_interval_ms_ = s.polling_interval; debug_mode_ = s.debug_mode; active_sensors_ = s.active_sensors;
     settings_prefs_.save(&s); global_preferences->sync(); r->send(200, "application/json", "{\"ok\":true}");
   }));
-  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/start", [this](web_server_idf::AsyncWebServerRequest *r) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/start", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;
     scan_phase_ = r->hasParam("phase") ? (ScanPhase)atoi(r->getParam("phase")->value().c_str()) : PHASE_EMPTY;
     scan_state_ = SCANNING; scan_progress_ = 0; r->send(200, "application/json", "{\"ok\":true}");
   }));
-  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/status", [this](web_server_idf::AsyncWebServerRequest *r) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/status", [this](roode_web::AsyncWebServerRequest *r) {
     JsonDocument d; d["s"] = scan_state_ == SCANNING ? "Scanning" : "Idle"; d["p"] = scan_progress_;
     std::string out; serializeJson(d, out); r->send(200, "application/json", out.c_str());
   }));
-  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/roi/preview", [this](web_server_idf::AsyncWebServerRequest *r) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/roi/preview", [this](roode_web::AsyncWebServerRequest *r) {
     if (!has_recommended_settings_) { r->send(200, "application/json", "null"); return; }
     JsonDocument d; d["roi"] = recommended_settings_.roi_center; d["con"] = (int)recommended_settings_.max_threshold;
     std::string out; serializeJson(d, out); r->send(200, "application/json", out.c_str());
   }));
-  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/roi/apply", [this](web_server_idf::AsyncWebServerRequest *r) {
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/roi/apply", [this](roode_web::AsyncWebServerRequest *r) {
     entry->roi->center = exit->roi->center = recommended_settings_.roi_center;
     recalibration(); r->send(200, "application/json", "{\"ok\":true}");
   }));
@@ -125,15 +131,19 @@ void Roode::update() {
 
 void Roode::update_metrics() {
   uint32_t now = millis(); if (now - loop_window_start_ < 10000) return;
+#ifdef CONFIG_IDF_TARGET_ESP32
   if (active_sensors_ & 0x10 && ram_free_sensor) ram_free_sensor->publish_state((float)ESP.getFreeHeap()/(float)ESP.getHeapSize()*100.0f);
+#endif
   loop_window_start_ = now;
 }
 
 void Roode::loop() {
   if (use_sensor_task_) {
+#ifdef CONFIG_IDF_TARGET_ESP32
     if (presence_update_pending_ && active_sensors_ & 0x04 && presence_sensor) { presence_sensor->publish_state(presence_state_); presence_update_pending_ = false; }
     if (people_counter_update_pending_ && active_sensors_ & 0x08 && people_counter) { auto c = people_counter->make_call(); c.set_value(pending_people_counter_value_); c.perform(); people_counter_update_pending_ = false; }
     vTaskDelay(pdMS_TO_TICKS(50));
+#endif
   } else {
     read_and_track_zone_(entry, true); read_and_track_zone_(exit, false); delay(polling_interval_ms_);
   }
@@ -177,6 +187,7 @@ void Roode::updateCounter(int d) {
 void Roode::recalibration() { run_zone_calibration(0); run_zone_calibration(1); }
 void Roode::run_zone_calibration(uint8_t id) { Zone *z = id == 0 ? entry : exit; z->calibrateThreshold(distanceSensor, 50); }
 
+#ifdef CONFIG_IDF_TARGET_ESP32
 void Roode::sensor_task(void *p) {
   auto *self = static_cast<Roode *>(p);
 #ifdef CONFIG_IDF_TARGET_ESP32
@@ -209,23 +220,33 @@ void Roode::sensor_task(void *p) {
     vTaskDelay(pdMS_TO_TICKS(self->polling_interval_ms_));
   }
 }
+#endif
 
 void Roode::restart_sensor() { if (distanceSensor) distanceSensor->restart(); }
 
 #ifdef USE_WEBSERVER
-bool Roode::portal_request_authorized_(web_server_idf::AsyncWebServerRequest *r) const {
+bool Roode::portal_request_authorized_(roode_web::AsyncWebServerRequest *r) const {
   if (portal_password_.empty()) return true;
+#ifdef CONFIG_IDF_TARGET_ESP32
   auto h = r->get_header("X-Portal-Token"); if (h.has_value() && h.value() == portal_password_) return true;
-  auto *t = r->getParam("token"); if (t && t->value() == portal_password_) return true;
+#else
+  if (r->hasHeader("X-Portal-Token") && r->header("X-Portal-Token").c_str() == portal_password_) return true;
+#endif
+  auto *t = r->getParam("token");
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (t && t->value() == portal_password_) return true;
+#else
+  if (t && t->value().c_str() == portal_password_) return true;
+#endif
   return false;
 }
-bool Roode::require_portal_auth_(web_server_idf::AsyncWebServerRequest *r, const char *ct) const {
+bool Roode::require_portal_auth_(roode_web::AsyncWebServerRequest *r, const char *ct) const {
   if (!portal_enabled_) { r->send(403, "text/plain", "Portal disabled"); return false; }
   if (portal_request_authorized_(r)) return true;
   if (ct && std::string(ct) == "text/html") send_portal_login_(r); else r->send(401, "application/json", "{\"error\":\"unauthorized\"}");
   return false;
 }
-void Roode::send_portal_login_(web_server_idf::AsyncWebServerRequest *r) const { r->send(200, "text/html", portal_login_html); }
+void Roode::send_portal_login_(roode_web::AsyncWebServerRequest *r) const { r->send(200, "text/html", portal_login_html); }
 #endif
 
 } }

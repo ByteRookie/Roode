@@ -58,9 +58,13 @@ static const char *const portal_html = R"PORTAL(
   <div class="wrap">
     <div class="hdr">
       <h1>Roode Control</h1>
-      <div class="status">
+      <div class="status" style="display:flex;align-items:center;gap:16px">
         <span id="statusText">Status: <b>Idle</b></span>
         <span id="luxDisplay" style="display:none"> · Lux: <b id="luxValue">—</b></span>
+        <span style="display:flex;align-items:center;gap:8px;font-size:13px">
+          <span style="color:var(--muted)">Counting</span>
+          <label class="switch"><input type="checkbox" id="masterEnable" checked><span class="slider"></span></label>
+        </span>
       </div>
     </div>
 
@@ -179,9 +183,16 @@ static const char *const portal_html = R"PORTAL(
     <div id="sensors" class="tab-content">
       <div class="card">
         <h2>Sensor Visibility</h2>
-        <p style="color:var(--muted);font-size:13px">Toggle which entities are enabled and published.</p>
+        <p style="color:var(--muted);font-size:13px">Toggle which entities are enabled and published to Home Assistant.</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--line)">
+          <span style="font-weight:600">All Sensors</span>
+          <div style="display:flex;gap:8px;margin-left:auto">
+            <button id="btnEnableAll" class="btn">Enable All</button>
+            <button id="btnDisableAll" class="btn">Disable All</button>
+          </div>
+        </div>
         <div id="sensorList"></div>
-        <div class="btns"><button id="btnSaveSensors" class="btn primary">Update Visibility</button></div>
+        <div class="btns"><button id="btnSaveSensors" class="btn primary">Save Visibility</button></div>
       </div>
     </div>
 
@@ -262,6 +273,7 @@ static const char *const portal_html = R"PORTAL(
       $('#setXrw').value = cur.xrw; $('#setXrh').value = cur.xrh; $('#setXrc').value = cur.xrc;
       $('#setXmin').value = cur.xmin; $('#setXmax').value = cur.xmax;
 
+      if(cur.ce !== undefined) $('#masterEnable').checked = cur.ce;
       if(!window._loaded) {
         const sl = $('#sensorList'); sl.innerHTML = '';
         SENSOR_MAP.forEach(s => {
@@ -358,6 +370,15 @@ static const char *const portal_html = R"PORTAL(
     });
   };
 
+  $('#masterEnable').onchange = function() {
+    api('/api/settings/update?ce=' + boolStr(this.checked), 'POST');
+  };
+  $('#btnEnableAll').onclick = () => {
+    document.querySelectorAll('.sensor-opt').forEach(el => { el.checked = true; });
+  };
+  $('#btnDisableAll').onclick = () => {
+    document.querySelectorAll('.sensor-opt').forEach(el => { el.checked = false; });
+  };
   $('#btnSaveSensors').onclick = () => {
     let m = 0; document.querySelectorAll('.sensor-opt').forEach(el => { if(el.checked) m |= parseInt(el.dataset.id); });
     api('/api/settings/update?m=' + m, 'POST').then(r => { if(r && r.ok) alert('Visibility updated'); });

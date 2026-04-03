@@ -101,6 +101,9 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   uint8_t interrupt_miss_count_{0};
   uint32_t last_interrupt_retry_{0};
   uint8_t consecutive_failures_{0};
+  // When non-zero, all ULD I2C callbacks use this address instead of the ULD-managed one.
+  // Used during init() to probe the physical bus independently of ULD's cached address.
+  uint8_t i2c_address_override_{0};
 };
 
 }  // namespace vl53l1x

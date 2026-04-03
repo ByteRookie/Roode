@@ -102,6 +102,21 @@ void Roode::setup() {
     }
     entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
   }
+  // Auto-calibrate on first boot when thresholds are zero (no saved calibration data)
+  if (distanceSensor && (entry->threshold->max == 0 || exit->threshold->max == 0)) {
+    ESP_LOGI(TAG, "No calibration data found - running initial threshold calibration");
+    recalibration();
+    // Persist calibration results to flash so subsequent boots skip this step
+    RoodeSettings cal_s;
+    if (!settings_prefs_.load(&cal_s)) memset(&cal_s, 0, sizeof(cal_s));
+    cal_s.entry_min_threshold = entry->threshold->min;
+    cal_s.entry_max_threshold = entry->threshold->max;
+    cal_s.exit_min_threshold = exit->threshold->min;
+    cal_s.exit_max_threshold = exit->threshold->max;
+    settings_prefs_.save(&cal_s);
+    global_preferences->sync();
+  }
+
 #ifdef CONFIG_IDF_TARGET_ESP32
   if (!force_single_core_) {
     xTaskCreatePinnedToCore(sensor_task, "SensorTask", 4096, this, 1, &sensor_task_handle_, 1);
@@ -182,6 +197,10 @@ void Roode::register_portal_routes_() {
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/status", [this](roode_web::AsyncWebServerRequest *r) {
     JsonDocument d; d["s"] = scan_state_ == SCANNING ? "Scanning" : "Idle"; d["p"] = scan_progress_;
     std::string out; serializeJson(d, out); r->send(200, "application/json", out.c_str());
+  }));
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/cancel", [this](roode_web::AsyncWebServerRequest *r) {
+    scan_state_ = SCAN_IDLE; scan_progress_ = 0;
+    r->send(200, "application/json", "{\"ok\":true}");
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/sessions", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;

@@ -281,21 +281,24 @@ static const char *const portal_html = R"PORTAL(
   $('#btnCancel').onclick = () => api('/api/scan/cancel', 'POST');
   $('#btnApply').onclick = () => api('/api/roi/apply', 'POST').then(()=>alert('Applied'));
   
+  function boolStr(v){ return v ? 'true' : 'false'; }
   $('#btnSaveSettings').onclick = () => {
-    const body = {
+    const params = new URLSearchParams({
       sa: parseInt($('#setSampling').value), or: parseInt($('#setOrientation').value),
-      inv: $('#setInvert').checked, cp: $('#setPersist').checked,
+      inv: boolStr($('#setInvert').checked), cp: boolStr($('#setPersist').checked),
       fm: parseInt($('#setFilterMode').value), fw: parseInt($('#setFilterWindow').value),
-      ul: $('#setUseLux').checked, us: $('#setUseSun').checked,
-      sid: parseInt($('#setSid').value), addr: parseInt($('#setAddr').value, 16),
-      to: parseInt($('#setTO').value), rm: parseInt($('#setRM').value)
-    };
-    api('/api/settings/update', 'POST', body).then(r => r && alert('Settings Updated'));
+      ul: boolStr($('#setUseLux').checked), us: boolStr($('#setUseSun').checked),
+      sid: parseInt($('#setSid').value), to: parseInt($('#setTO').value),
+      rm: parseInt($('#setRM').value),
+      debug: boolStr($('#setDebug').checked), sc: boolStr($('#setSingleCore').checked),
+      il: parseInt($('#setInvalidLimit').value), rt: parseInt($('#setRestartTO').value)
+    }).toString();
+    api('/api/settings/update?' + params, 'POST').then(r => r && alert('Settings Updated'));
   };
 
   $('#btnSaveSensors').onclick = () => {
     let m = 0; document.querySelectorAll('.sensor-opt').forEach(el => { if(el.checked) m |= parseInt(el.dataset.id); });
-    api('/api/settings/update', 'POST', {m}).then(r => r && alert('Visibility Updated'));
+    api('/api/settings/update?m=' + m, 'POST').then(r => r && alert('Visibility Updated'));
   };
 
   setInterval(poll, 2000); poll();

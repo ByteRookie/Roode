@@ -149,27 +149,29 @@ static const char *const portal_html = R"PORTAL(
     });
 
     async function poll(){
-      const [cur, stat, prev] = await Promise.all([
-        fetch('/api/settings/current', {headers: TOKEN_HEADER}).then(r=>r.json()),
-        fetch('/api/scan/status', {headers: TOKEN_HEADER}).then(r=>r.json()),
-        fetch('/api/roi/preview', {headers: TOKEN_HEADER}).then(r=>r.json())
-      ]);
-      if(cur){
-        const f = $('#settingsForm'); if(!f.dataset.dirty){
-          f.debug_mode.checked = cur.debug_mode; f.sampling.value = cur.sampling; f.polling_interval.value = cur.polling_interval;
+      try {
+        const [cur, stat, prev] = await Promise.all([
+          fetch('/api/settings/current', {headers: TOKEN_HEADER}).then(r=>r.json()),
+          fetch('/api/scan/status', {headers: TOKEN_HEADER}).then(r=>r.json()),
+          fetch('/api/roi/preview', {headers: TOKEN_HEADER}).then(r=>r.json())
+        ]);
+        if(cur){
+          const f = $('#settingsForm'); if(!f.dataset.dirty){
+            f.debug_mode.checked = cur.debug_mode; f.sampling.value = cur.sampling; f.polling_interval.value = cur.polling_interval;
+          }
+          if(!$('#sensorList').dataset.loaded){
+            document.querySelectorAll('#sensorList input').forEach(i => i.checked = (cur.active_sensors & (1 << parseInt(i.dataset.bit))));
+            $('#sensorList').dataset.loaded = 'true';
+          }
         }
-        if(!$('#sensorList').dataset.loaded){
-          document.querySelectorAll('#sensorList input').forEach(i => i.checked = (cur.active_sensors & (1 << i.dataset.bit)));
-          $('#sensorList').dataset.loaded = 'true';
+        if(stat){
+          $('#statusText').innerHTML = 'Status: <b>' + stat.state + '</b>';
+          $('#progressBar').style.width = stat.progress + '%';
+          $('#stepText').textContent = stat.step;
+          $('#btnCancel').style.display = stat.state==='Scanning' ? 'inline-block' : 'none';
         }
-      }
-      if(stat){
-        $('#statusText').innerHTML = 'Status: <b>' + stat.state + '</b>';
-        $('#progressBar').style.width = stat.progress + '%';
-        $('#stepText').textContent = stat.step;
-        $('#btnCancel').style.display = stat.state==='Scanning' ? 'inline-block' : 'none';
-      }
-      if(prev){ $('#pvRoi').textContent = prev.roi_center; $('#pvContrast').textContent = prev.contrast; $('#btnApply').disabled = false; }
+        if(prev && prev.roi_center !== undefined){ $('#pvRoi').textContent = prev.roi_center; $('#pvContrast').textContent = prev.contrast; $('#btnApply').disabled = false; }
+      } catch(e) {}
     }
 
     $('#btnStart').onclick = () => {
@@ -178,13 +180,13 @@ static const char *const portal_html = R"PORTAL(
     };
     $('#btnApply').onclick = () => fetch('/api/roi/apply', {method:'POST', headers: TOKEN_HEADER});
     $('#settingsForm').onsubmit = (e) => {
-      e.preventDefault(); const p = new URLSearchParams();
-      p.append('debug_mode', e.target.debug_mode.checked); p.append('sampling', e.target.sampling.value);
-      p.append('polling_interval', e.target.polling_interval.value); if(TOKEN) p.append('token', TOKEN);
+      e.preventDefault(); const f = e.target; f.dataset.dirty = '';
+      const p = new URLSearchParams(); p.append('debug_mode', f.debug_mode.checked); p.append('sampling', f.sampling.value);
+      p.append('polling_interval', f.polling_interval.value); if(TOKEN) p.append('token', TOKEN);
       fetch('/api/settings/update?' + p.toString(), {method:'POST', headers: TOKEN_HEADER});
     };
     $('#btnSaveEntities').onclick = () => {
-      let m = 0; document.querySelectorAll('#sensorList input').forEach(i => { if(i.checked) m |= (1 << i.dataset.bit); });
+      let m = 0; document.querySelectorAll('#sensorList input').forEach(i => { if(i.checked) m |= (1 << parseInt(i.dataset.bit)); });
       const p = new URLSearchParams(); p.append('active_sensors', m); if(TOKEN) p.append('token', TOKEN);
       fetch('/api/settings/update?' + p.toString(), {method:'POST', headers: TOKEN_HEADER});
     };
@@ -203,6 +205,14 @@ SemaphoreHandle_t Roode::i2c_mutex_ = xSemaphoreCreateRecursiveMutex();
 void Roode::log_event(const std::string &msg) {
   if (debug_mode_) ESP_LOGI(TAG, "%s", msg.c_str());
 }
+
+void Roode::dump_config() {
+  ESP_LOGCONFIG(TAG, "Roode (v%s):", VERSION);
+  ESP_LOGCONFIG(TAG, "  Debug Mode: %s", debug_mode_ ? "True" : "False");
+  ESP_LOGCONFIG(TAG, "  Polling Interval: %ums", polling_interval_ms_);
+}
+
+Roode::~Roode() { instance_ = nullptr; }
 
 void Roode::setup() {
   entry->set_filter_window(filter_window_); entry->set_filter_mode(filter_mode_);
@@ -343,7 +353,6 @@ void Roode::sensor_task(void *p) {
       }
       if (self->scan_phase_ == PHASE_EMPTY) self->background_scans_.push_back(h); else self->person_scans_.push_back(h);
       if (!self->background_scans_.empty() && !self->person_scans_.empty()) {
-        // Analysis: Find ROI with max distance delta between background and person
         uint8_t bi = 0; int32_t md = 0;
         for(uint8_t i=0; i<64; i++) {
           int32_t delta = (int32_t)self->background_scans_.back().distances[i] - (int32_t)self->person_scans_.back().distances[i];
@@ -358,7 +367,6 @@ void Roode::sensor_task(void *p) {
   }
 }
 
-void Roode::dump_config() {}
 void Roode::update_metrics() {}
 void Roode::restart_sensor() { distanceSensor->restart(); }
 const RangingMode *Roode::determine_ranging_mode(uint16_t ae, uint16_t ax) { return esphome::vl53l1x::Ranging::Long; }
@@ -372,7 +380,13 @@ void Roode::apply_cpu_optimizations(float c) {}
 void Roode::reset_cpu_optimizations(float c) {}
 
 #ifdef USE_WEBSERVER
-bool Roode::require_portal_auth_(web_server_idf::AsyncWebServerRequest *r, const char *c) const { return true; }
+bool Roode::require_portal_auth_(web_server_idf::AsyncWebServerRequest *request, const char *content_type) const {
+  if (!this->portal_enabled_) { request->send(403, "text/plain", "Portal disabled"); return false; }
+  if (this->portal_request_authorized_(request)) return true;
+  if (content_type != nullptr && std::string(content_type) == "text/html") { this->send_portal_login_(request); }
+  else { request->send(401, "application/json", "{\"error\":\"unauthorized\"}"); }
+  return false;
+}
 #endif
 
 } }

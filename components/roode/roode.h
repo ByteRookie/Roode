@@ -8,7 +8,9 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#ifdef USE_SUN
 #include "esphome/components/sun/sun.h"
+#endif
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
 #include "esphome/core/log.h"
@@ -151,7 +153,9 @@ class Roode : public PollingComponent {
   void set_portal_enabled(bool enabled) { portal_enabled_ = enabled; }
   void set_debug_mode(bool debug) { debug_mode_ = debug; }
   void set_lux_sensor(sensor::Sensor *lux) { lux_sensor_ = lux; }
+#ifdef USE_SUN
   void set_sun(sun::Sun *s) { sun_ = s; }
+#endif
   void set_cpu_optimization_thresholds(float activate, float deactivate) {
     cpu_opt_activate_threshold_ = activate;
     cpu_opt_deactivate_threshold_ = deactivate;
@@ -187,63 +191,10 @@ class Roode : public PollingComponent {
   bool debug_mode_{false};
   ScanPhase scan_phase_{PHASE_IDLE};
   sensor::Sensor *lux_sensor_{nullptr};
+#ifdef USE_SUN
   sun::Sun *sun_{nullptr};
-  
-  struct HistoricalScan {
-    uint32_t ts;
-    float lux;
-    std::vector<uint16_t> distances;
-    std::vector<uint16_t> rates;
-  };
-  std::vector<HistoricalScan> background_scans_;
-  std::vector<HistoricalScan> person_scans_;
-
-  Zone *current_zone = entry;
-
-  sensor::Sensor *distance_entry{nullptr};
-  sensor::Sensor *distance_exit{nullptr};
-  number::Number *people_counter{nullptr};
-  sensor::Sensor *max_threshold_entry_sensor{nullptr};
-  sensor::Sensor *max_threshold_exit_sensor{nullptr};
-  sensor::Sensor *min_threshold_entry_sensor{nullptr};
-  sensor::Sensor *min_threshold_exit_sensor{nullptr};
-  sensor::Sensor *exit_roi_height_sensor{nullptr};
-  sensor::Sensor *exit_roi_width_sensor{nullptr};
-  sensor::Sensor *entry_roi_height_sensor{nullptr};
-  sensor::Sensor *entry_roi_width_sensor{nullptr};
-  sensor::Sensor *status_sensor{nullptr};
-  sensor::Sensor *loop_time_sensor{nullptr};
-  sensor::Sensor *cpu_usage_sensor{nullptr};
-  sensor::Sensor *ram_free_sensor{nullptr};
-  sensor::Sensor *flash_free_sensor{nullptr};
-  binary_sensor::BinarySensor *presence_sensor{nullptr};           // True when any zone is occupied
-  binary_sensor::BinarySensor *entry_presence_sensor{nullptr};     // Occupancy for the entry zone
-  binary_sensor::BinarySensor *exit_presence_sensor{nullptr};      // Occupancy for the exit zone
-  binary_sensor::BinarySensor *xshut_state_binary_sensor{nullptr};
-  text_sensor::TextSensor *version_sensor{nullptr};
-  text_sensor::TextSensor *entry_exit_event_sensor{nullptr};
-  text_sensor::TextSensor *enabled_features_sensor{nullptr};
-  text_sensor::TextSensor *status_text_sensor{nullptr};
-  sensor::Sensor *manual_adjustment_sensor{nullptr};
-  sensor::Sensor *interrupt_status_sensor{nullptr};
-
-  struct CalibrationPrefs {
-    uint16_t baseline_mm;
-    uint16_t threshold_min_mm;
-    uint16_t threshold_max_mm;
-    uint32_t last_calibrated_ts;
-  };
-  CalibrationPrefs calibration_data_[2];
-  ESPPreferenceObject calibration_prefs_[2];
-  bool calibration_persistence_{false};
-  bool fail_safe_triggered_{false};
-  uint32_t last_calibration_ts_{0};
-  uint32_t last_calibration_millis_{0};
-  uint32_t auto_calibration_interval_sec_{4 * 60 * 60};
-
-  FilterMode filter_mode_{FILTER_MIN};
-  uint8_t filter_window_{5};
-  FilterMode default_filter_mode_{FILTER_MIN};
+#endif
+  bool debug_mode_{false};
   uint8_t default_filter_window_{5};
 
   bool cpu_optimizations_active_{false};

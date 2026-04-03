@@ -45,6 +45,7 @@ struct RoodeSettings {
   bool invert_direction;
   FilterMode filter_mode;
   uint8_t filter_window;
+  uint32_t active_sensors;
 } __attribute__((packed));
 
 class Roode;
@@ -175,6 +176,7 @@ class Roode : public PollingComponent {
   switch_::Switch *portal_switch{nullptr};
   bool portal_enabled_{true};
   bool sensor_enabled_{true};
+  uint32_t active_sensors_{0xFFFFFFFF};
   Zone *current_zone = entry;
 
   sensor::Sensor *distance_entry{nullptr};

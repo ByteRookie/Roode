@@ -34,8 +34,8 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
     return sensor_status;
   }
 
-  // If the room is empty, feed the baseline idle distance into the filter so it clears out
-  if (dist_to_filter == 0 || dist_to_filter > 4000) {
+  // If the sensor is out of range, feed the baseline idle distance into the filter so it clears out
+  if (dist_to_filter > 4000) {
     dist_to_filter = threshold->idle;
   }
 

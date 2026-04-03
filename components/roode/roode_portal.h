@@ -109,14 +109,14 @@ static const char *const portal_html = R"PORTAL(
       <div class="grid">
         <div class="card">
           <h2>Roode Core</h2>
-          <div class="kv"><div class="k">Sampling</div><input type="number" id="setSampling"></div>
+          <div class="kv"><div class="k">Sampling</div><input type="number" id="setSampling" min="1" max="10"></div>
           <div class="kv"><div class="k">Orientation</div>
             <select id="setOrientation"><option value="0">Parallel</option><option value="1">Perpendicular</option></select>
           </div>
           <div class="kv"><div class="k">Invert Zones</div><label class="switch"><input type="checkbox" id="setInvert"><span class="slider"></span></label></div>
           <div class="kv"><div class="k">Persistence</div><label class="switch"><input type="checkbox" id="setPersist"><span class="slider"></span></label></div>
         </div>
-        
+
         <div class="card">
           <h2>Filtering</h2>
           <div class="kv"><div class="k">Filter Mode</div>
@@ -126,7 +126,30 @@ static const char *const portal_html = R"PORTAL(
               <option value="2">Percentile 10</option>
             </select>
           </div>
-          <div class="kv"><div class="k">Window Size</div><input type="number" id="setFilterWindow"></div>
+          <div class="kv"><div class="k">Window Size</div><input type="number" id="setFilterWindow" min="1" max="10"></div>
+        </div>
+
+        <div class="card">
+          <h2>Entry Zone ROI</h2>
+          <p style="color:var(--muted);font-size:12px">Region of Interest the sensor reads for the entry zone. Width/height 4–16, center 0–255.</p>
+          <div class="kv"><div class="k">Width (cols)</div><input type="number" id="setErw" min="4" max="16"></div>
+          <div class="kv"><div class="k">Height (rows)</div><input type="number" id="setErh" min="4" max="16"></div>
+          <div class="kv"><div class="k">Center (SPAD)</div><input type="number" id="setErc" min="0" max="255"></div>
+          <div class="kv"><div class="k">Min threshold (mm)</div><input type="number" id="setEmin" min="0"></div>
+          <div class="kv"><div class="k">Max threshold (mm)</div><input type="number" id="setEmax" min="0"></div>
+        </div>
+
+        <div class="card">
+          <h2>Exit Zone ROI</h2>
+          <p style="color:var(--muted);font-size:12px">Region of Interest the sensor reads for the exit zone.</p>
+          <div class="kv"><div class="k">Width (cols)</div><input type="number" id="setXrw" min="4" max="16"></div>
+          <div class="kv"><div class="k">Height (rows)</div><input type="number" id="setXrh" min="4" max="16"></div>
+          <div class="kv"><div class="k">Center (SPAD)</div><input type="number" id="setXrc" min="0" max="255"></div>
+          <div class="kv"><div class="k">Min threshold (mm)</div><input type="number" id="setXmin" min="0"></div>
+          <div class="kv"><div class="k">Max threshold (mm)</div><input type="number" id="setXmax" min="0"></div>
+          <div class="btns" style="margin-top:12px">
+            <button id="btnRecal" class="btn">Re-run Threshold Calibration</button>
+          </div>
         </div>
 
         <div class="card">
@@ -149,7 +172,7 @@ static const char *const portal_html = R"PORTAL(
           </div>
         </div>
       </div>
-      <div class="btns"><button id="btnSaveSettings" class="btn primary">Save & Apply Configuration</button></div>
+      <div class="btns"><button id="btnSaveSettings" class="btn primary">Save & Apply All Settings</button></div>
     </div>
 
     <!-- Sensors Tab -->
@@ -175,6 +198,9 @@ static const char *const portal_html = R"PORTAL(
           <div class="kv"><div class="k">Single Core Only</div><label class="switch"><input type="checkbox" id="setSingleCore"><span class="slider"></span></label></div>
           <div class="kv"><div class="k">Invalid Limit</div><input type="number" id="setInvalidLimit"></div>
           <div class="kv"><div class="k">Restart TO (ms)</div><input type="number" id="setRestartTO"></div>
+          <div class="btns" style="margin-top:12px">
+            <button id="btnSaveDiag" class="btn primary">Save Diagnostics</button>
+          </div>
         </div>
       </div>
     </div>
@@ -221,35 +247,43 @@ static const char *const portal_html = R"PORTAL(
         $('#luxValue').textContent = cur.lux_val + ' lx';
         $('#luxRow').style.display = 'grid';
       }
+      // Always refresh values (not just once) so portal reflects live state
+      $('#setSampling').value = cur.sa; $('#setOrientation').value = cur.or;
+      $('#setInvert').checked = cur.inv; $('#setPersist').checked = cur.cp;
+      $('#setFilterMode').value = cur.fm; $('#setFilterWindow').value = cur.fw;
+      $('#setUseLux').checked = cur.ul; $('#setUseSun').checked = cur.us;
+      $('#setSid').value = cur.sid; $('#setAddr').value = '0x'+cur.addr.toString(16);
+      $('#setTO').value = cur.to; $('#setRM').value = cur.rm;
+      $('#setDebug').checked = cur.debug; $('#setSingleCore').checked = cur.sc;
+      $('#setInvalidLimit').value = cur.il; $('#setRestartTO').value = cur.rt;
+      // Zone ROI & thresholds
+      $('#setErw').value = cur.erw; $('#setErh').value = cur.erh; $('#setErc').value = cur.erc;
+      $('#setEmin').value = cur.emin; $('#setEmax').value = cur.emax;
+      $('#setXrw').value = cur.xrw; $('#setXrh').value = cur.xrh; $('#setXrc').value = cur.xrc;
+      $('#setXmin').value = cur.xmin; $('#setXmax').value = cur.xmax;
+
       if(!window._loaded) {
-        $('#setSampling').value = cur.sa; $('#setOrientation').value = cur.or;
-        $('#setInvert').checked = cur.inv; $('#setPersist').checked = cur.cp;
-        $('#setFilterMode').value = cur.fm; $('#setFilterWindow').value = cur.fw;
-        $('#setUseLux').checked = cur.ul; $('#setUseSun').checked = cur.us;
-        $('#setSid').value = cur.sid; $('#setAddr').value = '0x'+cur.addr.toString(16);
-        $('#setTO').value = cur.to; $('#setRM').value = cur.rm;
-        $('#setDebug').checked = cur.debug; $('#setSingleCore').checked = cur.sc;
-        $('#setInvalidLimit').value = cur.il; $('#setRestartTO').value = cur.rt;
-        
         const sl = $('#sensorList'); sl.innerHTML = '';
         SENSOR_MAP.forEach(s => {
           const div = document.createElement('div'); div.className='sensor-item';
           div.innerHTML = `<span>${s.n}</span><label class="switch"><input type="checkbox" class="sensor-opt" data-id="${s.id}" ${cur.m & s.id ? 'checked' : ''}><span class="slider"></span></label>`;
           sl.append(div);
         });
-        
-        const as = $('#activeState'); as.innerHTML = '';
-        const fields = [
-          ['ROI', `${cur.erh}x${cur.erw} @ ${cur.erc} / ${cur.xrh}x${cur.xrw} @ ${cur.xrc}`],
-          ['Thresholds', `E: ${cur.emin}-${cur.emax} / X: ${cur.xmin}-${cur.xmax}`]
-        ];
-        fields.forEach(f => {
-          const d = document.createElement('div'); d.className='kv';
-          d.innerHTML = `<div class="k">${f[0]}</div><div class="v">${f[1]}</div>`;
-          as.append(d);
-        });
         window._loaded = true;
       }
+
+      const as = $('#activeState'); as.innerHTML = '';
+      const fields = [
+        ['Entry ROI', `${cur.erh}h × ${cur.erw}w @ center ${cur.erc}`],
+        ['Entry Threshold', `${cur.emin} – ${cur.emax} mm`],
+        ['Exit ROI', `${cur.xrh}h × ${cur.xrw}w @ center ${cur.xrc}`],
+        ['Exit Threshold', `${cur.xmin} – ${cur.xmax} mm`],
+      ];
+      fields.forEach(f => {
+        const d = document.createElement('div'); d.className='kv';
+        d.innerHTML = `<div class="k">${f[0]}</div><div class="v">${f[1]}</div>`;
+        as.append(d);
+      });
     }
     if(stat) {
       $('#statusText').innerHTML = `Sensor: <b>${stat.s}</b>`;
@@ -282,23 +316,51 @@ static const char *const portal_html = R"PORTAL(
   $('#btnApply').onclick = () => api('/api/roi/apply', 'POST').then(()=>alert('Applied'));
   
   function boolStr(v){ return v ? 'true' : 'false'; }
+  function intVal(id){ return parseInt(document.getElementById(id).value) || 0; }
+
   $('#btnSaveSettings').onclick = () => {
     const params = new URLSearchParams({
-      sa: parseInt($('#setSampling').value), or: parseInt($('#setOrientation').value),
+      sa: intVal('setSampling'), or: intVal('setOrientation'),
       inv: boolStr($('#setInvert').checked), cp: boolStr($('#setPersist').checked),
-      fm: parseInt($('#setFilterMode').value), fw: parseInt($('#setFilterWindow').value),
+      fm: intVal('setFilterMode'), fw: intVal('setFilterWindow'),
       ul: boolStr($('#setUseLux').checked), us: boolStr($('#setUseSun').checked),
-      sid: parseInt($('#setSid').value), to: parseInt($('#setTO').value),
-      rm: parseInt($('#setRM').value),
+      sid: intVal('setSid'), to: intVal('setTO'), rm: intVal('setRM'),
+      // Zone ROI
+      erh: intVal('setErh'), erw: intVal('setErw'), erc: intVal('setErc'),
+      emin: intVal('setEmin'), emax: intVal('setEmax'),
+      xrh: intVal('setXrh'), xrw: intVal('setXrw'), xrc: intVal('setXrc'),
+      xmin: intVal('setXmin'), xmax: intVal('setXmax'),
+      // Diagnostics
       debug: boolStr($('#setDebug').checked), sc: boolStr($('#setSingleCore').checked),
-      il: parseInt($('#setInvalidLimit').value), rt: parseInt($('#setRestartTO').value)
+      il: intVal('setInvalidLimit'), rt: intVal('setRestartTO')
     }).toString();
-    api('/api/settings/update?' + params, 'POST').then(r => r && alert('Settings Updated'));
+    api('/api/settings/update?' + params, 'POST').then(r => { if(r && r.ok) alert('Settings saved'); });
+  };
+
+  $('#btnSaveDiag').onclick = () => {
+    const params = new URLSearchParams({
+      debug: boolStr($('#setDebug').checked), sc: boolStr($('#setSingleCore').checked),
+      il: intVal('setInvalidLimit'), rt: intVal('setRestartTO')
+    }).toString();
+    api('/api/settings/update?' + params, 'POST').then(r => { if(r && r.ok) alert('Diagnostics saved'); });
+  };
+
+  $('#btnRecal').onclick = () => {
+    if(!confirm('Run threshold calibration now? Keep the sensor view clear (no people).')) return;
+    $('#btnRecal').disabled = true;
+    api('/api/recalibrate', 'POST').then(r => {
+      $('#btnRecal').disabled = false;
+      if(r && r.ok) {
+        alert(`Calibration done!\nEntry: ${r.emin}–${r.emax} mm (idle ${r.idle_e} mm)\nExit:  ${r.xmin}–${r.xmax} mm (idle ${r.idle_x} mm)`);
+      } else {
+        alert('Calibration failed — check logs.');
+      }
+    });
   };
 
   $('#btnSaveSensors').onclick = () => {
     let m = 0; document.querySelectorAll('.sensor-opt').forEach(el => { if(el.checked) m |= parseInt(el.dataset.id); });
-    api('/api/settings/update?m=' + m, 'POST').then(r => r && alert('Visibility Updated'));
+    api('/api/settings/update?m=' + m, 'POST').then(r => { if(r && r.ok) alert('Visibility updated'); });
   };
 
   setInterval(poll, 2000); poll();

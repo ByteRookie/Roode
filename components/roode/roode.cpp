@@ -80,21 +80,28 @@ void Roode::setup() {
   if (!i2c_mutex_) i2c_mutex_ = xSemaphoreCreateRecursiveMutex();
 #endif
   settings_prefs_ = global_preferences->make_preference<RoodeSettings>(0xB0);
+  bool loaded_from_flash = false;
   RoodeSettings s; if (settings_prefs_.load(&s)) {
+    loaded_from_flash = true;
     samples = s.sampling; orientation_ = s.orientation; invert_direction_ = s.invert_direction;
     calibration_persistence_ = s.calibration_persistence; filter_mode_ = s.filter_mode; filter_window_ = s.filter_window;
     log_fallback_events_ = s.log_fallback_events; force_single_core_ = s.force_single_core;
     invalid_distance_limit_ = s.invalid_limit; restart_timeout_ms_ = s.restart_timeout;
     cpu_opt_activate_threshold_ = s.cpu_activate; cpu_opt_deactivate_threshold_ = s.cpu_deactivate;
     active_sensors_ = s.active_sensors; debug_mode_ = s.debug_mode;
-    
-    entry->roi->height = s.entry_roi_height; entry->roi->width = s.entry_roi_width; entry->roi->center = s.entry_roi_center;
+
+    // Only load ROI from flash if it has valid non-zero values
+    if (s.entry_roi_height > 0 && s.entry_roi_width > 0) {
+      entry->roi->height = s.entry_roi_height; entry->roi->width = s.entry_roi_width; entry->roi->center = s.entry_roi_center;
+    }
+    if (s.exit_roi_height > 0 && s.exit_roi_width > 0) {
+      exit->roi->height = s.exit_roi_height; exit->roi->width = s.exit_roi_width; exit->roi->center = s.exit_roi_center;
+    }
     entry->threshold->min = s.entry_min_threshold; entry->threshold->max = s.entry_max_threshold;
-    exit->roi->height = s.exit_roi_height; exit->roi->width = s.exit_roi_width; exit->roi->center = s.exit_roi_center;
     exit->threshold->min = s.exit_min_threshold; exit->threshold->max = s.exit_max_threshold;
-    
+
     use_lux_ = s.use_lux; use_sun_ = s.use_sun;
-    
+
     if (distanceSensor) {
       if (s.sensor_id > 0) distanceSensor->set_sensor_id(s.sensor_id);
       if (s.timeout > 0) distanceSensor->set_timeout(s.timeout);
@@ -102,17 +109,28 @@ void Roode::setup() {
     }
     entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
   }
+
+  // Apply YAML roi_override → roi for any zone whose roi is still zero (not loaded from flash).
+  // This is the fix for the critical bug: roi starts as {0,0,0} and reset_roi() was never called,
+  // causing every sensor.SetROI(0,0) to fail and return no valid readings.
+  if (entry->roi->width == 0 || entry->roi->height == 0) {
+    entry->reset_roi(orientation_ == Parallel ? 159 : 194);
+  }
+  if (exit->roi->width == 0 || exit->roi->height == 0) {
+    exit->reset_roi(orientation_ == Parallel ? 239 : 59);
+  }
+
   // Auto-calibrate on first boot when thresholds are zero (no saved calibration data)
   if (distanceSensor && (entry->threshold->max == 0 || exit->threshold->max == 0)) {
     ESP_LOGI(TAG, "No calibration data found - running initial threshold calibration");
     recalibration();
-    // Persist calibration results to flash so subsequent boots skip this step
+    // Persist calibration results + current ROI to flash
     RoodeSettings cal_s;
     if (!settings_prefs_.load(&cal_s)) memset(&cal_s, 0, sizeof(cal_s));
-    cal_s.entry_min_threshold = entry->threshold->min;
-    cal_s.entry_max_threshold = entry->threshold->max;
-    cal_s.exit_min_threshold = exit->threshold->min;
-    cal_s.exit_max_threshold = exit->threshold->max;
+    cal_s.entry_roi_height = entry->roi->height; cal_s.entry_roi_width = entry->roi->width; cal_s.entry_roi_center = entry->roi->center;
+    cal_s.entry_min_threshold = entry->threshold->min; cal_s.entry_max_threshold = entry->threshold->max;
+    cal_s.exit_roi_height = exit->roi->height; cal_s.exit_roi_width = exit->roi->width; cal_s.exit_roi_center = exit->roi->center;
+    cal_s.exit_min_threshold = exit->threshold->min; cal_s.exit_max_threshold = exit->threshold->max;
     settings_prefs_.save(&cal_s);
     global_preferences->sync();
   }
@@ -173,7 +191,20 @@ void Roode::register_portal_routes_() {
     if (r->hasParam("il")) s.invalid_limit = invalid_distance_limit_ = atoi(r->getParam("il")->value().c_str());
     if (r->hasParam("rt")) s.restart_timeout = restart_timeout_ms_ = atoi(r->getParam("rt")->value().c_str());
     if (r->hasParam("m")) s.active_sensors = active_sensors_ = strtoul(r->getParam("m")->value().c_str(), NULL, 10);
-    
+
+    // ROI params (apply live and persist)
+    if (r->hasParam("erh")) { entry->roi->height = atoi(r->getParam("erh")->value().c_str()); }
+    if (r->hasParam("erw")) { entry->roi->width  = atoi(r->getParam("erw")->value().c_str()); }
+    if (r->hasParam("erc")) { entry->roi->center = atoi(r->getParam("erc")->value().c_str()); }
+    if (r->hasParam("xrh")) { exit->roi->height  = atoi(r->getParam("xrh")->value().c_str()); }
+    if (r->hasParam("xrw")) { exit->roi->width   = atoi(r->getParam("xrw")->value().c_str()); }
+    if (r->hasParam("xrc")) { exit->roi->center  = atoi(r->getParam("xrc")->value().c_str()); }
+    // Threshold params (apply live and persist)
+    if (r->hasParam("emin")) { entry->threshold->min = atoi(r->getParam("emin")->value().c_str()); }
+    if (r->hasParam("emax")) { entry->threshold->max = atoi(r->getParam("emax")->value().c_str()); }
+    if (r->hasParam("xmin")) { exit->threshold->min  = atoi(r->getParam("xmin")->value().c_str()); }
+    if (r->hasParam("xmax")) { exit->threshold->max  = atoi(r->getParam("xmax")->value().c_str()); }
+
     s.entry_roi_height = entry->roi->height; s.entry_roi_width = entry->roi->width; s.entry_roi_center = entry->roi->center;
     s.entry_min_threshold = entry->threshold->min; s.entry_max_threshold = entry->threshold->max;
     s.exit_roi_height = exit->roi->height; s.exit_roi_width = exit->roi->width; s.exit_roi_center = exit->roi->center;
@@ -201,6 +232,18 @@ void Roode::register_portal_routes_() {
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/cancel", [this](roode_web::AsyncWebServerRequest *r) {
     scan_state_ = SCAN_IDLE; scan_progress_ = 0;
     r->send(200, "application/json", "{\"ok\":true}");
+  }));
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/recalibrate", [this](roode_web::AsyncWebServerRequest *r) {
+    if (!require_portal_auth_(r, "application/json")) return;
+    recalibration();
+    RoodeSettings cal_s;
+    if (!settings_prefs_.load(&cal_s)) memset(&cal_s, 0, sizeof(cal_s));
+    cal_s.entry_min_threshold = entry->threshold->min; cal_s.entry_max_threshold = entry->threshold->max;
+    cal_s.exit_min_threshold  = exit->threshold->min;  cal_s.exit_max_threshold  = exit->threshold->max;
+    settings_prefs_.save(&cal_s); global_preferences->sync();
+    JsonDocument d; d["ok"] = true; d["emin"] = entry->threshold->min; d["emax"] = entry->threshold->max;
+    d["xmin"] = exit->threshold->min; d["xmax"] = exit->threshold->max; d["idle_e"] = entry->threshold->idle; d["idle_x"] = exit->threshold->idle;
+    std::string out; serializeJson(d, out); r->send(200, "application/json", out.c_str());
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/sessions", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;

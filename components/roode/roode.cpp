@@ -111,120 +111,185 @@ static const char *const portal_html = R"PORTAL(
     .right{margin-left:auto}
     .hr{height:1px;background:var(--line);margin:12px 0}
     .muted{color:var(--muted)}
+    .tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:1px}
+    .tab{padding:8px 16px;cursor:pointer;border-radius:8px 8px 0 0;border:1px solid transparent;margin-bottom:-1px}
+    .tab.active{background:var(--panel);border-color:var(--line);border-bottom-color:var(--panel);font-weight:600;color:var(--acc)}
+    .tab-content{display:none}
+    .tab-content.active{display:block}
+    .form-row{margin-bottom:12px}
+    .form-row label{display:block;margin-bottom:4px;color:var(--muted);font-size:12px}
+    .form-row input, .form-row select{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div id="errorBanner" class="banner"></div>
     <div class="hdr">
-      <h1>Roode Calibration Portal</h1>
+      <h1>Roode Portal</h1>
       <div class="status"><span id="statusText">Status: <b>Idle</b></span> · <span id="lastCal">Last calibration: —</span></div>
     </div>
 
-    <!-- Controls & live status -->
-    <div class="row">
-      <div class="card" style="flex:1 1 100%">
-        <div class="btns">
-          <button class="btn primary" id="btnStart">Start Calibration</button>
-          <button class="btn" id="btnCancel" style="display:none">Cancel Scan</button>
+    <div class="tabs">
+      <div class="tab active" data-tab="calibration">Calibration</div>
+      <div class="tab" data-tab="settings">Settings</div>
+      <div class="tab" data-tab="about">About</div>
+    </div>
+
+    <div id="calibration" class="tab-content active">
+      <!-- Controls & live status -->
+      <div class="row">
+        <div class="card" style="flex:1 1 100%">
+          <div class="btns">
+            <button class="btn primary" id="btnStart">Start Auto Calibration</button>
+            <button class="btn" id="btnCancel" style="display:none">Cancel Scan</button>
+          </div>
+          <div class="hr"></div>
+          <div class="kv">
+            <div class="k">Active Session</div><div id="activeSession">—</div>
+            <div class="k">Step</div><div id="stepText">—</div>
+            <div class="k">Progress</div>
+            <div><div class="progress"><div id="progressBar" style="width:0%"></div></div></div>
+          </div>
         </div>
-        <div class="hr"></div>
-        <div class="kv">
-          <div class="k">Active Session</div><div id="activeSession">—</div>
-          <div class="k">Step</div><div id="stepText">—</div>
-          <div class="k">Progress</div>
-          <div><div class="progress"><div id="progressBar" style="width:0%"></div></div></div>
+
+        <!-- Current Settings -->
+        <div class="card">
+          <h2>Current ROI & Thresh</h2>
+          <div class="kv" id="currentSettings">
+            <div class="k">ROI Size</div><div id="curRoiSize">—</div>
+            <div class="k">ROI Center</div><div id="curRoiCenter">—</div>
+            <div class="k">Entry Center</div><div id="curEntry">—</div>
+            <div class="k">Exit Center</div><div id="curExit">—</div>
+            <div class="k">Min Threshold</div><div id="curMin">—</div>
+            <div class="k">Max Threshold</div><div id="curMax">—</div>
+          </div>
+          <div class="hr"></div>
+          <div class="kv">
+            <div class="k">Live Distance</div><div id="curLive">—</div>
+            <div class="k">Zone State</div><div id="curZones">—</div>
+            <div class="k">People Counter</div><div id="curCount">—</div>
+          </div>
+        </div>
+
+        <!-- Recommended Settings -->
+        <div class="card" style="flex:1 1 380px">
+          <h2>Recommended Settings</h2>
+          <div class="kv" id="preview">
+            <div class="k">ROI Size</div><div id="pvRoiSize">—</div>
+            <div class="k">ROI Center</div><div id="pvRoi">—</div>
+            <div class="k">Entry Center</div><div id="pvEntry">—</div>
+            <div class="k">Exit Center</div><div id="pvExit">—</div>
+            <div class="k">Min Threshold</div><div id="pvMin">—</div>
+            <div class="k">Max Threshold</div><div id="pvMax">—</div>
+          </div>
+          <div class="chips">
+            <button class="btn primary" id="btnApply" disabled>Apply & Save Recommended</button>
+          </div>
+        </div>
+
+        <!-- Past Sessions -->
+        <div class="card" style="flex:1 1 100%">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <h2>Scan Sessions</h2>
+          </div>
+          <div style="overflow:auto">
+            <table id="tblSessions">
+              <thead>
+                <tr>
+                  <th>#</th><th>Date/Time</th><th>Session ID</th><th>Duration</th><th>Size</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </div>
+    </div>
 
-      <!-- Current Settings -->
+    <div id="settings" class="tab-content">
+      <div class="row">
+        <div class="card">
+          <h2>Sensor Control</h2>
+          <div class="btns">
+            <button class="btn" id="btnToggleSensor">Toggle Sensor: <span id="sensorStatus">ON</span></button>
+            <button class="btn" id="btnRestartSensor">Restart Sensor</button>
+            <button class="btn" id="btnRecalibrate">Simple Recalibrate</button>
+          </div>
+          <div class="hr"></div>
+          <form id="settingsForm">
+            <div class="form-row">
+              <label>Sampling Size</label>
+              <input type="number" name="sampling" min="1" max="10" />
+            </div>
+            <div class="form-row">
+              <label>Polling Interval (ms)</label>
+              <input type="number" name="polling_interval" min="5" max="100" />
+            </div>
+            <div class="form-row">
+              <label>Invert Direction</label>
+              <select name="invert_direction">
+                <option value="false">Normal</option>
+                <option value="true">Inverted</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Filter Mode</label>
+              <select name="filter_mode">
+                <option value="0">Min</option>
+                <option value="1">Median</option>
+                <option value="2">Percentile 10</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Filter Window</label>
+              <input type="number" name="filter_window" min="1" max="20" />
+            </div>
+            <button type="submit" class="btn primary">Save Detailed Settings</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>Manual Override</h2>
+          <div class="form-row">
+            <label>ROI Width (4-16)</label>
+            <input type="number" id="manual_roi_w" min="4" max="16" />
+          </div>
+          <div class="form-row">
+            <label>ROI Height (4-16)</label>
+            <input type="number" id="manual_roi_h" min="4" max="16" />
+          </div>
+          <div class="form-row">
+            <label>ROI Center (0-255)</label>
+            <input type="number" id="manual_roi_c" min="0" max="255" />
+          </div>
+          <div class="btns">
+            <button class="btn" id="btnApplyManualROI">Apply ROI</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="about" class="tab-content">
       <div class="card">
-        <h2>Current Settings</h2>
-        <div class="kv" id="currentSettings">
-          <div class="k">ROI Size</div><div id="curRoiSize">—</div>
-          <div class="k">ROI Center</div><div id="curRoiCenter">—</div>
-          <div class="k">Entry Center</div><div id="curEntry">—</div>
-          <div class="k">Exit Center</div><div id="curExit">—</div>
-          <div class="k">Ranging Mode</div><div id="curMode">—</div>
-          <div class="k">Min Threshold</div><div id="curMin">—</div>
-          <div class="k">Max Threshold</div><div id="curMax">—</div>
-          <div class="k">Sampling</div><div id="curSampling">—</div>
-          <div class="k">Firmware</div><div id="curFw">—</div>
-          <div class="k">Live Distance</div><div id="curLive">—</div>
-          <div class="k">Zone State</div><div id="curZones">—</div>
-          <div class="k">People Counter</div><div id="curCount">—</div>
-        </div>
-        <div class="chips">
-          <button class="btn" id="btnCopyJSON">Copy as JSON</button>
+        <h2>Roode Firmware</h2>
+        <div class="kv">
+          <div class="k">Version</div><div id="aboutVersion">—</div>
+          <div class="k">Sensor Type</div><div>VL53L1X</div>
+          <div class="k">Portal Status</div><div id="aboutPortal">Active</div>
         </div>
       </div>
+    </div>
 
-      <!-- Recommended Settings -->
-      <div class="card" style="flex:1 1 380px">
-        <h2>Recommended Settings</h2>
-        <div class="kv" id="preview">
-          <div class="k">ROI Size</div><div id="pvRoiSize">—</div>
-          <div class="k">ROI Center</div><div id="pvRoi">—</div>
-          <div class="k">Entry Center</div><div id="pvEntry">—</div>
-          <div class="k">Exit Center</div><div id="pvExit">—</div>
-          <div class="k">Ranging Mode</div><div id="pvMode">—</div>
-          <div class="k">Min Threshold</div><div id="pvMin">—</div>
-          <div class="k">Max Threshold</div><div id="pvMax">—</div>
-          <div class="k">Sampling</div><div id="pvSampling">—</div>
-          <div class="k">Firmware</div><div id="pvFw">—</div>
-        </div>
-        <div class="chips">
-          <button class="btn" id="btnApply" disabled>Apply Settings</button>
-          <a class="btn" id="dlResult" href="#" download>Save roi_result.json</a>
-        </div>
-      </div>
-
-      <!-- Past Sessions -->
-      <div class="card" style="flex:1 1 100%">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <h2>Past Sessions</h2>
-          <a class="btn ghost" id="btnExport" href="/api/export/all">Export All ▾</a>
-        </div>
-        <div style="overflow:auto">
-          <table id="tblSessions">
-            <thead>
-              <tr>
-                <th>#</th><th>Date/Time</th><th>Session ID</th><th>Trials</th>
-                <th>Duration</th><th>Size</th><th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- Placeholder row (will be replaced by JS when data is available) -->
-              <tr>
-                <td>1</td><td>2025-08-26 17:00</td><td>calibration_2025-08-26_1700</td>
-                <td>3</td><td>02:15</td><td>24.1KB</td>
-                <td class="mono">
-                  <a href="/api/scan/session/calibration_2025-08-26_1700">Download</a>
-                  &nbsp;|&nbsp;<a href="#" data-view="calibration_2025-08-26_1700">View</a>
-                  &nbsp;|&nbsp;<a href="#" data-del="calibration_2025-08-26_1700">Delete</a>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-    </div><!-- /row -->
   </div><!-- /wrap -->
 
   <script>
   const TOKEN = new URLSearchParams(location.search).get('token') || '';
   const TOKEN_HEADER = TOKEN ? {'X-Portal-Token': TOKEN} : {};
   const tokenParam = TOKEN ? `?token=${encodeURIComponent(TOKEN)}` : '';
-  if(TOKEN){
-    const exp = document.getElementById('btnExport');
-    if(exp) exp.href = '/api/export/all'+tokenParam;
-  }
-  // Helpers
+  
   const $ = (s)=>document.querySelector(s);
   const showToast = (msg, ok=false)=>{
     const b = $('#errorBanner');
-    if(!b) return;
     b.textContent = msg || '';
     b.style.background = ok ? 'var(--ok)' : 'var(--err)';
     b.style.display = 'block';
@@ -233,121 +298,32 @@ static const char *const portal_html = R"PORTAL(
   };
   const showError = (msg)=>showToast(msg || 'Request failed', false);
   const showSuccess = (msg)=>showToast(msg || 'Success', true);
-  const fmtBytes = n => {
-    if(n==null) return '—';
-    const u=['B','KB','MB']; let i=0, v=n;
-    while(v>=1024 && i<u.length-1){ v/=1024; i++; }
-    return (i?v.toFixed(1):v|0) + ' ' + u[i];
-  };
-  const fmtDur = s => {
-    if(!Number.isFinite(s)) return '—';
-    const m = Math.floor(s/60), sec = s%60;
-    return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
-  };
 
-  // State
-  let current = null, preview = null, status = null, sessions = [];
+  // Tabs
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
+      t.classList.add('active');
+      $('#' + t.dataset.tab).classList.add('active');
+    });
+  });
 
-  // Fetch JSON with graceful fallback
   async function getJSON(url){
     try {
       const r = await fetch(url, {cache:'no-store', headers: TOKEN_HEADER});
       if(!r.ok) throw new Error(r.status + ' ' + r.statusText);
       return await r.json();
-    } catch(e) {
-      showError(e.message);
-      return null;
-    }
+    } catch(e) { return null; }
   }
   async function postJSON(url, body){
     try {
       const headers = {'Content-Type':'application/json'};
       if(TOKEN) headers['X-Portal-Token'] = TOKEN;
       const r = await fetch(url, {method:'POST', headers, body: body?JSON.stringify(body):'{}'});
-      if(!r.ok) throw new Error(r.status + ' ' + r.statusText);
       return await r.json().catch(()=>({ok:true}));
-    } catch(e) {
-      showError(e.message);
-      return { ok:false };
-    }
+    } catch(e) { return { ok:false }; }
   }
 
-  // Renderers
-  function renderStatus(){
-    const st = status || {state:'Idle', id:'—', step:'—', progress:0};
-    $('#statusText').innerHTML = 'Status: <b>'+st.state+'</b>';
-    $('#activeSession').textContent = st.id || '—';
-    $('#stepText').textContent = st.step || '—';
-    $('#progressBar').style.width = (st.progress||0)+'%';
-    $('#btnCancel').style.display = (st.state==='Scanning') ? 'inline-block' : 'none';
-  }
-  function renderCurrent(){
-    if(!current) return;
-    $('#curRoiSize').textContent = (current.roi_width&&current.roi_height) ? `${current.roi_width} × ${current.roi_height}` : '—';
-    $('#curRoiCenter').textContent = current.roi_center ? `(${current.roi_center.x}, ${current.roi_center.y})` : '—';
-    $('#curEntry').textContent = current.entry_center ? `(${current.entry_center.x}, ${current.entry_center.y})` : '—';
-    $('#curExit').textContent = current.exit_center ? `(${current.exit_center.x}, ${current.exit_center.y})` : '—';
-    $('#curMode').textContent = current.ranging_mode || '—';
-    $('#curMin').textContent = current.min_threshold!=null ? current.min_threshold+'%' : '—';
-    $('#curMax').textContent = current.max_threshold!=null ? current.max_threshold+'%' : '—';
-    $('#curSampling').textContent = current.sampling || '—';
-    $('#curFw').textContent = current.firmware || '—';
-    $('#curLive').textContent = (current.distance_entry_mm!=null && current.distance_exit_mm!=null)
-      ? `${current.distance_entry_mm} mm / ${current.distance_exit_mm} mm`
-      : '—';
-    $('#curZones').textContent = `${current.entry_active ? 'Entry active' : 'Entry idle'} · ${current.exit_active ? 'Exit active' : 'Exit idle'}`;
-    $('#curCount').textContent = current.people_counter!=null ? current.people_counter : '—';
-    if(current.last_calibration) $('#lastCal').textContent = 'Last calibration: ' + new Date(current.last_calibration).toLocaleString();
-  }
-  function renderPreview(){
-    const apply = $('#btnApply');
-    if(!preview){ // clear
-      $('#pvRoiSize').textContent = '—'; $('#pvRoi').textContent='—';
-      $('#pvEntry').textContent='—'; $('#pvExit').textContent='—';
-      $('#pvMode').textContent='—'; $('#pvMin').textContent='—';
-      $('#pvMax').textContent='—'; $('#pvSampling').textContent='—'; $('#pvFw').textContent='—';
-      $('#dlResult').removeAttribute('href');
-      if(apply) apply.disabled = true;
-      return;
-    }
-    const r = preview;
-    if(r.roi){ $('#pvRoiSize').textContent = `${r.roi.width} × ${r.roi.height}`; $('#pvRoi').textContent = `(${r.roi.center.x}, ${r.roi.center.y})`; }
-    if(r.zones){ $('#pvEntry').textContent = `(${r.zones.entry.x}, ${r.zones.entry.y})`; $('#pvExit').textContent = `(${r.zones.exit.x}, ${r.zones.exit.y})`; }
-    $('#pvMode').textContent = r.ranging_mode || '—';
-    if(r.thresholds){ $('#pvMin').textContent = r.thresholds.min+'%'; $('#pvMax').textContent = r.thresholds.max+'%'; }
-    $('#pvSampling').textContent = r.sampling || '—';
-    $('#pvFw').textContent = r.firmware || '—';
-    if(r.download) $('#dlResult').href = r.download + (TOKEN ? (r.download.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(TOKEN) : '');
-    if(apply) apply.disabled = false;
-  }
-  function renderSessions(){
-    const tbody = document.querySelector('#tblSessions tbody');
-    tbody.innerHTML = '';
-    if(!sessions || !sessions.length){
-      const tr = document.createElement('tr');
-      tr.innerHTML = '<td colspan="7" class="muted">No sessions yet.</td>';
-      tbody.appendChild(tr);
-      return;
-    }
-    sessions.sort((a,b)=>new Date(b.ts)-new Date(a.ts)).forEach((s, i)=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${i+1}</td>
-        <td>${new Date(s.ts).toLocaleString()}</td>
-        <td class="mono">${s.id}</td>
-        <td>${s.trials ?? '—'}</td>
-        <td>${fmtDur(s.duration_sec)}</td>
-        <td>${fmtBytes(s.size_bytes)}</td>
-        <td class="mono">
-          <a href="/api/scan/session/${encodeURIComponent(s.id)}${tokenParam}">Download</a>
-          &nbsp;|&nbsp;<a href="#" data-view="${s.id}">View</a>
-          &nbsp;|&nbsp;<a href="#" data-del="${s.id}">Delete</a>
-        </td>`;
-      tbody.appendChild(tr);
-    });
-  }
-
-  // Polling
   async function poll(){
     const [cur, stat, list, prev] = await Promise.all([
       getJSON('/api/settings/current'),
@@ -355,83 +331,94 @@ static const char *const portal_html = R"PORTAL(
       getJSON('/api/scan/sessions'),
       getJSON('/api/roi/preview')
     ]);
-    if(cur) current = cur;
-    if(stat) status = stat;
-    if(list) sessions = list;
-    // Only show preview if we have one (typically after completion)
-    preview = prev || null;
-
-    renderStatus(); renderCurrent(); renderPreview(); renderSessions();
+    if(cur){
+      $('#curRoiSize').textContent = `${cur.roi_width} × ${cur.roi_height}`;
+      $('#curRoiCenter').textContent = cur.roi_center_id || cur.roi_center;
+      $('#curEntry').textContent = cur.entry_center;
+      $('#curExit').textContent = cur.exit_center;
+      $('#curMin').textContent = cur.min_threshold + '%';
+      $('#curMax').textContent = cur.max_threshold + '%';
+      $('#curLive').textContent = `${cur.distance_entry_mm} / ${cur.distance_exit_mm} mm`;
+      $('#curZones').textContent = `${cur.entry_active ? 'Entry ON' : 'Entry OFF'} · ${cur.exit_active ? 'Exit ON' : 'Exit OFF'}`;
+      $('#curCount').textContent = cur.people_counter;
+      $('#aboutVersion').textContent = cur.firmware;
+      $('#sensorStatus').textContent = cur.sensor_enabled ? 'ON' : 'OFF';
+      $('#btnToggleSensor').style.borderColor = cur.sensor_enabled ? 'var(--ok)' : 'var(--err)';
+      if(cur.last_calibration) $('#lastCal').textContent = 'Last: ' + new Date(cur.last_calibration * 1000).toLocaleString();
+      
+      // Update settings form if not dirty
+      const form = $('#settingsForm');
+      if(!form.dataset.dirty){
+        form.sampling.value = cur.sampling;
+        form.polling_interval.value = cur.polling_interval;
+        form.invert_direction.value = cur.invert_direction ? 'true' : 'false';
+        form.filter_mode.value = cur.filter_mode;
+        form.filter_window.value = cur.filter_window;
+      }
+    }
+    if(stat){
+      $('#statusText').innerHTML = 'Status: <b>' + stat.state + '</b>';
+      $('#activeSession').textContent = stat.id || '—';
+      $('#stepText').textContent = stat.step || '—';
+      $('#progressBar').style.width = (stat.progress || 0) + '%';
+      $('#btnCancel').style.display = (stat.state === 'Scanning') ? 'inline-block' : 'none';
+      $('#btnStart').disabled = (stat.state === 'Scanning');
+    }
+    if(list){
+      const tbody = $('#tblSessions tbody');
+      tbody.innerHTML = '';
+      list.forEach((s, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${i+1}</td><td>${new Date(s.ts * 1000).toLocaleString()}</td><td>${s.id}</td><td>${s.duration_sec}s</td><td>${s.size_bytes}B</td><td><a href="#" data-view="${s.id}">View</a></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+    if(prev){
+      $('#pvRoiSize').textContent = `${prev.roi_width} × ${prev.roi_height}`;
+      $('#pvRoi').textContent = prev.roi_center;
+      $('#pvEntry').textContent = prev.entry_center;
+      $('#pvExit').textContent = prev.exit_center;
+      $('#pvMin').textContent = prev.min_threshold + '%';
+      $('#pvMax').textContent = prev.max_threshold + '%';
+      $('#btnApply').disabled = false;
+    } else {
+      $('#btnApply').disabled = true;
+    }
   }
 
-  // Actions
-  $('#btnStart').addEventListener('click', async (e)=>{
-    const btn = e.target;
-    btn.disabled = true;
-    try {
-      const r = await postJSON('/api/scan/start');
-      if(r && r.id){ status = {state:'Scanning', id:r.id, step:'8×8 Scan', progress:0}; renderStatus(); }
-    } finally {
-      btn.disabled = false;
-    }
-  });
-  $('#btnCancel').addEventListener('click', async (e)=>{
-    const btn = e.target;
-    btn.disabled = true;
-    try {
-      await postJSON('/api/scan/cancel');
-      status = {state:'Idle', id:status?.id || '—', step:'—', progress:0};
-      renderStatus();
-    } finally {
-      btn.disabled = false;
-    }
-  });
-  $('#btnApply').addEventListener('click', async (e)=>{
-    const btn = e.target;
-    btn.disabled = true;
-    try {
-      const r = await postJSON('/api/roi/apply');
-      if(r && r.ok){
-        showSuccess('Settings applied');
-      } else {
-        showError('Apply failed');
-      }
-    } finally {
-      btn.disabled = false;
-    }
-  });
-  $('#btnCopyJSON').addEventListener('click', ()=>{
-    if(!current) return;
-    navigator.clipboard.writeText(JSON.stringify(current, null, 2));
-  });
-  document.querySelector('#tblSessions').addEventListener('click', async (e)=>{
-    const a = e.target.closest('a'); if(!a) return;
-    if(a.dataset.view){ e.preventDefault();
-      a.classList.add('disabled');
-      try {
-        // Prefer a queryable preview endpoint per session if available:
-        const prev = await getJSON(`/api/roi/preview?session_id=${encodeURIComponent(a.dataset.view)}`);
-        preview = prev || preview; renderPreview();
-        document.querySelector('#preview')?.scrollIntoView({behavior:'smooth', block:'start'});
-      } finally {
-        a.classList.remove('disabled');
-      }
-    }
-    if(a.dataset.del){ e.preventDefault();
-      a.classList.add('disabled');
-      try {
-        await postJSON('/api/scan/delete', { session_id: a.dataset.del });
-        sessions = (sessions||[]).filter(s => s.id !== a.dataset.del);
-        renderSessions();
-      } finally {
-        a.classList.remove('disabled');
-      }
-    }
-  });
+  $('#btnApplyManualROI').onclick = () => {
+    const params = new URLSearchParams();
+    params.append('width', $('#manual_roi_w').value);
+    params.append('height', $('#manual_roi_h').value);
+    params.append('center', $('#manual_roi_c').value);
+    if(TOKEN) params.append('token', TOKEN);
+    fetch('/api/roi/manual?' + params.toString(), {method:'POST', headers: TOKEN_HEADER})
+      .then(r => r.ok ? showSuccess('Manual ROI applied') : showError());
+  };
+  $('#btnStart').onclick = () => postJSON('/api/scan/start');
+  $('#btnCancel').onclick = () => postJSON('/api/scan/cancel');
+  $('#btnApply').onclick = () => postJSON('/api/roi/apply').then(r => r.ok ? showSuccess('Applied') : showError());
+  $('#btnToggleSensor').onclick = () => postJSON('/api/sensor/toggle');
+  $('#btnRestartSensor').onclick = () => postJSON('/api/sensor/restart');
+  $('#btnRecalibrate').onclick = () => postJSON('/api/sensor/recalibrate');
+  
+  $('#settingsForm').onsubmit = (e) => {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    params.append('sampling', e.target.sampling.value);
+    params.append('polling_interval', e.target.polling_interval.value);
+    params.append('invert_direction', e.target.invert_direction.value);
+    params.append('filter_mode', e.target.filter_mode.value);
+    params.append('filter_window', e.target.filter_window.value);
+    if(TOKEN) params.append('token', TOKEN);
+    
+    fetch('/api/settings/update?' + params.toString(), {method:'POST', headers: TOKEN_HEADER})
+      .then(r => r.ok ? showSuccess('Settings saved') : showError());
+  };
+  $('#settingsForm').oninput = (e) => e.target.form.dataset.dirty = 'true';
 
-  // Kick off
+  setInterval(poll, 2000);
   poll();
-  setInterval(poll, 1500);
   </script>
 </body>
 </html>
@@ -574,6 +561,23 @@ void Roode::setup() {
   exit->set_filter_window(filter_window_);
   exit->set_filter_mode(filter_mode_);
 
+  settings_prefs_ = global_preferences->make_preference<RoodeSettings>(0xB0);
+  RoodeSettings settings;
+  if (settings_prefs_.load(&settings)) {
+    ESP_LOGI(TAG, "Loaded persisted settings");
+    this->set_sampling_size(settings.sampling);
+    this->polling_interval_ms_ = settings.polling_interval;
+    this->set_invert_direction(settings.invert_direction);
+    this->set_filter_mode(settings.filter_mode);
+    this->set_filter_window(settings.filter_window);
+    entry->roi->width = settings.roi_width;
+    entry->roi->height = settings.roi_height;
+    entry->roi->center = settings.roi_center;
+    exit->roi->width = settings.roi_width;
+    exit->roi->height = settings.roi_height;
+    exit->roi->center = settings.roi_center;
+  }
+
   if (calibration_persistence_) {
     calibration_prefs_[0] = global_preferences->make_preference<CalibrationPrefs>(0xA0);
     calibration_prefs_[1] = global_preferences->make_preference<CalibrationPrefs>(0xA1);
@@ -696,10 +700,15 @@ void Roode::send_portal_login_(web_server_idf::AsyncWebServerRequest *request) c
   ESP_LOGD(TAG, "Portal auth required, serving login page");
   request->send(200, "text/html", portal_login_html);
 }
-
+#ifdef USE_WEBSERVER
 bool Roode::require_portal_auth_(web_server_idf::AsyncWebServerRequest *request, const char *content_type) const {
+  if (!this->portal_enabled_) {
+    request->send(403, "text/plain", "Portal disabled");
+    return false;
+  }
   if (this->portal_request_authorized_(request))
     return true;
+
   ESP_LOGD(TAG, "Portal auth rejected for content-type=%s", content_type == nullptr ? "<null>" : content_type);
   if (content_type != nullptr && std::string(content_type) == "text/html") {
     this->send_portal_login_(request);
@@ -788,19 +797,16 @@ void Roode::register_portal_routes_() {
     DynamicJsonDocument doc(1024);
     doc["roi_width"] = entry->roi->width;
     doc["roi_height"] = entry->roi->height;
-    JsonObject roi_center = doc.createNestedObject("roi_center");
-    roi_center["x"] = entry->roi->center % 16;
-    roi_center["y"] = entry->roi->center / 16;
-    JsonObject entry_center = doc.createNestedObject("entry_center");
-    entry_center["x"] = entry->roi->center % 16;
-    entry_center["y"] = entry->roi->center / 16;
-    JsonObject exit_center = doc.createNestedObject("exit_center");
-    exit_center["x"] = exit->roi->center % 16;
-    exit_center["y"] = exit->roi->center / 16;
-    doc["ranging_mode"] = distanceSensor->is_failed() ? "offline" : "auto";
+    doc["roi_center"] = entry->roi->center;
+    doc["entry_center"] = entry->roi->center;
+    doc["exit_center"] = exit->roi->center;
     doc["min_threshold"] = entry->threshold->min_percentage.value_or(15);
     doc["max_threshold"] = entry->threshold->max_percentage.value_or(80);
     doc["sampling"] = samples;
+    doc["polling_interval"] = polling_interval_ms_;
+    doc["invert_direction"] = invert_direction_;
+    doc["filter_mode"] = (int) filter_mode_;
+    doc["filter_window"] = filter_window_;
     doc["firmware"] = VERSION;
     doc["last_calibration"] = last_calibration_ts_;
     doc["distance_entry_mm"] = entry->getDistance();
@@ -808,9 +814,69 @@ void Roode::register_portal_routes_() {
     doc["entry_active"] = LeftPreviousStatus == SOMEONE;
     doc["exit_active"] = RightPreviousStatus == SOMEONE;
     doc["people_counter"] = people_counter != nullptr ? people_counter->state : 0.0f;
+    doc["sensor_enabled"] = sensor_enabled_;
     std::string output;
     serializeJson(doc, output);
     request->send(request->beginResponse(200, "application/json", output));
+  }));
+
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/sensor/toggle", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json")) return;
+    this->sensor_enabled_ = !this->sensor_enabled_;
+    if (this->sensor_enabled_) {
+      this->distanceSensor->start_ranging();
+    } else {
+      this->distanceSensor->stop_ranging();
+    }
+    DynamicJsonDocument doc(64);
+    doc["enabled"] = sensor_enabled_;
+    std::string output;
+    serializeJson(doc, output);
+    request->send(request->beginResponse(200, "application/json", output));
+  }));
+
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/settings/update", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json")) return;
+    
+    RoodeSettings settings;
+    settings.sampling = request->hasParam("sampling") ? atoi(request->getParam("sampling")->value().c_str()) : samples;
+    settings.polling_interval = request->hasParam("polling_interval") ? atoi(request->getParam("polling_interval")->value().c_str()) : polling_interval_ms_;
+    settings.invert_direction = request->hasParam("invert_direction") ? (request->getParam("invert_direction")->value() == "true") : invert_direction_;
+    settings.filter_mode = request->hasParam("filter_mode") ? (FilterMode)atoi(request->getParam("filter_mode")->value().c_str()) : filter_mode_;
+    settings.filter_window = request->hasParam("filter_window") ? atoi(request->getParam("filter_window")->value().c_str()) : filter_window_;
+    
+    settings.roi_width = entry->roi->width;
+    settings.roi_height = entry->roi->height;
+    settings.roi_center = entry->roi->center;
+    settings.entry_center = entry->roi->center;
+    settings.exit_center = exit->roi->center;
+    settings.min_threshold = entry->threshold->min_percentage.value_or(15);
+    settings.max_threshold = entry->threshold->max_percentage.value_or(80);
+
+    // Apply settings
+    this->set_sampling_size(settings.sampling);
+    this->polling_interval_ms_ = settings.polling_interval;
+    this->set_invert_direction(settings.invert_direction);
+    this->set_filter_mode(settings.filter_mode);
+    this->set_filter_window(settings.filter_window);
+    
+    // Persist
+    settings_prefs_.save(&settings);
+    global_preferences->sync();
+
+    request->send(200, "application/json", "{\"ok\":true}");
+  }));
+
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/sensor/restart", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json")) return;
+    this->restart_sensor();
+    request->send(200, "application/json", "{\"ok\":true}");
+  }));
+
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/sensor/recalibrate", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json")) return;
+    this->recalibration();
+    request->send(200, "application/json", "{\"ok\":true}");
   }));
 
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/status", [this](web_server_idf::AsyncWebServerRequest *request) {
@@ -856,18 +922,76 @@ void Roode::register_portal_routes_() {
   }));
 
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/roi/apply", [this](web_server_idf::AsyncWebServerRequest *request) {
-    if (!this->require_portal_auth_(request, "application/json"))
+    if (!this->require_portal_auth_(request, "application/json")) return;
+    if (!has_recommended_settings_) {
+      request->send(400, "application/json", "{\"ok\":false, \"msg\":\"No recommended settings available\"}");
       return;
-    // This endpoint typically receives recommended ROI from the portal
-    // For now we just return OK
+    }
+    // Apply recommended settings
+    entry->roi->width = recommended_settings_.roi_width;
+    entry->roi->height = recommended_settings_.roi_height;
+    entry->roi->center = recommended_settings_.roi_center;
+    exit->roi->width = recommended_settings_.roi_width;
+    exit->roi->height = recommended_settings_.roi_height;
+    exit->roi->center = recommended_settings_.roi_center;
+    
+    // Persist
+    RoodeSettings settings;
+    settings.roi_width = recommended_settings_.roi_width;
+    settings.roi_height = recommended_settings_.roi_height;
+    settings.roi_center = recommended_settings_.roi_center;
+    settings.entry_center = recommended_settings_.entry_center;
+    settings.exit_center = recommended_settings_.exit_center;
+    settings.min_threshold = recommended_settings_.min_threshold;
+    settings.max_threshold = recommended_settings_.max_threshold;
+    settings.sampling = samples;
+    settings.polling_interval = polling_interval_ms_;
+    settings.invert_direction = invert_direction_;
+    settings.filter_mode = filter_mode_;
+    settings.filter_window = filter_window_;
+    settings_prefs_.save(&settings);
+    global_preferences->sync();
+
+    // Trigger simple recalibration to get baselines
+    this->recalibration();
+    request->send(200, "application/json", "{\"ok\":true}");
+  }));
+
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/roi/manual", [this](web_server_idf::AsyncWebServerRequest *request) {
+    if (!this->require_portal_auth_(request, "application/json")) return;
+    if (request->hasParam("width")) {
+      uint8_t w = atoi(request->getParam("width")->value().c_str());
+      entry->roi->width = w; exit->roi->width = w;
+    }
+    if (request->hasParam("height")) {
+      uint8_t h = atoi(request->getParam("height")->value().c_str());
+      entry->roi->height = h; exit->roi->height = h;
+    }
+    if (request->hasParam("center")) {
+      uint8_t c = atoi(request->getParam("center")->value().c_str());
+      entry->roi->center = c; exit->roi->center = c;
+    }
+    this->recalibration();
     request->send(200, "application/json", "{\"ok\":true}");
   }));
 
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/roi/preview", [this](web_server_idf::AsyncWebServerRequest *request) {
-    if (!this->require_portal_auth_(request, "application/json"))
+    if (!this->require_portal_auth_(request, "application/json")) return;
+    if (!has_recommended_settings_) {
+      request->send(200, "application/json", "null");
       return;
-    // Return a dummy preview for now
-    request->send(200, "application/json", "null");
+    }
+    DynamicJsonDocument doc(512);
+    doc["roi_width"] = recommended_settings_.roi_width;
+    doc["roi_height"] = recommended_settings_.roi_height;
+    doc["roi_center"] = recommended_settings_.roi_center;
+    doc["entry_center"] = recommended_settings_.entry_center;
+    doc["exit_center"] = recommended_settings_.exit_center;
+    doc["min_threshold"] = recommended_settings_.min_threshold;
+    doc["max_threshold"] = recommended_settings_.max_threshold;
+    std::string output;
+    serializeJson(doc, output);
+    request->send(request->beginResponse(200, "application/json", output));
   }));
 
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/delete", [this](web_server_idf::AsyncWebServerRequest *request) {
@@ -1677,45 +1801,74 @@ void Roode::sensor_task(void *param) {
 #endif
     self->use_sensor_task_ = true;
 
+    if (!self->sensor_enabled_ || self->distanceSensor->is_failed()) {
+      vTaskDelay(pdMS_TO_TICKS(100));
+      continue;
+    }
+
     if (self->scan_state_ == SCANNING) {
-      self->scan_step_ = "8x8 Grid Scan";
-      std::vector<uint16_t> scan_data;
-      scan_data.reserve(64);
+      self->scan_step_ = "Grid Scanning (8x8)";
+      std::vector<uint16_t> rates;
+      std::vector<uint16_t> distances;
+      rates.reserve(64);
+      distances.reserve(64);
       for (uint8_t y = 0; y < 8; y++) {
         for (uint8_t x = 0; x < 8; x++) {
           if (self->scan_state_ != SCANNING) break;
           ROI roi;
           roi.width = 4;
           roi.height = 4;
-          roi.center = (y * 2 + 1) * 16 + (x * 2 + 1); // Approx center of 2x2 SPAD block in 16x16 grid
+          roi.center = (y * 2 + 1) * 16 + (x * 2 + 1);
 #ifdef CONFIG_IDF_TARGET_ESP32
           i2c_lock();
 #endif
           VL53L1_Error status;
-          self->distanceSensor->read_distance(&roi, status);
+          auto dist = self->distanceSensor->read_distance(&roi, status);
           auto rate = self->distanceSensor->get_signal_rate();
 #ifdef CONFIG_IDF_TARGET_ESP32
           i2c_unlock();
 #endif
-          scan_data.push_back(rate.value_or(0));
-          self->scan_progress_ = (scan_data.size() * 100) / 64;
-          vTaskDelay(pdMS_TO_TICKS(10));
+          rates.push_back(rate.value_or(0));
+          distances.push_back(dist.value_or(0));
+          self->scan_progress_ = (rates.size() * 100) / 64;
+          vTaskDelay(pdMS_TO_TICKS(50));
         }
         if (self->scan_state_ != SCANNING) break;
       }
       if (self->scan_state_ == SCANNING) {
+        self->scan_step_ = "Analyzing results";
+        // Simple analysis: find the SPAD with the longest distance and reasonable signal
+        uint8_t best_idx = 0;
+        uint16_t max_dist = 0;
+        for (uint8_t i = 0; i < 64; i++) {
+          if (distances[i] > max_dist && distances[i] < 4000) {
+            max_dist = distances[i];
+            best_idx = i;
+          }
+        }
+        uint8_t bx = best_idx % 8;
+        uint8_t by = best_idx / 8;
+        
+        self->recommended_settings_.roi_width = 6;
+        self->recommended_settings_.roi_height = 16;
+        self->recommended_settings_.roi_center = (by * 2 + 1) * 16 + (bx * 2 + 1);
+        self->recommended_settings_.entry_center = self->recommended_settings_.roi_center;
+        self->recommended_settings_.exit_center = self->recommended_settings_.roi_center; // To be refined
+        self->recommended_settings_.min_threshold = 15;
+        self->recommended_settings_.max_threshold = 85;
+        self->has_recommended_settings_ = true;
+
         self->scan_state_ = SCAN_IDLE;
         self->scan_step_ = "Complete";
         self->scan_progress_ = 100;
-        // Store session (simplified)
+        
         ScanSession s;
         s.id = self->active_scan_id_;
         s.ts = millis() / 1000;
-        s.trials = 1;
         s.duration_sec = (millis() - self->scan_start_ts_) / 1000;
-        s.size_bytes = scan_data.size() * 2;
+        s.size_bytes = rates.size() * 2 + distances.size() * 2;
         self->sessions_.push_back(s);
-        self->scan_results_[self->active_scan_id_] = std::move(scan_data);
+        self->scan_results_[self->active_scan_id_] = std::move(rates);
       } else {
         self->scan_state_ = SCAN_IDLE;
         self->scan_step_ = "Idle";

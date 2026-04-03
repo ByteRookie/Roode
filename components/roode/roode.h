@@ -14,6 +14,7 @@
 #ifdef USE_WEBSERVER
 #include "esphome/components/web_server_base/web_server_base.h"
 #endif
+#include "esphome/components/switch/switch.h"
 #include "../vl53l1x/vl53l1x.h"
 #include "esphome/core/preferences.h"
 #include "orientation.h"
@@ -31,34 +32,32 @@ static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
 
-/*
-Use the VL53L1X_SetTimingBudget function to set the TB in milliseconds. The TB
-values available are [15, 20, 33, 50, 100, 200, 500]. This function must be
-called after VL53L1X_SetDistanceMode. Note: 15 ms only works with Short distance
-mode. 100 ms is the default value. The TB can be adjusted to improve the
-standard deviation (SD) of the measurement. Increasing the TB, decreases the SD
-but increases the power consumption.
-*/
+struct RoodeSettings {
+  uint8_t roi_width;
+  uint8_t roi_height;
+  uint8_t roi_center;
+  uint8_t entry_center;
+  uint8_t exit_center;
+  uint16_t min_threshold;
+  uint16_t max_threshold;
+  uint8_t sampling;
+  uint16_t polling_interval;
+  bool invert_direction;
+  FilterMode filter_mode;
+  uint8_t filter_window;
+} __attribute__((packed));
 
-static int delay_between_measurements = 0;
-static int time_budget_in_ms = 0;
+class Roode;
 
-/*
-Parameters which define the time between two different measurements in various
-modes (https://www.st.com/resource/en/datasheet/vl53l1x.pdf) The timing budget
-and inter-measurement period should not be called when the sensor is ranging.
-The user has to stop the ranging, change these parameters, and restart ranging
-The minimum inter-measurement period must be longer than the timing budget + 4
-ms.
-// Lowest possible is 15ms with the ULD API
-(https://www.st.com/resource/en/user_manual/um2510-a-guide-to-using-the-vl53l1x-ultra-lite-driver-stmicroelectronics.pdf)
-Valid values: [15,20,33,50,100,200,500]
-*/
-static int time_budget_in_ms_short = 15;  // max range: 1.3m
-static int time_budget_in_ms_medium = 33;
-static int time_budget_in_ms_medium_long = 50;
-static int time_budget_in_ms_long = 100;
-static int time_budget_in_ms_max = 200;  // max range: 4m
+class PortalSwitch : public switch_::Switch, public Component {
+ public:
+  void set_parent(Roode *parent) { parent_ = parent; }
+  void write_state(bool state) override;
+  void dump_config() override;
+
+ protected:
+  Roode *parent_;
+};
 
 class Roode : public PollingComponent {
  public:
@@ -144,10 +143,12 @@ class Roode : public PollingComponent {
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
   void set_portal_password(const std::string &password) { portal_password_ = password; }
+  void set_portal_enabled(bool enabled) { portal_enabled_ = enabled; }
   void set_cpu_optimization_thresholds(float activate, float deactivate) {
     cpu_opt_activate_threshold_ = activate;
     cpu_opt_deactivate_threshold_ = deactivate;
   }
+  void set_portal_switch(switch_::Switch *sw) { portal_switch = sw; }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
@@ -171,7 +172,11 @@ class Roode : public PollingComponent {
 
  protected:
   TofSensor *distanceSensor;
+  switch_::Switch *portal_switch{nullptr};
+  bool portal_enabled_{true};
+  bool sensor_enabled_{true};
   Zone *current_zone = entry;
+
   sensor::Sensor *distance_entry{nullptr};
   sensor::Sensor *distance_exit{nullptr};
   number::Number *people_counter{nullptr};
@@ -292,6 +297,9 @@ class Roode : public PollingComponent {
   uint8_t scan_progress_{0};
   std::string scan_step_{""};
   uint32_t scan_start_ts_{0};
+  RoodeSettings recommended_settings_{0};
+  ESPPreferenceObject settings_prefs_;
+  bool has_recommended_settings_{false};
 
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;

@@ -1,6 +1,7 @@
 from typing import Dict, Union
 import esphome.codegen as cg
 import esphome.config_validation as cv
+from esphome.components import switch
 from esphome.const import (
     CONF_HEIGHT,
     CONF_ID,
@@ -41,6 +42,7 @@ CONF_CPU_OPTIMIZATION = "cpu_optimization"
 CONF_ACTIVATE = "activate"
 CONF_DEACTIVATE = "deactivate"
 CONF_PORTAL_PASSWORD = "portal_password"
+CONF_PORTAL = "portal"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -106,6 +108,7 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_PORTAL_PASSWORD, default=""): cv.string,
+        cv.Optional(CONF_PORTAL): switch.switch_schema(roode_ns.class_("PortalSwitch", switch.Switch, cg.Component)).extend(cv.COMPONENT_SCHEMA),
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
                 cv.Optional(CONF_INVERT, default=False): cv.boolean,
@@ -143,7 +146,14 @@ async def to_code(config: Dict):
         )
     )
     cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
+
+    if CONF_PORTAL in config:
+        sw = await switch.new_switch(config[CONF_PORTAL])
+        await cg.register_parented(sw, roode)
+        cg.add(roode.set_portal_switch(sw))
+
     setup_zone(CONF_ENTRY_ZONE, config, roode)
+
     setup_zone(CONF_EXIT_ZONE, config, roode)
 
 

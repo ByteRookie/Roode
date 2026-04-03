@@ -66,6 +66,7 @@ void Roode::setup() {
     samples = s.sampling; polling_interval_ms_ = s.polling_interval; invert_direction_ = s.invert_direction;
     filter_mode_ = s.filter_mode; filter_window_ = s.filter_window; active_sensors_ = s.active_sensors;
     debug_mode_ = s.debug_mode; entry->roi->center = exit->roi->center = s.roi_center;
+    entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
     auto_calibration_interval_sec_ = s.auto_calibration_interval; restart_timeout_ms_ = s.restart_timeout;
     cpu_opt_activate_threshold_ = s.cpu_activate; cpu_opt_deactivate_threshold_ = s.cpu_deactivate;
     manual_presence_ = s.manual_presence; invalid_distance_limit_ = s.invalid_limit;
@@ -129,6 +130,7 @@ void Roode::register_portal_routes_() {
     invalid_distance_limit_ = s.invalid_limit; restart_timeout_ms_ = s.restart_timeout;
     lux_threshold_ = s.lux_threshold; sun_elevation_threshold_enabled_ = s.sun_elevation_threshold_enabled;
     sun_elevation_threshold_ = s.sun_elevation_threshold; manual_presence_ = s.manual_presence;
+    entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
 
     settings_prefs_.save(&s); global_preferences->sync(); r->send(200, "application/json", "{\"ok\":true}");
   }));
@@ -148,6 +150,26 @@ void Roode::register_portal_routes_() {
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/status", [this](roode_web::AsyncWebServerRequest *r) {
     JsonDocument d; d["s"] = scan_state_ == SCANNING ? "Scanning" : "Idle"; d["p"] = scan_progress_;
     std::string out; serializeJson(d, out); r->send(200, "application/json", out.c_str());
+  }));
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/sessions", [this](roode_web::AsyncWebServerRequest *r) {
+    if (!require_portal_auth_(r, "application/json")) return;
+    JsonDocument doc; JsonArray arr = doc.to<JsonArray>();
+    for (size_t i = 0; i < sessions_.size(); i++) {
+      JsonObject o = arr.add<JsonObject>(); o["id"] = std::to_string(i);
+      o["bg_lux"] = sessions_[i].background.lux; o["p_lux"] = sessions_[i].person.lux;
+      o["complete"] = sessions_[i].complete;
+      char buf[32]; struct tm *tm = localtime((time_t *)&sessions_[i].ts);
+      strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tm); o["date"] = std::string(buf);
+    }
+    std::string out; serializeJson(doc, out); r->send(200, "application/json", out.c_str());
+  }));
+  base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/delete", [this](roode_web::AsyncWebServerRequest *r) {
+    if (!require_portal_auth_(r, "application/json")) return;
+    if (r->hasParam("id")) {
+      size_t idx = atoi(r->getParam("id")->value().c_str());
+      if (idx < sessions_.size()) sessions_.erase(sessions_.begin() + idx);
+    }
+    r->send(200, "application/json", "{\"ok\":true}");
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/roi/preview", [this](roode_web::AsyncWebServerRequest *r) {
     if (!has_recommended_settings_) { r->send(200, "application/json", "null"); return; }
@@ -188,12 +210,11 @@ void Roode::loop() {
 }
 
 VL53L1_Error Roode::read_and_track_zone_(Zone *zone, bool ut) {
-  // Check lux and sun thresholds
   if (lux_sensor_ && lux_sensor_->state < lux_threshold_) return VL53L1_ERROR_NONE;
 #ifdef USE_SUN
   if (sun_elevation_threshold_enabled_ && sun_ && sun_->elevation->state < sun_elevation_threshold_) return VL53L1_ERROR_NONE;
 #endif
-  if (manual_presence_) return VL53L1_ERROR_NONE; // If manual presence is on, skip sensor read
+  if (manual_presence_) return VL53L1_ERROR_NONE;
 
 #ifdef CONFIG_IDF_TARGET_ESP32
   i2c_lock();
@@ -249,16 +270,26 @@ void Roode::sensor_task(void *p) {
         VL53L1_Error st; auto d = self->distanceSensor->read_distance(&roi, st); h.distances.push_back(d.value_or(0));
         self->scan_progress_ = (i * 100) / 64; vTaskDelay(pdMS_TO_TICKS(20));
       }
-      if (self->scan_phase_ == PHASE_EMPTY) self->background_scans_.push_back(h); else self->person_scans_.push_back(h);
-      if (!self->background_scans_.empty() && !self->person_scans_.empty()) {
+      
+      if (self->scan_phase_ == PHASE_EMPTY) {
+        self->active_session_.ts = h.ts;
+        self->active_session_.background = h;
+        self->active_session_.complete = false;
+      } else if (self->scan_phase_ == PHASE_PERSON) {
+        self->active_session_.person = h;
+        self->active_session_.complete = true;
+        self->sessions_.push_back(self->active_session_);
+        
+        // Calculate recommended ROI using background and person scans
         uint8_t bi = 0; int32_t md = 0;
         for(uint8_t i=0; i<64; i++) {
-          int32_t delta = (int32_t)self->background_scans_.back().distances[i] - (int32_t)self->person_scans_.back().distances[i];
+          int32_t delta = (int32_t)self->active_session_.background.distances[i] - (int32_t)self->active_session_.person.distances[i];
           if (delta > md) { md = delta; bi = i; }
         }
         self->recommended_settings_.roi_center = ((bi/8)*2+1)*16 + ((bi%8)*2+1);
         self->recommended_settings_.max_threshold = (uint16_t)md; self->has_recommended_settings_ = true;
       }
+      
       self->scan_state_ = SCAN_IDLE; continue;
     }
     self->read_and_track_zone_(self->entry, true); self->read_and_track_zone_(self->exit, false);

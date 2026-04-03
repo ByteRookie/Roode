@@ -8,9 +8,8 @@ PortalSwitch = roode_ns.class_("PortalSwitch", switch.Switch, cg.Component)
 
 CONF_PORTAL = "portal"
 
-CONFIG_SCHEMA = switch.SWITCH_SCHEMA.extend(
+CONFIG_SCHEMA = switch.switch_schema(PortalSwitch).extend(
     {
-        cv.GenerateID(): cv.declare_id(PortalSwitch),
         cv.GenerateID("roode_id"): cv.use_id(Roode),
         cv.Optional(CONF_ICON, default="mdi:web"): cv.icon,
     }

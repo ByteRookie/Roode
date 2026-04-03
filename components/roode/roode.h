@@ -94,6 +94,13 @@ class PortalSwitch : public switch_::Switch, public Component {
   Roode *parent_;
 };
 
+struct CalibrationSession {
+  uint32_t ts;
+  HistoricalScan background;
+  HistoricalScan person;
+  bool complete{false};
+};
+
 class Roode : public PollingComponent {
  public:
   Roode() { instance_ = this; }
@@ -262,8 +269,8 @@ class Roode : public PollingComponent {
   sun::Sun *sun_{nullptr};
 #endif
 
-  std::vector<HistoricalScan> background_scans_;
-  std::vector<HistoricalScan> person_scans_;
+  std::vector<CalibrationSession> sessions_;
+  CalibrationSession active_session_;
 
   enum FSMState { STATE_IDLE, STATE_ACTIVE };
   FSMState state_{STATE_IDLE};

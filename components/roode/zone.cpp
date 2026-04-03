@@ -77,12 +77,16 @@ void Zone::reset_roi(uint8_t default_center) {
   roi->width = roi_override->width ? roi_override->width : 6;
   roi->height = roi_override->height ? roi_override->height : 16;
   roi->center = roi_override->center ? roi_override->center : default_center;
-  ESP_LOGD(TAG, "%s ROI reset: { width: %d, height: %d, center: %d }", id == 0U ? "Entry" : "Exit", roi->width,
-           roi->height, roi->center);
+  if (debug_mode_) {
+    ESP_LOGD(TAG, "%s ROI reset: { width: %d, height: %d, center: %d }", id == 0U ? "Entry" : "Exit", roi->width,
+             roi->height, roi->center);
+  }
 }
 
 void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
-  ESP_LOGD(CALIBRATION, "Beginning. zoneId: %d", id);
+  if (debug_mode_) {
+    ESP_LOGD(CALIBRATION, "Beginning. zoneId: %d", id);
+  }
   std::vector<int> zone_distances;
   zone_distances.reserve(number_attempts);
   int sum = 0;
@@ -95,7 +99,9 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
     Roode::i2c_unlock();
 #endif
     if (sensor_status != VL53L1_ERROR_NONE) {
-      ESP_LOGW(CALIBRATION, "Distance read failed during calibration. status: %d", sensor_status);
+      if (debug_mode_) {
+        ESP_LOGW(CALIBRATION, "Distance read failed during calibration. status: %d", sensor_status);
+      }
       continue;
     }
     uint16_t dist = this->getDistance();
@@ -105,8 +111,10 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
     }
   };
   if (zone_distances.size() < (size_t) number_attempts) {
-    ESP_LOGW(CALIBRATION, "Calibration failed: only %d valid distances recorded (needed %d). Retaining previous baseline.",
-             zone_distances.size(), number_attempts);
+    if (debug_mode_) {
+      ESP_LOGW(CALIBRATION, "Calibration failed: only %d valid distances recorded (needed %d). Retaining previous baseline.",
+               zone_distances.size(), number_attempts);
+    }
   } else {
     int avg = sum / zone_distances.size();
     threshold->idle = avg;
@@ -116,10 +124,12 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
     threshold->min_percentage = min_pct;
     threshold->max = (avg * max_pct) / 100;
     threshold->min = (avg * min_pct) / 100;
-    ESP_LOGI(CALIBRATION, "Calibrated threshold for zone. zoneId: %d, idle: %d, min: %d (%d%%), max: %d (%d%%)", id,
-             threshold->idle, threshold->min,
-             threshold->min_percentage.value_or((threshold->min * 100) / threshold->idle), threshold->max,
-             threshold->max_percentage.value_or((threshold->max * 100) / threshold->idle));
+    if (debug_mode_) {
+      ESP_LOGI(CALIBRATION, "Calibrated threshold for zone. zoneId: %d, idle: %d, min: %d (%d%%), max: %d (%d%%)", id,
+               threshold->idle, threshold->min,
+               threshold->min_percentage.value_or((threshold->min * 100) / threshold->idle), threshold->max,
+               threshold->max_percentage.value_or((threshold->max * 100) / threshold->idle));
+    }
   }
 }
 
@@ -165,8 +175,10 @@ void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Or
       }
     }
   }
-  ESP_LOGI(CALIBRATION, "Calibrated ROI for zone. zoneId: %d, width: %d, height: %d, center: %d", id, roi->width,
-           roi->height, roi->center);
+  if (debug_mode_) {
+    ESP_LOGI(CALIBRATION, "Calibrated ROI for zone. zoneId: %d, width: %d, height: %d, center: %d", id, roi->width,
+             roi->height, roi->center);
+  }
 }
 
 uint16_t Zone::getDistance() const { return this->last_distance; }

@@ -89,11 +89,11 @@ Ps=0 (when connected to GND): In the IIC mode, the user can operate the chip by 
 
 ## Configuration
 
+Roode is provided as an external_component which means it is easy to set up in any ESPHome sensor configuration file. **Initial setup is done in YAML, while all calibration and advanced settings are handled via the Web UI at `/portal`.**
+
 ### Platform Setup
 
-Roode is provided as an external_component which means it is easy to set up in any ESPHome sensor configuration file.
-
-Other than base ESPHome configuration the only config that's needed for Roode is
+Other than base ESPHome configuration the only config that's needed for Roode is:
 
 ```yaml
 external_components:
@@ -101,11 +101,15 @@ external_components:
     refresh: always
 vl53l1x:
 roode:
+  sensor: my_vl53l1x_id
 ```
 
-This uses the recommended default configuration.
+Navigate to `http://<device_ip>/portal` to perform calibration, manage history, and adjust all advanced settings (Sampling, Filtering, Lux/Sun thresholds, and Sensor visibility).
 
-However, we offer a lot of flexibility. Here's the full configuration spelled out.
+---
+
+### YAML Configuration Reference
+While UI-based configuration is recommended, we still offer full flexibility via YAML for advanced users.
 
 ```yml
 external_components:

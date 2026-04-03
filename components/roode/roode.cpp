@@ -485,62 +485,26 @@ void Roode::log_event(const std::string &msg) {
   } else if (msg.rfind("xshut_reinitialize_sensor_", 0) == 0) {
     std::string id = msg.substr(sizeof("xshut_reinitialize_sensor_") - 1);
     out += " - reinitializing sensor " + id;
-  } else if (msg == "xshut_reinitialize") {
-    out += " - reinitializing";
-  } else if (msg.rfind("sensor_", 0) == 0 && msg.find("_addr") != std::string::npos) {
-    size_t start = sizeof("sensor_") - 1;
-    size_t end = msg.find('_', start);
-    std::string id = msg.substr(start, end - start);
-    std::string addr = msg.substr(msg.find("0x") + 2);
-    out += " - address 0x" + addr + " for sensor " + id;
-  } else if (msg.rfind("sensor_", 0) == 0 && msg.find(".recovered_via_xshut") != std::string::npos) {
-    std::string id = msg.substr(sizeof("sensor_") - 1, msg.find('.') - (sizeof("sensor_") - 1));
-    out += " - sensor " + id + " recovered via XSHUT";
-  } else if (msg == "sensor.recovered_via_xshut") {
-    out += " - sensor recovered via XSHUT";
-  } else if (msg == "interrupt_fallback_polling" || msg == "interrupt_fallback")
-    out += " - INT pin timeout, polling";
-  else if (msg == "int_pin_missed")
-    out += " - INT miss";
-  else if (msg.rfind("int_pin_missed_sensor_", 0) == 0) {
-    std::string id = msg.substr(sizeof("int_pin_missed_sensor_") - 1);
-    out += " - INT miss sensor " + id;
-  } else if (msg.rfind("manual_adjust", 0) == 0)
-    out += " - user corrected";
-  const char *color = "\033[32m";  // green by default
-  if (msg.find("fail") != std::string::npos || msg.find("fallback") != std::string::npos ||
-      msg.find("missed") != std::string::npos)
-    color = "\033[31m";  // red for errors
-  else if (msg.find("retry") != std::string::npos || msg.find("manual_adjust") != std::string::npos ||
-           msg.find("reinitialize") != std::string::npos || msg.find("pulse_off") != std::string::npos)
-    color = "\033[33m";  // yellow for informational
-
-  std::string colored = std::string(color) + out + "\033[0m";
-  ESP_LOGI(TAG, "%s", colored.c_str());
-  if (instance_ != nullptr) {
-    if (msg.find("reinitialize") != std::string::npos) {
-      instance_->update_status_text("reinitializing");
-    } else if (msg.find("recovered_via_xshut") != std::string::npos) {
-      instance_->update_status_text("ok");
-    }
-    if (msg == "dual_core_success" || msg == "fallback_single_core" || msg == "force_single_core" ||
-        msg == "interrupt_fallback_polling" || msg == "interrupt_recovered") {
-      instance_->publish_feature_list();
-    }
+  } else if (msg == "xshut_reinitialize")
+    out += " - reinitializing all sensors";
+  else if (msg == "sensor.recovered_via_xshut")
+    out += " - sensor recovered via XSHUT pulse";
+  else if (msg.rfind("sensor_", 0) == 0 && msg.find(".recovered_via_xshut") != std::string::npos) {
+    size_t end = msg.find('.');
+    std::string id = msg.substr(sizeof("sensor_") - 1, end - (sizeof("sensor_") - 1));
+    out = "sensor " + id + " recovered via XSHUT pulse";
   }
+  ESP_LOGI(TAG, "%s", out.c_str());
 }
 
-Roode::~Roode() {
-  delete entry;
-  delete exit;
-}
 void Roode::dump_config() {
   ESP_LOGCONFIG(TAG, "Roode:");
-  ESP_LOGCONFIG(TAG, "  Sample size: %d", samples);
-  LOG_UPDATE_INTERVAL(this);
-  entry->dump_config();
-  exit->dump_config();
+  ESP_LOGCONFIG(TAG, "  Orientation: %s", orientation_ == Parallel ? "Parallel" : "Perpendicular");
+  ESP_LOGCONFIG(TAG, "  Invert Direction: %s", invert_direction_ ? "True" : "False");
+  ESP_LOGCONFIG(TAG, "  Sampling Size: %d", samples);
 }
+
+Roode::~Roode() { instance_ = nullptr; }
 
 void Roode::setup() {
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
@@ -700,7 +664,7 @@ void Roode::send_portal_login_(web_server_idf::AsyncWebServerRequest *request) c
   ESP_LOGD(TAG, "Portal auth required, serving login page");
   request->send(200, "text/html", portal_login_html);
 }
-#ifdef USE_WEBSERVER
+
 bool Roode::require_portal_auth_(web_server_idf::AsyncWebServerRequest *request, const char *content_type) const {
   if (!this->portal_enabled_) {
     request->send(403, "text/plain", "Portal disabled");
@@ -719,9 +683,7 @@ bool Roode::require_portal_auth_(web_server_idf::AsyncWebServerRequest *request,
   }
   return false;
 }
-#endif
 
-#ifdef USE_WEBSERVER
 namespace {
 class LambdaRequestHandler : public web_server_idf::AsyncWebHandler {
  public:
@@ -794,7 +756,7 @@ void Roode::register_portal_routes_() {
     if (!this->require_portal_auth_(request, "application/json"))
       return;
     ESP_LOGD(TAG, "Serving /api/settings/current");
-    DynamicJsonDocument doc(1024);
+    JsonDocument doc;
     doc["roi_width"] = entry->roi->width;
     doc["roi_height"] = entry->roi->height;
     doc["roi_center"] = entry->roi->center;
@@ -823,12 +785,7 @@ void Roode::register_portal_routes_() {
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/sensor/toggle", [this](web_server_idf::AsyncWebServerRequest *request) {
     if (!this->require_portal_auth_(request, "application/json")) return;
     this->sensor_enabled_ = !this->sensor_enabled_;
-    if (this->sensor_enabled_) {
-      this->distanceSensor->start_ranging();
-    } else {
-      this->distanceSensor->stop_ranging();
-    }
-    DynamicJsonDocument doc(64);
+    JsonDocument doc;
     doc["enabled"] = sensor_enabled_;
     std::string output;
     serializeJson(doc, output);
@@ -882,7 +839,7 @@ void Roode::register_portal_routes_() {
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/status", [this](web_server_idf::AsyncWebServerRequest *request) {
     if (!this->require_portal_auth_(request, "application/json"))
       return;
-    DynamicJsonDocument doc(256);
+    JsonDocument doc;
     doc["state"] = scan_state_ == SCANNING ? "Scanning" : "Idle";
     doc["id"] = active_scan_id_;
     doc["step"] = scan_step_;
@@ -904,7 +861,7 @@ void Roode::register_portal_routes_() {
     scan_progress_ = 0;
     scan_step_ = "Initializing";
     scan_start_ts_ = millis();
-    DynamicJsonDocument doc(128);
+    JsonDocument doc;
     doc["id"] = active_scan_id_;
     std::string output;
     serializeJson(doc, output);
@@ -981,7 +938,7 @@ void Roode::register_portal_routes_() {
       request->send(200, "application/json", "null");
       return;
     }
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
     doc["roi_width"] = recommended_settings_.roi_width;
     doc["roi_height"] = recommended_settings_.roi_height;
     doc["roi_center"] = recommended_settings_.roi_center;
@@ -1010,10 +967,10 @@ void Roode::register_portal_routes_() {
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_GET, "/api/scan/sessions", [this](web_server_idf::AsyncWebServerRequest *request) {
     if (!this->require_portal_auth_(request, "application/json"))
       return;
-    DynamicJsonDocument doc(2048);
+    JsonDocument doc;
     JsonArray arr = doc.to<JsonArray>();
     for (const auto &s : sessions_) {
-      JsonObject obj = arr.createNestedObject();
+      JsonObject obj = arr.add<JsonObject>();
       obj["id"] = s.id;
       obj["ts"] = s.ts;
       obj["trials"] = s.trials;
@@ -1029,14 +986,15 @@ void Roode::register_portal_routes_() {
       HTTP_GET, "/api/scan/session/", [this](web_server_idf::AsyncWebServerRequest *request) {
     if (!this->require_portal_auth_(request, "application/json"))
       return;
-    std::string uri = request->url().c_str();
+    char url_buf[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
+    std::string uri = request->url_to(url_buf);
     std::string id = uri.substr(uri.find_last_of('/') + 1);
     if (this->scan_results_.count(id)) {
-      DynamicJsonDocument doc(4096);
+      JsonDocument doc;
       doc["type"] = "passive_scan";
       doc["grid"] = 8;
       doc["ranging"] = "auto";
-      JsonArray data = doc.createNestedObject("data").createNestedArray("mcps");
+      JsonArray data = doc["data"].to<JsonObject>()["mcps"].to<JsonArray>();
       for (uint16_t val : this->scan_results_[id]) {
         data.add(val);
       }
@@ -1160,14 +1118,8 @@ void Roode::loop() {
       metrics_update_pending_ = false;
     }
     if (config_update_pending_) {
-      if (max_threshold_entry_sensor != nullptr) max_threshold_entry_sensor->publish_state(pending_max_th_[0]);
-      if (max_threshold_exit_sensor != nullptr) max_threshold_exit_sensor->publish_state(pending_max_th_[1]);
-      if (min_threshold_entry_sensor != nullptr) min_threshold_entry_sensor->publish_state(pending_min_th_[0]);
-      if (min_threshold_exit_sensor != nullptr) min_threshold_exit_sensor->publish_state(pending_min_th_[1]);
-      if (entry_roi_height_sensor != nullptr) entry_roi_height_sensor->publish_state(pending_roi_h_[0]);
-      if (entry_roi_width_sensor != nullptr) entry_roi_width_sensor->publish_state(pending_roi_w_[0]);
-      if (exit_roi_height_sensor != nullptr) exit_roi_height_sensor->publish_state(pending_roi_h_[1]);
-      if (exit_roi_width_sensor != nullptr) exit_roi_width_sensor->publish_state(pending_roi_w_[1]);
+      publish_sensor_configuration(entry, exit, true);
+      publish_sensor_configuration(entry, exit, false);
       config_update_pending_ = false;
     }
     for (int i = 0; i < 2; i++) {
@@ -1176,30 +1128,25 @@ void Roode::loop() {
         calibration_save_pending_[i] = false;
       }
     }
-    return;
+  } else {
+    // Single core mode
+    unsigned long start = micros();
+    AnEventHasOccured = 0;
+    AllZonesCurrentStatus = 0;
+    read_and_track_zone_(entry, true);
+    read_and_track_zone_(exit, false);
+    unsigned long end = micros();
+    unsigned long delta = end - start;
+    loop_time_sum_ += delta;
+    loop_count_++;
+    update_metrics();
+    uint32_t now = millis();
+    if (auto_calibration_interval_sec_ > 0 &&
+        (now - last_calibration_millis_ >= auto_calibration_interval_sec_ * 1000)) {
+      run_zone_calibration(0);
+      run_zone_calibration(1);
+    }
   }
-  uint32_t now = millis();
-  if (last_loop_update_ts_ != 0 && (now - last_loop_update_ts_ > restart_timeout_ms_) &&
-      (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
-    ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", restart_timeout_ms_ / 1000);
-    restart_sensor();
-  }
-  unsigned long start = micros();
-  AnEventHasOccured = 0;
-  AllZonesCurrentStatus = 0;
-  this->read_and_track_zone_(this->entry, true);
-  this->read_and_track_zone_(this->exit, false);
-  // Attempt to recover the sensor when repeated invalid distance values are observed
-  if (invalid_read_count_ > invalid_distance_limit_ && (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
-    ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
-    restart_sensor();
-  }
-  unsigned long end = micros();
-  unsigned long delta = end - start;
-  loop_time_sum_ += delta;
-  loop_count_++;
-  update_metrics();
-  delay(polling_interval_ms_);
 }
 
 bool Roode::handle_sensor_status() {
@@ -1254,7 +1201,8 @@ void Roode::path_tracking(Zone *zone) {
   uint32_t timeout = state_ == STATE_ENTRY_ACTIVE ? 2500 : 3500;
   if (state_ != STATE_IDLE && millis() - state_started_ts > timeout) {
     state_ = STATE_IDLE;
-    PathTrackFillingSize = 1;
+    PathTrackFillingSize = 0;
+    PathTrack[0] = 0;
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
 
@@ -1350,21 +1298,10 @@ void Roode::path_tracking(Zone *zone) {
     // if nobody anywhere lets check if an exit or entry has happened
     if (AllZonesCurrentStatus == 0) {
       ESP_LOGD(TAG, "Nobody anywhere, sequence length: %d", PathTrackFillingSize);
-      if (PathTrackFillingSize == 4) {
-        if ((PathTrack[1] == 1) && (PathTrack[2] == 3) && (PathTrack[3] == 2)) {
-          ESP_LOGI("Roode pathTracking", "Exit detected.");
-          this->updateCounter(-1);
-          last_valid_crossing_ts_ = millis();
-          if (entry_exit_event_sensor != nullptr) {
-            if (use_sensor_task_) {
-              strncpy((char *) pending_entry_exit_event_, "Exit", sizeof(pending_entry_exit_event_) - 1);
-              pending_entry_exit_event_[sizeof(pending_entry_exit_event_) - 1] = '\0';
-              entry_exit_event_pending_ = true;
-            } else {
-              entry_exit_event_sensor->publish_state("Exit");
-            }
-          }
-        } else if ((PathTrack[1] == 2) && (PathTrack[2] == 3) && (PathTrack[3] == 1)) {
+      if (PathTrackFillingSize >= 3) {
+        // Entry: [..., 2, 3, 1, 0]
+        if (PathTrackFillingSize >= 3 && PathTrack[PathTrackFillingSize-3] == 2 && 
+            PathTrack[PathTrackFillingSize-2] == 3 && PathTrack[PathTrackFillingSize-1] == 1) {
           ESP_LOGI("Roode pathTracking", "Entry detected.");
           this->updateCounter(1);
           last_valid_crossing_ts_ = millis();
@@ -1377,14 +1314,31 @@ void Roode::path_tracking(Zone *zone) {
               entry_exit_event_sensor->publish_state("Entry");
             }
           }
+        } 
+        // Exit: [..., 1, 3, 2, 0]
+        else if (PathTrackFillingSize >= 3 && PathTrack[PathTrackFillingSize-3] == 1 && 
+                 PathTrack[PathTrackFillingSize-2] == 3 && PathTrack[PathTrackFillingSize-1] == 2) {
+          ESP_LOGI("Roode pathTracking", "Exit detected.");
+          this->updateCounter(-1);
+          last_valid_crossing_ts_ = millis();
+          if (entry_exit_event_sensor != nullptr) {
+            if (use_sensor_task_) {
+              strncpy((char *) pending_entry_exit_event_, "Exit", sizeof(pending_entry_exit_event_) - 1);
+              pending_entry_exit_event_[sizeof(pending_entry_exit_event_) - 1] = '\0';
+              entry_exit_event_pending_ = true;
+            } else {
+              entry_exit_event_sensor->publish_state("Exit");
+            }
+          }
         }
       }
 
-      PathTrackFillingSize = 1;
+      PathTrackFillingSize = 0;
+      PathTrack[0] = 0;
       state_ = STATE_IDLE;
     } else {
       // update PathTrack if the status is different from the last recorded one
-      if (AllZonesCurrentStatus != PathTrack[PathTrackFillingSize - 1]) {
+      if (PathTrackFillingSize == 0 || AllZonesCurrentStatus != PathTrack[PathTrackFillingSize - 1]) {
         if (PathTrackFillingSize < 4) {
           PathTrackFillingSize++;
           PathTrack[PathTrackFillingSize - 1] = AllZonesCurrentStatus;
@@ -1401,50 +1355,114 @@ void Roode::path_tracking(Zone *zone) {
       } else {
         presence_sensor->publish_state(false);
       }
+    } else {
+      if (use_sensor_task_) {
+        presence_state_ = true;
+        presence_update_pending_ = true;
+      } else {
+        presence_sensor->publish_state(true);
+      }
     }
   }
 }
-void Roode::updateCounter(int delta) {
-  if (this->people_counter == nullptr) {
+
+void Roode::update_status_text(const std::string &status) {
+  if (status == last_status_text_)
     return;
-  }
-  auto next = this->people_counter->state + (float) delta;
-  ESP_LOGI(TAG, "Updating people count: %d", (int) next);
-  expected_counter_ = next;
-  if (use_sensor_task_) {
-    pending_people_counter_value_ = next;
-    people_counter_update_pending_ = true;
-  } else {
-    auto call = this->people_counter->make_call();
-    call.set_value(next);
-    call.perform();
+
+  if (status_text_sensor != nullptr) {
+    if (use_sensor_task_) {
+      strncpy((char *) pending_status_text_, status.c_str(), sizeof(pending_status_text_) - 1);
+      pending_status_text_[sizeof(pending_status_text_) - 1] = '\0';
+      status_text_update_pending_ = true;
+    } else {
+      status_text_sensor->publish_state(status);
+      last_status_text_ = status;
+    }
   }
 }
-void Roode::recalibration() { calibrate_zones(); }
+
+void Roode::calibrateDistance() { calibrate_zones(); }
+
+void Roode::calibrate_zones() {
+  run_zone_calibration(0);
+  run_zone_calibration(1);
+}
+
+void Roode::publish_feature_list() {
+  std::string features = "ULD";
+#ifdef USE_WEBSERVER
+  features += ",Portal";
+#endif
+  if (calibration_persistence_)
+    features += ",Persist";
+  if (use_sensor_task_)
+    features += ",DualCore";
+  if (enabled_features_sensor != nullptr)
+    enabled_features_sensor->publish_state(features);
+}
 
 bool Roode::pause_sensor_task_if_needed_() {
-#ifdef CONFIG_IDF_TARGET_ESP32
   if (!use_sensor_task_ || sensor_task_handle_ == nullptr)
     return false;
-  if (xTaskGetCurrentTaskHandle() == sensor_task_handle_)
-    return false;
-  i2c_lock();
   vTaskSuspend(sensor_task_handle_);
   return true;
-#else
-  return false;
-#endif
 }
 
 void Roode::resume_sensor_task_if_needed_(bool paused) {
-#ifdef CONFIG_IDF_TARGET_ESP32
-  if (paused && sensor_task_handle_ != nullptr) {
+  if (paused && sensor_task_handle_ != nullptr)
     vTaskResume(sensor_task_handle_);
-    i2c_unlock();
+}
+
+const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_distance,
+                                                 uint16_t average_exit_zone_distance) {
+  uint16_t max_dist = std::max(average_entry_zone_distance, average_exit_zone_distance);
+  if (max_dist <= short_distance_threshold)
+    return &RANGING_SHORT;
+  if (max_dist <= medium_distance_threshold)
+    return &RANGING_MEDIUM;
+  if (max_dist <= medium_long_distance_threshold)
+    return &RANGING_MEDIUM_LONG;
+  if (max_dist <= long_distance_threshold)
+    return &RANGING_LONG;
+  return &RANGING_LONGEST;
+}
+
+void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
+  if (isMax) {
+    if (max_threshold_entry_sensor != nullptr)
+      max_threshold_entry_sensor->publish_state(entry->threshold->max);
+    if (max_threshold_exit_sensor != nullptr)
+      max_threshold_exit_sensor->publish_state(exit->threshold->max);
+  } else {
+    if (min_threshold_entry_sensor != nullptr)
+      min_threshold_entry_sensor->publish_state(entry->threshold->min);
+    if (min_threshold_exit_sensor != nullptr)
+      min_threshold_exit_sensor->publish_state(exit->threshold->min);
   }
-#else
-  (void) paused;
-#endif
+  if (entry_roi_height_sensor != nullptr)
+    entry_roi_height_sensor->publish_state(entry->roi->height);
+  if (entry_roi_width_sensor != nullptr)
+    entry_roi_width_sensor->publish_state(entry->roi->width);
+  if (exit_roi_height_sensor != nullptr)
+    exit_roi_height_sensor->publish_state(exit->roi->height);
+  if (exit_roi_width_sensor != nullptr)
+    exit_roi_width_sensor->publish_state(exit->roi->width);
+}
+
+void Roode::updateCounter(int delta) {
+  if (people_counter == nullptr)
+    return;
+  float new_val = people_counter->state + delta;
+  if (use_sensor_task_) {
+    pending_people_counter_value_ = new_val;
+    people_counter_update_pending_ = true;
+  } else {
+    auto call = people_counter->make_call();
+    call.set_value(new_val);
+    call.perform();
+  }
+  expected_counter_ = new_val;
 }
 
 void Roode::run_zone_calibration(uint8_t zone_id) {
@@ -1523,32 +1541,14 @@ void Roode::update_metrics() {
   float cpu = 0.0f;
   float loop_time = 0.0f;
   if (loop_count_ > 0) {
-    loop_time = (float) loop_time_sum_ / loop_count_ / 1000.0f;
-    cpu = ((float) loop_time_sum_ / ((now - loop_window_start_) * 1000.0f)) * 100.0f;
+    loop_time = (float) loop_time_sum_ / (float) loop_count_ / 1000.0f;
+    cpu = (loop_time / (float) polling_interval_ms_) * 100.0f;
   }
-  float ram_used = 0;
-  float flash_used = 0;
-#ifdef CONFIG_IDF_TARGET_ESP32
-  uint32_t total_heap = ESP.getHeapSize();
-  if (total_heap > 0) {
-    uint32_t used = total_heap - ESP.getFreeHeap();
-    ram_used = ((float) used / (float) total_heap) * 100.0f;
-  }
-  uint32_t total_flash = ESP.getFlashChipSize();
-  if (total_flash > 0) {
-    uint32_t used = total_flash - ESP.getFreeSketchSpace();
-    flash_used = ((float) used / (float) total_flash) * 100.0f;
-  }
-#else
-  ram_used = (1.0f - (float)ESP.getFreeHeap() / 81920.0f) * 100.0f;
-  flash_used = (1.0f - (float)ESP.getFreeSketchSpace() / 1048576.0f) * 100.0f;
-#endif
-
   if (use_sensor_task_) {
     pending_loop_time_ = loop_time;
     pending_cpu_usage_ = cpu;
-    pending_ram_free_ = ram_used;
-    pending_flash_free_ = flash_used;
+    pending_ram_free_ = (float) ESP.getFreeHeap() / (float) ESP.getHeapSize() * 100.0f;
+    pending_flash_free_ = 100.0f;  // TO DO
     metrics_update_pending_ = true;
   } else {
     if (loop_time_sensor != nullptr)
@@ -1556,220 +1556,16 @@ void Roode::update_metrics() {
     if (cpu_usage_sensor != nullptr)
       cpu_usage_sensor->publish_state(cpu);
     if (ram_free_sensor != nullptr)
-      ram_free_sensor->publish_state(ram_used);
-    if (flash_free_sensor != nullptr)
-      flash_free_sensor->publish_state(flash_used);
+      ram_free_sensor->publish_state((float) ESP.getFreeHeap() / (float) ESP.getHeapSize() * 100.0f);
   }
-
   apply_cpu_optimizations(cpu);
   reset_cpu_optimizations(cpu);
+  loop_window_start_ = now;
   loop_time_sum_ = 0;
   loop_count_ = 0;
-  loop_window_start_ = now;
 }
 
-const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_distance,
-                                                 uint16_t average_exit_zone_distance) {
-  uint16_t min = average_entry_zone_distance < average_exit_zone_distance ? average_entry_zone_distance
-                                                                          : average_exit_zone_distance;
-  uint16_t max = average_entry_zone_distance > average_exit_zone_distance ? average_entry_zone_distance
-                                                                          : average_exit_zone_distance;
-  if (min <= short_distance_threshold) {
-    return Ranging::Short;
-  }
-  if (max > short_distance_threshold && min <= medium_distance_threshold) {
-    return Ranging::Medium;
-  }
-  if (max > medium_distance_threshold && min <= medium_long_distance_threshold) {
-    return Ranging::Long;
-  }
-  if (max > medium_long_distance_threshold && min <= long_distance_threshold) {
-    return Ranging::Longer;
-  }
-  return Ranging::Longest;
-}
-
-void Roode::calibrate_zones() {
-  if (this->distanceSensor->is_failed()) {
-    ESP_LOGW(TAG, "Skipping zone calibration: sensor is offline");
-    return;
-  }
-  bool paused = pause_sensor_task_if_needed_();
-  ESP_LOGI(SETUP, "Calibrating sensor zones");
-
-  entry->reset_roi(orientation_ == Parallel ? 167 : 195);
-  exit->reset_roi(orientation_ == Parallel ? 231 : 60);
-
-  calibrateDistance();
-
-  entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-  entry->calibrateThreshold(distanceSensor, 50);
-  exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-  exit->calibrateThreshold(distanceSensor, 50);
-
-  publish_sensor_configuration(entry, exit, true);
-  App.feed_wdt();
-  publish_sensor_configuration(entry, exit, false);
-
-  calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max,
-                          static_cast<uint32_t>(time(nullptr))};
-  calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max,
-                          static_cast<uint32_t>(time(nullptr))};
-  last_calibration_millis_ = millis();
-
-  if (calibration_persistence_) {
-    if (use_sensor_task_) {
-      calibration_save_pending_[0] = true;
-      calibration_save_pending_[1] = true;
-    } else {
-      calibration_prefs_[0].save(&calibration_data_[0]);
-      calibration_prefs_[1].save(&calibration_data_[1]);
-    }
-  }
-  ESP_LOGI(SETUP, "Finished calibrating sensor zones");
-  last_calibration_ts_ =
-      std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
-  publish_feature_list();
-  resume_sensor_task_if_needed_(paused);
-}
-
-void Roode::calibrateDistance() {
-  if (this->distanceSensor->is_failed()) {
-    return;
-  }
-  auto *const initial = distanceSensor->get_ranging_mode_override().value_or(Ranging::Longest);
-  distanceSensor->set_ranging_mode(initial);
-
-  entry->calibrateThreshold(distanceSensor, 50);
-  exit->calibrateThreshold(distanceSensor, 50);
-
-  if (distanceSensor->get_ranging_mode_override().has_value()) {
-    return;
-  }
-  auto *mode = determine_ranging_mode(entry->threshold->idle, exit->threshold->idle);
-  if (mode != initial) {
-    distanceSensor->set_ranging_mode(mode);
-  }
-}
-
-void Roode::publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax) {
-  if (use_sensor_task_) {
-    pending_max_th_[0] = entry->threshold->max;
-    pending_max_th_[1] = exit->threshold->max;
-    pending_min_th_[0] = entry->threshold->min;
-    pending_min_th_[1] = exit->threshold->min;
-    pending_roi_h_[0] = entry->roi->height;
-    pending_roi_h_[1] = exit->roi->height;
-    pending_roi_w_[0] = entry->roi->width;
-    pending_roi_w_[1] = exit->roi->width;
-    config_update_pending_ = true;
-    return;
-  }
-  if (isMax) {
-    if (max_threshold_entry_sensor != nullptr) {
-      max_threshold_entry_sensor->publish_state(entry->threshold->max);
-    }
-
-    if (max_threshold_exit_sensor != nullptr) {
-      max_threshold_exit_sensor->publish_state(exit->threshold->max);
-    }
-  } else {
-    if (min_threshold_entry_sensor != nullptr) {
-      min_threshold_entry_sensor->publish_state(entry->threshold->min);
-    }
-    if (min_threshold_exit_sensor != nullptr) {
-      min_threshold_exit_sensor->publish_state(exit->threshold->min);
-    }
-  }
-
-  if (entry_roi_height_sensor != nullptr) {
-    entry_roi_height_sensor->publish_state(entry->roi->height);
-  }
-  if (entry_roi_width_sensor != nullptr) {
-    entry_roi_width_sensor->publish_state(entry->roi->width);
-  }
-
-  if (exit_roi_height_sensor != nullptr) {
-    exit_roi_height_sensor->publish_state(exit->roi->height);
-  }
-  if (exit_roi_width_sensor != nullptr) {
-    exit_roi_width_sensor->publish_state(exit->roi->width);
-  }
-}
-
-void Roode::publish_feature_list() {
-  auto fmt_bytes = [](uint32_t bytes) {
-    char buf[16];
-    if (bytes >= 1024UL * 1024UL * 1024UL)
-      snprintf(buf, sizeof(buf), "%uGB", bytes / 1024 / 1024 / 1024);
-    else if (bytes >= 1024 * 1024)
-      snprintf(buf, sizeof(buf), "%uMB", bytes / 1024 / 1024);
-    else
-      snprintf(buf, sizeof(buf), "%uKB", bytes / 1024);
-    return std::string(buf);
-  };
-
-  auto fmt_time = [](uint32_t epoch) {
-    if (epoch == 0)
-      return std::string("unknown");
-    time_t t = epoch;
-    struct tm tm_time;
-    if (!localtime_r(&t, &tm_time))
-      return std::string("unknown");
-    char buf[8];
-    int hour = tm_time.tm_hour % 12;
-    if (hour == 0)
-      hour = 12;
-    snprintf(buf, sizeof(buf), "%d:%02d%cM", hour, tm_time.tm_min, tm_time.tm_hour >= 12 ? 'P' : 'A');
-    return std::string(buf);
-  };
-
-  std::vector<std::pair<std::string, std::string>> features;
-#ifdef CONFIG_IDF_TARGET_ESP32
-  features.push_back({"cpu_mode", use_sensor_task_ ? "dual" : "single"});
-  features.push_back({"cpu", ESP.getChipModel()});
-  features.push_back({"cpu_cores", std::to_string(ESP.getChipCores())});
-#else
-  features.push_back({"cpu_mode", "single"});
-  features.push_back({"cpu", "ESP8266"});
-  features.push_back({"cpu_cores", "1"});
-#endif
-  features.push_back({"xshut", distanceSensor->get_xshut_state().has_value() ? "enabled" : "disabled"});
-  features.push_back({"refresh", distanceSensor->is_interrupt_enabled() ? "interrupt" : "polling"});
-  features.push_back({"ram", fmt_bytes(ESP.getHeapSize())});
-  features.push_back({"flash", fmt_bytes(ESP.getFlashChipSize())});
-  features.push_back({"calibration_value", std::to_string(entry->threshold->idle)});
-  uint32_t last_cal_epoch = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
-  features.push_back({"calibration", fmt_time(last_cal_epoch)});
-
-  std::string feature_list;
-  for (size_t i = 0; i < features.size(); ++i) {
-    feature_list += features[i].first + ":" + features[i].second;
-    if (i + 1 < features.size())
-      feature_list += "\n";
-  }
-  if (enabled_features_sensor != nullptr) {
-    if (use_sensor_task_) {
-      feature_list_update_pending_ = true;
-    } else {
-      enabled_features_sensor->publish_state(feature_list);
-    }
-  }
-  log_event(std::string("features_enabled: ") + feature_list);
-}
-
-void Roode::update_status_text(const std::string &status) {
-  if (status_text_sensor != nullptr && status != last_status_text_) {
-    if (use_sensor_task_) {
-      strncpy((char *) pending_status_text_, status.c_str(), sizeof(pending_status_text_) - 1);
-      pending_status_text_[sizeof(pending_status_text_) - 1] = '\0';
-      status_text_update_pending_ = true;
-    } else {
-      status_text_sensor->publish_state(status);
-      last_status_text_ = status;
-    }
-  }
-}
+void Roode::recalibration() { calibrate_zones(); }
 
 void Roode::restart_sensor() {
   uint32_t now = millis();

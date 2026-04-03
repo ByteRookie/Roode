@@ -74,8 +74,12 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   optional<int16_t> offset{};
   optional<uint16_t> xtalk{};
   uint16_t timeout{};
- ROI *last_roi{};
- int recovery_count_{0};
+  // Value-copy of the last ROI pushed to the sensor hardware.
+  // A pointer was previously stored here, causing *roi != *last_roi to always
+  // return false (same struct address), so portal ROI changes were ignored.
+  ROI last_roi_val_{};
+  bool has_last_roi_{false};
+  int recovery_count_{0};
   uint8_t sensor_id_{0};
   uint8_t desired_address_{0x29};
   static std::vector<VL53L1X *> sensors;

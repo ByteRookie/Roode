@@ -120,20 +120,18 @@ void Roode::setup() {
     exit->reset_roi(orientation_ == Parallel ? 239 : 59);
   }
 
-  // Auto-calibrate on first boot when thresholds are zero (no saved calibration data)
-  if (distanceSensor && (entry->threshold->max == 0 || exit->threshold->max == 0)) {
-    ESP_LOGI(TAG, "No calibration data found - running initial threshold calibration");
-    recalibration();
-    // Persist calibration results + current ROI to flash
-    RoodeSettings cal_s;
-    if (!settings_prefs_.load(&cal_s)) memset(&cal_s, 0, sizeof(cal_s));
-    cal_s.entry_roi_height = entry->roi->height; cal_s.entry_roi_width = entry->roi->width; cal_s.entry_roi_center = entry->roi->center;
-    cal_s.entry_min_threshold = entry->threshold->min; cal_s.entry_max_threshold = entry->threshold->max;
-    cal_s.exit_roi_height = exit->roi->height; cal_s.exit_roi_width = exit->roi->width; cal_s.exit_roi_center = exit->roi->center;
-    cal_s.exit_min_threshold = exit->threshold->min; cal_s.exit_max_threshold = exit->threshold->max;
-    settings_prefs_.save(&cal_s);
-    global_preferences->sync();
+  // If thresholds are zero, schedule calibration to run after VL53L1X setup()
+  // completes. Roode has setup_priority::PROCESSOR=300, VL53L1X has DATA=200,
+  // so VL53L1X setup() runs AFTER ours — we cannot call recalibration() here.
+  if (entry->threshold->max == 0 || exit->threshold->max == 0) {
+    needs_initial_calibration_ = true;
+    ESP_LOGI(TAG, "No calibration data — will calibrate after sensor initializes");
   }
+
+  // Publish initial states so HA entities show as available (not "unavailable")
+  // immediately after boot, before the first update() tick.
+  publish_static_states_();
+  publish_threshold_and_roi_states_();
 
 #ifdef CONFIG_IDF_TARGET_ESP32
   if (!force_single_core_) {
@@ -218,7 +216,9 @@ void Roode::register_portal_routes_() {
       if (s.ranging_mode < 7) distanceSensor->set_ranging_mode_override(ranging_modes[s.ranging_mode]);
     }
     entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
-    settings_prefs_.save(&s); global_preferences->sync(); r->send(200, "application/json", "{\"ok\":true}");
+    settings_prefs_.save(&s); global_preferences->sync();
+    publish_threshold_and_roi_states_();
+    r->send(200, "application/json", "{\"ok\":true}");
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/start", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;
@@ -242,6 +242,7 @@ void Roode::register_portal_routes_() {
     cal_s.entry_min_threshold = entry->threshold->min; cal_s.entry_max_threshold = entry->threshold->max;
     cal_s.exit_min_threshold  = exit->threshold->min;  cal_s.exit_max_threshold  = exit->threshold->max;
     settings_prefs_.save(&cal_s); global_preferences->sync();
+    publish_threshold_and_roi_states_();
     JsonDocument d; d["ok"] = true; d["emin"] = entry->threshold->min; d["emax"] = entry->threshold->max;
     d["xmin"] = exit->threshold->min; d["xmax"] = exit->threshold->max; d["idle_e"] = entry->threshold->idle; d["idle_x"] = exit->threshold->idle;
     std::string out; serializeJson(d, out); r->send(200, "application/json", out.c_str());
@@ -288,15 +289,40 @@ void Roode::update() {
   }
   if (active_sensors_ & 0x01 && distance_entry) distance_entry->publish_state(entry->getDistance());
   if (active_sensors_ & 0x02 && distance_exit) distance_exit->publish_state(exit->getDistance());
+  if (active_sensors_ & 0x100 && status_sensor) status_sensor->publish_state((float)entry->sensor_status);
+  if (active_sensors_ & 0x800 && interrupt_status_sensor)
+    interrupt_status_sensor->publish_state(distanceSensor && distanceSensor->is_interrupt_enabled() ? 1.0f : 0.0f);
+  // Threshold and ROI sensors update every poll cycle so HA stays in sync with live values
+  if (active_sensors_ & 0x8000) {
+    if (max_threshold_entry_sensor) max_threshold_entry_sensor->publish_state(entry->threshold->max);
+    if (min_threshold_entry_sensor) min_threshold_entry_sensor->publish_state(entry->threshold->min);
+  }
+  if (active_sensors_ & 0x10000) {
+    if (max_threshold_exit_sensor) max_threshold_exit_sensor->publish_state(exit->threshold->max);
+    if (min_threshold_exit_sensor) min_threshold_exit_sensor->publish_state(exit->threshold->min);
+  }
+  if (active_sensors_ & 0x20000) {
+    if (entry_roi_height_sensor) entry_roi_height_sensor->publish_state(entry->roi->height);
+    if (entry_roi_width_sensor) entry_roi_width_sensor->publish_state(entry->roi->width);
+    if (exit_roi_height_sensor) exit_roi_height_sensor->publish_state(exit->roi->height);
+    if (exit_roi_width_sensor) exit_roi_width_sensor->publish_state(exit->roi->width);
+  }
   update_metrics();
 }
 
 void Roode::update_metrics() {
   uint32_t now = millis(); if (now - loop_window_start_ < 10000) return;
-#ifdef CONFIG_IDF_TARGET_ESP32
-  if (active_sensors_ & 0x10 && ram_free_sensor) ram_free_sensor->publish_state((float)ESP.getFreeHeap()/(float)ESP.getHeapSize()*100.0f);
-#endif
   loop_window_start_ = now;
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (active_sensors_ & 0x10 && ram_free_sensor)
+    ram_free_sensor->publish_state((float)ESP.getFreeHeap() / (float)ESP.getHeapSize() * 100.0f);
+  if (active_sensors_ & 0x20 && flash_free_sensor) {
+    uint32_t free_sketch = ESP.getFreeSketchSpace();
+    uint32_t total_sketch = free_sketch + ESP.getSketchSize();
+    if (total_sketch > 0)
+      flash_free_sensor->publish_state((float)free_sketch / (float)total_sketch * 100.0f);
+  }
+#endif
 }
 
 void Roode::loop() {
@@ -304,9 +330,22 @@ void Roode::loop() {
 #ifdef CONFIG_IDF_TARGET_ESP32
     if (presence_update_pending_ && active_sensors_ & 0x04 && presence_sensor) { presence_sensor->publish_state(presence_state_); presence_update_pending_ = false; }
     if (people_counter_update_pending_ && active_sensors_ & 0x08 && people_counter) { auto c = people_counter->make_call(); c.set_value(pending_people_counter_value_); c.perform(); people_counter_update_pending_ = false; }
-    vTaskDelay(pdMS_TO_TICKS(50));
+    // sensor_task handles its own blocking — do not delay the main loop here
 #endif
   } else {
+    // Single-core: run deferred calibration on first iteration (after VL53L1X is ready)
+    if (needs_initial_calibration_ && distanceSensor && !distanceSensor->is_failed()) {
+      needs_initial_calibration_ = false;
+      ESP_LOGI(TAG, "Running initial threshold calibration");
+      recalibration();
+      RoodeSettings cal_s; if (!settings_prefs_.load(&cal_s)) memset(&cal_s, 0, sizeof(cal_s));
+      cal_s.entry_roi_height = entry->roi->height; cal_s.entry_roi_width = entry->roi->width; cal_s.entry_roi_center = entry->roi->center;
+      cal_s.entry_min_threshold = entry->threshold->min; cal_s.entry_max_threshold = entry->threshold->max;
+      cal_s.exit_roi_height = exit->roi->height; cal_s.exit_roi_width = exit->roi->width; cal_s.exit_roi_center = exit->roi->center;
+      cal_s.exit_min_threshold = exit->threshold->min; cal_s.exit_max_threshold = exit->threshold->max;
+      settings_prefs_.save(&cal_s); global_preferences->sync();
+      publish_threshold_and_roi_states_();
+    }
     read_and_track_zone_(entry, true); read_and_track_zone_(exit, false); delay(polling_interval_ms_);
   }
 }
@@ -364,6 +403,20 @@ void Roode::sensor_task(void *p) {
 #ifdef CONFIG_IDF_TARGET_ESP32
   esp_task_wdt_add(nullptr);
 #endif
+  // Run deferred calibration on first iteration: by now VL53L1X setup() has completed
+  if (self->needs_initial_calibration_ && self->distanceSensor && !self->distanceSensor->is_failed()) {
+    self->needs_initial_calibration_ = false;
+    ESP_LOGI(TAG, "Running initial threshold calibration");
+    self->recalibration();
+    RoodeSettings cal_s; if (!self->settings_prefs_.load(&cal_s)) memset(&cal_s, 0, sizeof(cal_s));
+    cal_s.entry_roi_height = self->entry->roi->height; cal_s.entry_roi_width = self->entry->roi->width; cal_s.entry_roi_center = self->entry->roi->center;
+    cal_s.entry_min_threshold = self->entry->threshold->min; cal_s.entry_max_threshold = self->entry->threshold->max;
+    cal_s.exit_roi_height = self->exit->roi->height; cal_s.exit_roi_width = self->exit->roi->width; cal_s.exit_roi_center = self->exit->roi->center;
+    cal_s.exit_min_threshold = self->exit->threshold->min; cal_s.exit_max_threshold = self->exit->threshold->max;
+    self->settings_prefs_.save(&cal_s); global_preferences->sync();
+    self->publish_threshold_and_roi_states_();
+  }
+
   for (;;) {
 #ifdef CONFIG_IDF_TARGET_ESP32
     esp_task_wdt_reset();
@@ -424,5 +477,46 @@ bool Roode::require_portal_auth_(roode_web::AsyncWebServerRequest *r, const char
 }
 void Roode::send_portal_login_(roode_web::AsyncWebServerRequest *r) const { r->send(200, "text/html", portal_login_html); }
 #endif
+
+void Roode::publish_static_states_() {
+  // Publish all static/initial sensor states so HA marks entities as available
+  // immediately. Without an initial publish_state(), HA shows "unavailable".
+  if (version_sensor) version_sensor->publish_state(VERSION);
+  if (status_text_sensor) status_text_sensor->publish_state("Initializing");
+  if (enabled_features_sensor) {
+    std::string f;
+    if (distanceSensor) {
+      if (distanceSensor->is_interrupt_enabled()) f += "interrupt ";
+      if (distanceSensor->get_xshut_state().has_value()) f += "xshut ";
+    }
+    enabled_features_sensor->publish_state(f.empty() ? "none" : f);
+  }
+  if (presence_sensor) presence_sensor->publish_state(false);
+  if (entry_presence_sensor) entry_presence_sensor->publish_state(false);
+  if (exit_presence_sensor) exit_presence_sensor->publish_state(false);
+  if (xshut_state_sensor) xshut_state_sensor->publish_state(false);
+  if (entry_exit_event_sensor) entry_exit_event_sensor->publish_state("");
+  if (manual_adjustment_sensor) manual_adjustment_sensor->publish_state(0);
+  if (interrupt_status_sensor) interrupt_status_sensor->publish_state(0);
+  if (status_sensor) status_sensor->publish_state(0);
+  if (loop_time_sensor) loop_time_sensor->publish_state(0);
+  if (cpu_usage_sensor) cpu_usage_sensor->publish_state(0);
+  if (ram_free_sensor) ram_free_sensor->publish_state(0);
+  if (flash_free_sensor) flash_free_sensor->publish_state(0);
+  if (distance_entry) distance_entry->publish_state(0);
+  if (distance_exit) distance_exit->publish_state(0);
+  if (people_counter) { auto c = people_counter->make_call(); c.set_value(0); c.perform(); }
+}
+
+void Roode::publish_threshold_and_roi_states_() {
+  if (max_threshold_entry_sensor) max_threshold_entry_sensor->publish_state(entry->threshold->max);
+  if (min_threshold_entry_sensor) min_threshold_entry_sensor->publish_state(entry->threshold->min);
+  if (max_threshold_exit_sensor) max_threshold_exit_sensor->publish_state(exit->threshold->max);
+  if (min_threshold_exit_sensor) min_threshold_exit_sensor->publish_state(exit->threshold->min);
+  if (entry_roi_height_sensor) entry_roi_height_sensor->publish_state(entry->roi->height);
+  if (entry_roi_width_sensor) entry_roi_width_sensor->publish_state(entry->roi->width);
+  if (exit_roi_height_sensor) exit_roi_height_sensor->publish_state(exit->roi->height);
+  if (exit_roi_width_sensor) exit_roi_width_sensor->publish_state(exit->roi->width);
+}
 
 } }

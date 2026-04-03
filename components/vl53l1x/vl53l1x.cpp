@@ -175,24 +175,24 @@ VL53L1_Error VL53L1X::init() {
   // 2. Fall back to factory default 0x29 (covers: XShut reset resets sensor to 0x29,
   //    and address_ != 0x29 — the most common recovery scenario).
   if (found_at == 0 && address_ != FACTORY_DEFAULT) {
-    ESP_LOGI(TAG, "Not found at 0x%02X, trying factory default 0x29", address_);
+    ESP_LOGD(TAG, "Not found at 0x%02X, trying factory default 0x29", address_);
     i2c_address_override_ = FACTORY_DEFAULT;
     status = wait_for_boot();
     if (status == VL53L1_ERROR_NONE) {
       found_at = FACTORY_DEFAULT;
-      ESP_LOGI(TAG, "Sensor found at factory default 0x29");
+      ESP_LOGD(TAG, "Sensor found at factory default 0x29");
     }
   }
 
   // 3. If configured for 0x29 but not found, try 0x66 (covers: old firmware relocated
   //    the sensor to 0x66 and the ESP restarted without power-cycling the sensor).
   if (found_at == 0 && address_ == FACTORY_DEFAULT && ALT_ADDR != FACTORY_DEFAULT) {
-    ESP_LOGI(TAG, "Not found at 0x29, trying alternate address 0x%02X", ALT_ADDR);
+    ESP_LOGD(TAG, "Not found at 0x29, trying alternate address 0x%02X", ALT_ADDR);
     i2c_address_override_ = ALT_ADDR;
     status = wait_for_boot();
     if (status == VL53L1_ERROR_NONE) {
       found_at = ALT_ADDR;
-      ESP_LOGI(TAG, "Sensor found at alternate address 0x%02X", ALT_ADDR);
+      ESP_LOGD(TAG, "Sensor found at alternate address 0x%02X", ALT_ADDR);
     }
   }
 
@@ -245,7 +245,7 @@ VL53L1_Error VL53L1X::init() {
       ESP_LOGE(TAG, "Failed to relocate sensor address, error: %d", status);
     } else {
       delay(2);  // Allow sensor time to switch addresses
-      ESP_LOGI(TAG, "Sensor relocated to 0x%02X", address_);
+      ESP_LOGD(TAG, "Sensor relocated to 0x%02X", address_);
     }
   }
 
@@ -278,8 +278,8 @@ VL53L1_Error VL53L1X::apply_runtime_configuration_() {
   }
 
   // Address relocation is handled in init() — skip here to avoid confusion.
-
-  last_roi = nullptr;
+  // Clear cached ROI so it is re-applied after re-initialization.
+  has_last_roi_ = false;
   if (this->ranging_mode != nullptr) {
     status = this->sensor.SetDistanceMode(this->ranging_mode->mode);
     if (status != VL53L1_ERROR_NONE) {
@@ -410,8 +410,8 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
 
   ESP_LOGVV(TAG, "Beginning distance read");
 
-  if (last_roi == nullptr || *roi != *last_roi) {
-    ESP_LOGVV(TAG, "Setting new ROI: { width: %d, height: %d, center: %d }", roi->width, roi->height, roi->center);
+  if (!has_last_roi_ || *roi != last_roi_val_) {
+    ESP_LOGD(TAG, "Applying ROI to sensor: { width: %d, height: %d, center: %d }", roi->width, roi->height, roi->center);
 
     status = this->sensor.SetROI(roi->width, roi->height);
     if (status != VL53L1_ERROR_NONE) {
@@ -425,7 +425,8 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
       record_failure();
       return {};
     }
-    last_roi = roi;
+    last_roi_val_ = *roi;
+    has_last_roi_ = true;
   }
 
   // Decide whether we can use the interrupt pin for this reading
@@ -502,19 +503,13 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     this->sensor.StopRanging();
     if (this->xshut_pin.has_value()) {
       this->xshut_pin.value()->digital_write(false);
-      roode::Roode::log_event("xshut_pulse_off_sensor_" + std::to_string(sensor_id_));
-      roode::Roode::log_event("xshut_pulse_off");
-      ESP_LOGW(TAG, "XShut pin set LOW - resetting sensor");
       delay(100);
       this->xshut_pin.value()->digital_write(true);
-      roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
-      roode::Roode::log_event("xshut_reinitialize");
-      ESP_LOGD(TAG, "XShut pin set HIGH - reset complete");
+      ESP_LOGW(TAG, "Sensor timeout — XShut reset triggered");
       auto recovery_status = this->reinitialize_after_hard_reset_();
       if (recovery_status == VL53L1_ERROR_NONE) {
-        roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
-        roode::Roode::log_event("sensor.recovered_via_xshut");
         recovery_count_++;
+        ESP_LOGD(TAG, "Sensor recovered via XShut (total recoveries: %d)", recovery_count_);
       } else {
         status = recovery_status;
       }

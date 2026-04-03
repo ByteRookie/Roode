@@ -204,6 +204,8 @@ class Roode : public PollingComponent {
   void recalibration();
   void update_metrics();
   void updateCounter(int delta);
+  void publish_static_states_();
+  void publish_threshold_and_roi_states_();
   static void log_event(const std::string &msg);
 
 #ifdef CONFIG_IDF_TARGET_ESP32
@@ -305,6 +307,9 @@ class Roode : public PollingComponent {
   int AllZonesCurrentStatus = 0;
 
   bool force_single_core_{false};
+  // Set when thresholds are zero at boot; calibration is deferred until the
+  // sensor task/loop runs (after VL53L1X setup() has completed).
+  bool needs_initial_calibration_{false};
 #ifdef CONFIG_IDF_TARGET_ESP32
   TaskHandle_t sensor_task_handle_{nullptr};
 #endif

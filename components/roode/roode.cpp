@@ -135,7 +135,7 @@ void Roode::setup() {
 
 #ifdef CONFIG_IDF_TARGET_ESP32
   if (!force_single_core_) {
-    xTaskCreatePinnedToCore(sensor_task, "SensorTask", 4096, this, 1, &sensor_task_handle_, 1);
+    xTaskCreatePinnedToCore(sensor_task, "SensorTask", 8192, this, 1, &sensor_task_handle_, 1);
     if (sensor_task_handle_) use_sensor_task_ = true;
   }
 #endif
@@ -330,6 +330,7 @@ void Roode::loop() {
 #ifdef CONFIG_IDF_TARGET_ESP32
     if (presence_update_pending_ && active_sensors_ & 0x04 && presence_sensor) { presence_sensor->publish_state(presence_state_); presence_update_pending_ = false; }
     if (people_counter_update_pending_ && active_sensors_ & 0x08 && people_counter) { auto c = people_counter->make_call(); c.set_value(pending_people_counter_value_); c.perform(); people_counter_update_pending_ = false; }
+    if (calibration_update_pending_) { calibration_update_pending_ = false; publish_threshold_and_roi_states_(); }
     // sensor_task handles its own blocking — do not delay the main loop here
 #endif
   } else {
@@ -375,13 +376,28 @@ void Roode::path_tracking(Zone *z) {
   int cur = (dist < z->threshold->max && dist > z->threshold->min) ? SOMEONE : NOBODY;
   if (z->id == 0) LeftPreviousStatus = cur; else RightPreviousStatus = cur;
   AllZonesCurrentStatus = (LeftPreviousStatus == SOMEONE ? 1 : 0) + (RightPreviousStatus == SOMEONE ? 2 : 0);
-  if (state_ == STATE_IDLE && AllZonesCurrentStatus != 0) { state_ = STATE_ACTIVE; state_started_ts = millis(); }
+
+  // Per-zone presence sensors (safe to call directly in single-core; skip in sensor_task)
+  if (!use_sensor_task_) {
+    if (z->id == 0 && entry_presence_sensor) entry_presence_sensor->publish_state(cur == SOMEONE);
+    if (z->id == 1 && exit_presence_sensor) exit_presence_sensor->publish_state(cur == SOMEONE);
+  }
+
+  if (state_ == STATE_IDLE && AllZonesCurrentStatus != 0) {
+    state_ = STATE_ACTIVE; state_started_ts = millis();
+    // Someone just entered the doorway — update overall presence
+    if (use_sensor_task_) { presence_state_ = true; presence_update_pending_ = true; }
+    else if (presence_sensor) presence_sensor->publish_state(true);
+  }
   if (AllZonesCurrentStatus == 0) {
     if (PathTrackFillingSize >= 3) {
       if (PathTrack[PathTrackFillingSize-3] == 2 && PathTrack[PathTrackFillingSize-2] == 3 && PathTrack[PathTrackFillingSize-1] == 1) updateCounter(1);
       else if (PathTrack[PathTrackFillingSize-3] == 1 && PathTrack[PathTrackFillingSize-2] == 3 && PathTrack[PathTrackFillingSize-1] == 2) updateCounter(-1);
     }
     PathTrackFillingSize = 0; state_ = STATE_IDLE;
+    // Doorway is clear — clear overall presence
+    if (use_sensor_task_) { presence_state_ = false; presence_update_pending_ = true; }
+    else if (presence_sensor) presence_sensor->publish_state(false);
   } else if (PathTrackFillingSize == 0 || AllZonesCurrentStatus != PathTrack[PathTrackFillingSize - 1]) {
     if (PathTrackFillingSize < 4) PathTrack[PathTrackFillingSize++] = AllZonesCurrentStatus;
   }
@@ -414,7 +430,8 @@ void Roode::sensor_task(void *p) {
     cal_s.exit_roi_height = self->exit->roi->height; cal_s.exit_roi_width = self->exit->roi->width; cal_s.exit_roi_center = self->exit->roi->center;
     cal_s.exit_min_threshold = self->exit->threshold->min; cal_s.exit_max_threshold = self->exit->threshold->max;
     self->settings_prefs_.save(&cal_s); global_preferences->sync();
-    self->publish_threshold_and_roi_states_();
+    // Signal main task (Core 0) to publish — publish_state() is not thread-safe from Core 1
+    self->calibration_update_pending_ = true;
   }
 
   for (;;) {

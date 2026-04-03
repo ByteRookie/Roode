@@ -280,23 +280,28 @@ VL53L1_Error VL53L1X::apply_runtime_configuration_() {
   // Address relocation is handled in init() — skip here to avoid confusion.
   // Clear cached ROI so it is re-applied after re-initialization.
   has_last_roi_ = false;
-  if (this->ranging_mode != nullptr) {
-    status = this->sensor.SetDistanceMode(this->ranging_mode->mode);
+  {
+    // Use user-configured ranging mode, or fall back to Medium (33ms) for reasonable
+    // out-of-the-box performance. Without this, the sensor defaults to ~100ms/measurement.
+    const RangingMode *effective_mode = this->ranging_mode ? this->ranging_mode : Ranging::Medium;
+    status = this->sensor.SetDistanceMode(effective_mode->mode);
     if (status != VL53L1_ERROR_NONE) {
-      ESP_LOGE(TAG, "Could not restore distance mode: %d, error code: %d", this->ranging_mode->mode, status);
+      ESP_LOGE(TAG, "Could not set distance mode: %d, error code: %d", effective_mode->mode, status);
       goto done;
     }
-    status = this->sensor.SetTimingBudgetInMs(this->ranging_mode->timing_budget);
+    status = this->sensor.SetTimingBudgetInMs(effective_mode->timing_budget);
     if (status != VL53L1_ERROR_NONE) {
-      ESP_LOGE(TAG, "Could not restore timing budget: %d ms, error code: %d", this->ranging_mode->timing_budget,
-               status);
+      ESP_LOGE(TAG, "Could not set timing budget: %d ms, error code: %d", effective_mode->timing_budget, status);
       goto done;
     }
-    status = this->sensor.SetInterMeasurementInMs(this->ranging_mode->delay_between_measurements);
+    status = this->sensor.SetInterMeasurementInMs(effective_mode->delay_between_measurements);
     if (status != VL53L1_ERROR_NONE) {
-      ESP_LOGE(TAG, "Could not restore measurement delay: %d ms, error code: %d",
-               this->ranging_mode->delay_between_measurements, status);
+      ESP_LOGE(TAG, "Could not set measurement delay: %d ms, error code: %d",
+               effective_mode->delay_between_measurements, status);
       goto done;
+    }
+    if (!this->ranging_mode) {
+      ESP_LOGI(TAG, "No ranging mode configured — using default Medium (33ms)");
     }
   }
 

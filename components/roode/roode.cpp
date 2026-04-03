@@ -132,7 +132,7 @@ void Roode::update_metrics() {
 void Roode::loop() {
   if (use_sensor_task_) {
     if (presence_update_pending_ && active_sensors_ & 0x04 && presence_sensor) { presence_sensor->publish_state(presence_state_); presence_update_pending_ = false; }
-    if (people_counter_update_pending_ && active_sensors_ & 0x08 && people_counter_sensor) { auto c = people_counter_sensor->make_call(); c.set_value(pending_people_counter_value_); c.perform(); people_counter_update_pending_ = false; }
+    if (people_counter_update_pending_ && active_sensors_ & 0x08 && people_counter) { auto c = people_counter->make_call(); c.set_value(pending_people_counter_value_); c.perform(); people_counter_update_pending_ = false; }
     vTaskDelay(pdMS_TO_TICKS(50));
   } else {
     read_and_track_zone_(entry, true); read_and_track_zone_(exit, false); delay(polling_interval_ms_);
@@ -168,10 +168,10 @@ void Roode::path_tracking(Zone *z) {
 }
 
 void Roode::updateCounter(int d) {
-  if (!people_counter_sensor) return;
-  float nv = people_counter_sensor->state + d;
+  if (!people_counter) return;
+  float nv = people_counter->state + d;
   if (use_sensor_task_) { pending_people_counter_value_ = nv; people_counter_update_pending_ = true; }
-  else { auto c = people_counter_sensor->make_call(); c.set_value(nv); c.perform(); }
+  else { auto c = people_counter->make_call(); c.set_value(nv); c.perform(); }
 }
 
 void Roode::recalibration() { run_zone_calibration(0); run_zone_calibration(1); }

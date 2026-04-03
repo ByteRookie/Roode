@@ -57,6 +57,7 @@ struct RoodeSettings {
 } __attribute__((packed));
 
 enum ScanPhase { PHASE_IDLE, PHASE_EMPTY, PHASE_PERSON };
+enum ScanState { SCAN_IDLE, SCANNING, SCAN_CANCELLED };
 
 struct HistoricalScan {
   uint32_t ts;
@@ -78,7 +79,7 @@ class PortalSwitch : public switch_::Switch, public Component {
 class Roode : public PollingComponent {
  public:
   Roode() { instance_ = this; }
-  ~Roode() { instance_ = nullptr; }
+  ~Roode();
 
   void setup() override;
   void update() override;
@@ -95,9 +96,9 @@ class Roode : public PollingComponent {
     exit->set_max_samples(size);
   }
 
-  void set_distance_entry(sensor::Sensor *s) { distance_entry = s; }
-  void set_distance_exit(sensor::Sensor *s) { distance_exit = s; }
-  void set_people_counter(number::Number *counter) { this->people_counter = counter; }
+  void set_distance_entry(sensor::Sensor *s) { distance_entry_sensor = s; }
+  void set_distance_exit(sensor::Sensor *s) { distance_exit_sensor = s; }
+  void set_people_counter(number::Number *counter) { this->people_counter_sensor = counter; }
   void set_max_threshold_entry_sensor(sensor::Sensor *s) { max_threshold_entry_sensor = s; }
   void set_max_threshold_exit_sensor(sensor::Sensor *s) { max_threshold_exit_sensor = s; }
   void set_min_threshold_entry_sensor(sensor::Sensor *s) { min_threshold_entry_sensor = s; }
@@ -171,9 +172,9 @@ class Roode : public PollingComponent {
   bool invert_direction_{false};
   uint16_t polling_interval_ms_{10};
   
-  sensor::Sensor *distance_entry{nullptr};
-  sensor::Sensor *distance_exit{nullptr};
-  number::Number *people_counter{nullptr};
+  sensor::Sensor *distance_entry_sensor{nullptr};
+  sensor::Sensor *distance_exit_sensor{nullptr};
+  number::Number *people_counter_sensor{nullptr};
   sensor::Sensor *max_threshold_entry_sensor{nullptr};
   sensor::Sensor *max_threshold_exit_sensor{nullptr};
   sensor::Sensor *min_threshold_entry_sensor{nullptr};
@@ -214,6 +215,8 @@ class Roode : public PollingComponent {
   uint8_t filter_window_{5};
 
   ScanPhase scan_phase_{PHASE_IDLE};
+  volatile ScanState scan_state_{SCAN_IDLE};
+  volatile uint8_t scan_progress_{0};
   sensor::Sensor *lux_sensor_{nullptr};
 #ifdef USE_SUN
   sun::Sun *sun_{nullptr};

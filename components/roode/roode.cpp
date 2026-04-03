@@ -505,7 +505,9 @@ void Roode::publish_static_states_() {
   if (flash_free_sensor) flash_free_sensor->publish_state(0);
   if (distance_entry) distance_entry->publish_state(0);
   if (distance_exit) distance_exit->publish_state(0);
-  if (people_counter) { auto c = people_counter->make_call(); c.set_value(0); c.perform(); }
+  // people_counter is a Number — use publish_state directly so it doesn't
+  // trigger side-effects before the component is fully initialized.
+  if (people_counter) people_counter->publish_state(0);
 }
 
 void Roode::publish_threshold_and_roi_states_() {

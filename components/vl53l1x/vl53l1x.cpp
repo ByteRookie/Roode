@@ -131,63 +131,79 @@ int8_t VL53L1X::uld_write_register(uint8_t address, uint16_t register_address, c
   if (this->bus_ == nullptr || len > 64) {
     return 1;
   }
+  uint8_t effective_addr = this->i2c_address_override_ ? this->i2c_address_override_ : address;
   std::array<uint8_t, 66> buffer{};
   buffer[0] = register_address >> 8;
   buffer[1] = register_address & 0xFF;
   if (len > 0) {
     memcpy(buffer.data() + 2, data, len);
   }
-  return this->bus_->write_readv(address, buffer.data(), len + 2, nullptr, 0) == i2c::ERROR_OK ? 0 : 1;
+  return this->bus_->write_readv(effective_addr, buffer.data(), len + 2, nullptr, 0) == i2c::ERROR_OK ? 0 : 1;
 }
 
 int8_t VL53L1X::uld_read_register(uint8_t address, uint16_t register_address, uint8_t *data, size_t len) {
   if (this->bus_ == nullptr || len > 64) {
     return 1;
   }
+  uint8_t effective_addr = this->i2c_address_override_ ? this->i2c_address_override_ : address;
   std::array<uint8_t, 2> buffer{{static_cast<uint8_t>(register_address >> 8), static_cast<uint8_t>(register_address & 0xFF)}};
-  return this->bus_->write_readv(address, buffer.data(), buffer.size(), data, len) == i2c::ERROR_OK ? 0 : 1;
+  return this->bus_->write_readv(effective_addr, buffer.data(), buffer.size(), data, len) == i2c::ERROR_OK ? 0 : 1;
 }
 
 VL53L1_Error VL53L1X::init() {
-  ESP_LOGD(TAG, "Trying to initialize at address 0x%02X", address_);
+  static constexpr uint8_t FACTORY_DEFAULT = 0x29;
+  // Common relocated address used by older firmware versions. If the sensor was previously
+  // moved here and the ESP restarted (without power-cycling the sensor), we need to find it.
+  static constexpr uint8_t ALT_ADDR = 0x66;
 
+  ESP_LOGD(TAG, "Initializing sensor, configured address: 0x%02X", address_);
+
+  // Use the address override mechanism so we control exactly which I2C address the ULD
+  // driver talks to, regardless of its internal cached state.
   VL53L1_Error status;
+  uint8_t found_at = 0;
 
-#ifdef CONFIG_IDF_TARGET_ESP32
-  roode::Roode::i2c_lock();
-#endif
-  uint16_t current_addr = sensor.GetI2CAddress() >> 1;
-#ifdef CONFIG_IDF_TARGET_ESP32
-  roode::Roode::i2c_unlock();
-#endif
-
-  ESP_LOGD(TAG, "Current ULD driver address: 0x%02X", current_addr);
-
-  // Emergency re-addressing: if we expect 0x66 but sensor is at 0x29
-  if (address_ != current_addr) {
-    ESP_LOGD(TAG, "Address mismatch. Checking if sensor is at 0x29...");
-#ifdef CONFIG_IDF_TARGET_ESP32
-    roode::Roode::i2c_lock();
-#endif
-    status = sensor.SetI2CAddress(0x29 << 1); // Try to talk to 0x29
-    if (status == VL53L1_ERROR_NONE) {
-       ESP_LOGI(TAG, "Sensor found at 0x29. Moving to 0x%02X...", address_);
-       status = sensor.SetI2CAddress(address_ << 1);
-    }
-#ifdef CONFIG_IDF_TARGET_ESP32
-    roode::Roode::i2c_unlock();
-#endif
-    if (status != VL53L1_ERROR_NONE) {
-      ESP_LOGW(TAG, "Could not find sensor at 0x%02X or 0x29", address_);
-    }
-  }
-
+  // 1. Try the configured address first (covers: ESP restart with sensor keeping its address,
+  //    or first boot when address_ == 0x29 and sensor is at factory default).
+  i2c_address_override_ = address_;
   status = wait_for_boot();
-  if (status != VL53L1_ERROR_NONE) {
-    return status;
+  if (status == VL53L1_ERROR_NONE) {
+    found_at = address_;
+    ESP_LOGD(TAG, "Sensor found at configured address 0x%02X", address_);
   }
 
-  ESP_LOGD(TAG, "Found device, initializing...");
+  // 2. Fall back to factory default 0x29 (covers: XShut reset resets sensor to 0x29,
+  //    and address_ != 0x29 — the most common recovery scenario).
+  if (found_at == 0 && address_ != FACTORY_DEFAULT) {
+    ESP_LOGI(TAG, "Not found at 0x%02X, trying factory default 0x29", address_);
+    i2c_address_override_ = FACTORY_DEFAULT;
+    status = wait_for_boot();
+    if (status == VL53L1_ERROR_NONE) {
+      found_at = FACTORY_DEFAULT;
+      ESP_LOGI(TAG, "Sensor found at factory default 0x29");
+    }
+  }
+
+  // 3. If configured for 0x29 but not found, try 0x66 (covers: old firmware relocated
+  //    the sensor to 0x66 and the ESP restarted without power-cycling the sensor).
+  if (found_at == 0 && address_ == FACTORY_DEFAULT && ALT_ADDR != FACTORY_DEFAULT) {
+    ESP_LOGI(TAG, "Not found at 0x29, trying alternate address 0x%02X", ALT_ADDR);
+    i2c_address_override_ = ALT_ADDR;
+    status = wait_for_boot();
+    if (status == VL53L1_ERROR_NONE) {
+      found_at = ALT_ADDR;
+      ESP_LOGI(TAG, "Sensor found at alternate address 0x%02X", ALT_ADDR);
+    }
+  }
+
+  if (found_at == 0) {
+    i2c_address_override_ = 0;
+    ESP_LOGE(TAG, "VL53L1X not found at 0x%02X, 0x29, or 0x%02X", address_, ALT_ADDR);
+    return status;  // last non-VL53L1_ERROR_NONE status
+  }
+
+  // Initialize the sensor at the address where it was found.
+  ESP_LOGD(TAG, "Initializing device at 0x%02X", found_at);
 #ifdef CONFIG_IDF_TARGET_ESP32
   roode::Roode::i2c_lock();
 #endif
@@ -195,6 +211,32 @@ VL53L1_Error VL53L1X::init() {
 #ifdef CONFIG_IDF_TARGET_ESP32
   roode::Roode::i2c_unlock();
 #endif
+  if (status != VL53L1_ERROR_NONE) {
+    i2c_address_override_ = 0;
+    ESP_LOGE(TAG, "sensor.Init() failed at 0x%02X, error: %d", found_at, status);
+    return status;
+  }
+
+  // If found at a different address than configured, relocate the sensor.
+  // The override is still active (pointing at found_at), so SetI2CAddress writes to found_at
+  // and the sensor physically moves to address_. The ULD cache also updates.
+  if (found_at != address_) {
+    ESP_LOGI(TAG, "Relocating sensor from 0x%02X to configured address 0x%02X", found_at, address_);
+#ifdef CONFIG_IDF_TARGET_ESP32
+    roode::Roode::i2c_lock();
+#endif
+    status = sensor.SetI2CAddress(address_ << 1);
+#ifdef CONFIG_IDF_TARGET_ESP32
+    roode::Roode::i2c_unlock();
+#endif
+    if (status != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Failed to relocate sensor address, error: %d", status);
+    } else {
+      ESP_LOGI(TAG, "Sensor now at 0x%02X", address_);
+    }
+  }
+
+  i2c_address_override_ = 0;
   return status;
 }
 
@@ -204,18 +246,6 @@ VL53L1_Error VL53L1X::apply_runtime_configuration_() {
 #ifdef CONFIG_IDF_TARGET_ESP32
   roode::Roode::i2c_lock();
 #endif
-  if (desired_address_ != 0x29 && desired_address_ != address_) {
-    status = this->sensor.SetI2CAddress(desired_address_ << 1);
-    if (status == VL53L1_ERROR_NONE) {
-      char buf[5];
-      snprintf(buf, sizeof(buf), "%02X", desired_address_);
-      roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + "_addr = 0x" + std::string(buf));
-    } else {
-      ESP_LOGE(TAG, "Failed to change address. Error: %d", status);
-      goto done;
-    }
-  }
-
   if (this->offset.has_value()) {
     ESP_LOGI(TAG, "Setting offset calibration to %d", this->offset.value());
     status = this->sensor.SetOffsetInMm(this->offset.value());
@@ -233,6 +263,8 @@ VL53L1_Error VL53L1X::apply_runtime_configuration_() {
       goto done;
     }
   }
+
+  // Address relocation is handled in init() — skip here to avoid confusion.
 
   last_roi = nullptr;
   if (this->ranging_mode != nullptr) {

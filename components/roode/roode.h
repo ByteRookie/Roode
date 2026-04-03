@@ -186,6 +186,8 @@ class Roode : public PollingComponent {
   }
   void set_portal_password(const std::string &password) { portal_password_ = password; }
   void set_portal_enabled(bool enabled) { portal_enabled_ = enabled; }
+  void set_counting_enabled(bool enabled) { counting_enabled_ = enabled; }
+  bool is_counting_enabled() const { return counting_enabled_; }
   void set_debug_mode(bool debug) { debug_mode_ = debug; }
   void set_lux_sensor(sensor::Sensor *lux) { lux_sensor_ = lux; }
 #ifdef USE_SUN
@@ -221,6 +223,7 @@ class Roode : public PollingComponent {
   TofSensor *distanceSensor{nullptr};
   switch_::Switch *portal_switch{nullptr};
   bool portal_enabled_{true};
+  bool counting_enabled_{true};
   bool debug_mode_{false};
   uint32_t active_sensors_{0xFFFFFFFF};
   Orientation orientation_{Parallel};

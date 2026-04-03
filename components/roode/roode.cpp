@@ -162,7 +162,7 @@ void Roode::register_portal_routes_() {
     doc["rm"] = distanceSensor ? get_ranging_mode_index(distanceSensor->get_ranging_mode()) : 0;
     doc["debug"] = debug_mode_; doc["sc"] = force_single_core_;
     doc["il"] = invalid_distance_limit_; doc["rt"] = (int)restart_timeout_ms_;
-    doc["m"] = active_sensors_;
+    doc["m"] = active_sensors_; doc["ce"] = counting_enabled_;
     if (lux_sensor_) doc["lux_val"] = lux_sensor_->state;
     doc["ts"] = (time(nullptr) > 1000000);
     doc["erh"] = entry->roi->height; doc["erw"] = entry->roi->width; doc["erc"] = entry->roi->center;
@@ -191,6 +191,7 @@ void Roode::register_portal_routes_() {
     if (r->hasParam("il")) s.invalid_limit = invalid_distance_limit_ = atoi(r->getParam("il")->value().c_str());
     if (r->hasParam("rt")) s.restart_timeout = restart_timeout_ms_ = atoi(r->getParam("rt")->value().c_str());
     if (r->hasParam("m")) s.active_sensors = active_sensors_ = strtoul(r->getParam("m")->value().c_str(), NULL, 10);
+    if (r->hasParam("ce")) counting_enabled_ = (r->getParam("ce")->value() == "true");
 
     // ROI params (apply live and persist)
     if (r->hasParam("erh")) { entry->roi->height = atoi(r->getParam("erh")->value().c_str()); }
@@ -317,6 +318,7 @@ VL53L1_Error Roode::read_and_track_zone_(Zone *zone, bool ut) {
 #ifdef USE_SUN
   if (use_sun_ && sun_ && sun_->elevation->state < 0.0f) return VL53L1_ERROR_NONE;
 #endif
+  if (!counting_enabled_) return VL53L1_ERROR_NONE;
   if (manual_presence_) return VL53L1_ERROR_NONE;
 
 #ifdef CONFIG_IDF_TARGET_ESP32

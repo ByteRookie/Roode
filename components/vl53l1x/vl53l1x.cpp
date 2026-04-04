@@ -405,6 +405,42 @@ void VL53L1X::set_ranging_mode(const RangingMode *mode) {
   ESP_LOGI(TAG, "Set ranging mode: %s", mode->name);
 }
 
+void VL53L1X::start_continuous_ranging() {
+  if (continuous_mode_) return;
+  ScopedActiveSensor scoped(this);
+#ifdef CONFIG_IDF_TARGET_ESP32
+  roode::Roode::i2c_lock();
+#endif
+  auto status = this->sensor.StartRanging();
+#ifdef CONFIG_IDF_TARGET_ESP32
+  roode::Roode::i2c_unlock();
+#endif
+  if (status == VL53L1_ERROR_NONE) {
+    continuous_mode_ = true;
+    ESP_LOGD(TAG, "Continuous ranging started");
+  } else {
+    ESP_LOGE(TAG, "Failed to start continuous ranging, error code: %d", status);
+  }
+}
+
+void VL53L1X::stop_continuous_ranging() {
+  if (!continuous_mode_) return;
+  ScopedActiveSensor scoped(this);
+#ifdef CONFIG_IDF_TARGET_ESP32
+  roode::Roode::i2c_lock();
+#endif
+  auto status = this->sensor.StopRanging();
+#ifdef CONFIG_IDF_TARGET_ESP32
+  roode::Roode::i2c_unlock();
+#endif
+  if (status == VL53L1_ERROR_NONE) {
+    continuous_mode_ = false;
+    ESP_LOGD(TAG, "Continuous ranging stopped");
+  } else {
+    ESP_LOGE(TAG, "Failed to stop continuous ranging, error code: %d", status);
+  }
+}
+
 optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   ScopedActiveSensor scoped(this);
   if (this->is_failed()) {
@@ -449,11 +485,13 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     }
   }
 
-  status = this->sensor.StartRanging();
-  if (status != VL53L1_ERROR_NONE) {
-    ESP_LOGE(TAG, "Failed to start ranging, error code: %d", status);
-    record_failure();
-    return {};
+  if (!continuous_mode_) {
+    status = this->sensor.StartRanging();
+    if (status != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Failed to start ranging, error code: %d", status);
+      record_failure();
+      return {};
+    }
   }
 
   // Wait for measurement ready using interrupt pin when available
@@ -537,11 +575,14 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     record_failure();
     return {};
   }
-  status = this->sensor.StopRanging();
-  if (status != VL53L1_ERROR_NONE) {
-    ESP_LOGE(TAG, "Could not stop ranging, error code: %d", status);
-    record_failure();
-    return {};
+
+  if (!continuous_mode_) {
+    status = this->sensor.StopRanging();
+    if (status != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Could not stop ranging, error code: %d", status);
+      record_failure();
+      return {};
+    }
   }
 
   if (use_int)

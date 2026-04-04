@@ -43,6 +43,7 @@ CONF_ACTIVATE = "activate"
 CONF_DEACTIVATE = "deactivate"
 CONF_PORTAL_PASSWORD = "portal_password"
 CONF_PORTAL = "portal"
+CONF_POLLING_INTERVAL = "polling_interval"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -108,6 +109,7 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_PORTAL_PASSWORD, default=""): cv.string,
+        cv.Optional(CONF_POLLING_INTERVAL, default="10ms"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_PORTAL): switch.switch_schema(roode_ns.class_("PortalSwitch", switch.Switch, cg.Component)).extend(cv.COMPONENT_SCHEMA),
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {
@@ -137,6 +139,7 @@ async def to_code(config: Dict):
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
     cg.add(roode.set_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT]))
     cg.add(roode.set_restart_timeout(config[CONF_RESTART_TIMEOUT]))
+    cg.add(roode.set_polling_interval(config[CONF_POLLING_INTERVAL]))
     cg.add(roode.set_portal_password(config[CONF_PORTAL_PASSWORD]))
     
     # Active sensors bitmask init (all on by default)

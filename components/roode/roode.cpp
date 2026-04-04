@@ -343,6 +343,7 @@ void Roode::loop() {
       settings_prefs_.save(&cal_s); global_preferences->sync();
       publish_threshold_and_roi_states_();
     }
+    if (distanceSensor) distanceSensor->start_continuous_ranging();
     read_and_track_zone_(entry, true); read_and_track_zone_(exit, false); delay(polling_interval_ms_);
   }
 }
@@ -484,6 +485,7 @@ void Roode::sensor_task(void *p) {
       }
       self->scan_state_ = SCAN_IDLE; continue;
     }
+    if (self->distanceSensor) self->distanceSensor->start_continuous_ranging();
     self->read_and_track_zone_(self->entry, true); self->read_and_track_zone_(self->exit, false);
     vTaskDelay(pdMS_TO_TICKS(self->polling_interval_ms_));
   }

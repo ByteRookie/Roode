@@ -120,7 +120,7 @@ struct CalibrationSession {
 
 class Roode : public PollingComponent {
  public:
-  Roode() { instance_ = this; }
+  Roode() : PollingComponent(100) { instance_ = this; }
   ~Roode();
 
   void setup() override;
@@ -132,6 +132,7 @@ class Roode : public PollingComponent {
   void set_tof_sensor(TofSensor *sensor) { distanceSensor = sensor; }
   void set_invert_direction(bool dir) { invert_direction_ = dir; }
   void set_orientation(Orientation val) { orientation_ = val; }
+  void set_polling_interval(uint32_t ms) { polling_interval_ms_ = ms; }
   void set_sampling_size(uint8_t size) {
     samples = size;
     entry->set_max_samples(size);

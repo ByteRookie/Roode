@@ -56,6 +56,8 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   void set_xtalk(uint16_t val) { this->xtalk = val; }
   void set_timeout(uint16_t val) { this->timeout = val; }
   uint16_t get_timeout() const { return timeout; }
+  void start_continuous_ranging();
+  void stop_continuous_ranging();
   static void set_active_sensor(VL53L1X *sensor) { active_sensor_ = sensor; }
   static VL53L1X *get_active_sensor() { return active_sensor_; }
   int8_t uld_write_register(uint8_t address, uint16_t register_address, const uint8_t *data, size_t len);
@@ -74,6 +76,7 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   optional<int16_t> offset{};
   optional<uint16_t> xtalk{};
   uint16_t timeout{};
+  bool continuous_mode_{false};
   // Value-copy of the last ROI pushed to the sensor hardware.
   // A pointer was previously stored here, causing *roi != *last_roi to always
   // return false (same struct address), so portal ROI changes were ignored.

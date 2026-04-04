@@ -706,8 +706,10 @@ void VL53L1X::soft_reset() {
       roode::Roode::log_event("sensor.recovered_via_xshut");
       recovery_count_++;
     } else {
-      ESP_LOGW(TAG, "Reinitialization failed - attempting I2C bus recovery");
-      this->bus_->recover();
+      ESP_LOGW(TAG, "Reinitialization failed - attempting power cycle recovery");
+      this->xshut_pin.value()->digital_write(false);
+      delay(200);
+      this->xshut_pin.value()->digital_write(true);
       delay(50);
       if (this->reinitialize_after_hard_reset_() != VL53L1_ERROR_NONE) {
         this->mark_failed();

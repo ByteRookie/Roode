@@ -333,16 +333,12 @@ VL53L1_Error VL53L1X::wait_for_boot() {
   delayMicroseconds(1200);
 
   uint8_t device_state = 0;
-  VL53L1_Error status;
+  VL53L1_Error status = VL53L1_ERROR_CONTROL_INTERFACE;
   auto start = millis();
   ESP_LOGD(TAG, "Waiting for boot, timeout: %dms", timeout);
   while ((millis() - start) < this->timeout) {
     status = get_device_state(&device_state);
-    if (status != VL53L1_ERROR_NONE) {
-      ESP_LOGE(TAG, "get_device_state failed: %d", status);
-      return status;
-    }
-    if ((device_state & 0x01) == 0x01) {
+    if (status == VL53L1_ERROR_NONE && (device_state & 0x01) == 0x01) {
       ESP_LOGD(TAG, "Finished waiting for boot. Device state: %d", device_state);
       return VL53L1_ERROR_NONE;
     }
@@ -350,8 +346,13 @@ VL53L1_Error VL53L1X::wait_for_boot() {
     delay(1);
   }
 
-  ESP_LOGW(TAG, "Timed out waiting for boot. Current state: %d", device_state);
-  return VL53L1_ERROR_TIME_OUT;
+  if (status != VL53L1_ERROR_NONE) {
+    ESP_LOGD(TAG, "Timed out waiting for boot (I2C error: %d)", status);
+  } else {
+    ESP_LOGW(TAG, "Timed out waiting for boot. Current state: %d", device_state);
+    status = VL53L1_ERROR_TIME_OUT;
+  }
+  return status;
 }
 
 VL53L1_Error VL53L1X::get_device_state(uint8_t *device_state) {
@@ -699,6 +700,7 @@ void VL53L1X::restart() {
     ESP_LOGW(TAG, "XShut pin set LOW - restarting sensor");
     delay(100);
     this->xshut_pin.value()->digital_write(true);
+    delay(10); // Allow sensor time to stabilize
     roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
     roode::Roode::log_event("xshut_reinitialize");
     ESP_LOGD(TAG, "XShut pin set HIGH - restart complete");
@@ -729,6 +731,7 @@ void VL53L1X::soft_reset() {
 
     delay(100);
     this->xshut_pin.value()->digital_write(true);
+    delay(10); // Allow sensor time to stabilize
     roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
     roode::Roode::log_event("xshut_reinitialize");
 

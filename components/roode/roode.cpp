@@ -53,6 +53,8 @@ bool Roode::log_fallback_events_ = false;
 SemaphoreHandle_t Roode::i2c_mutex_ = nullptr;
 #endif
 
+static uint32_t session_id_counter = 1;
+
 static const RangingMode *ranging_modes[] = {
   nullptr, // 0 = Auto
   Ranging::Shortest,
@@ -247,19 +249,24 @@ void Roode::register_portal_routes_() {
     if (!require_portal_auth_(r, "application/json")) return;
     JsonDocument doc; JsonArray arr = doc.to<JsonArray>();
     for (size_t i = 0; i < sessions_.size(); i++) {
-      JsonObject o = arr.add<JsonObject>(); o["id"] = std::to_string(i);
+      JsonObject o = arr.add<JsonObject>(); o["id"] = std::to_string(sessions_[i].id);
       o["bg_lux"] = sessions_[i].background.lux; o["p_lux"] = sessions_[i].person.lux;
       o["complete"] = sessions_[i].complete;
-      char buf[32]; struct tm *tm = localtime((time_t *)&sessions_[i].ts);
-      strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tm); o["date"] = std::string(buf);
+      if (sessions_[i].ts > 1000000) {
+        char buf[32]; struct tm *tm = localtime((time_t *)&sessions_[i].ts);
+        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tm); o["date"] = std::string(buf);
+      } else {
+        o["date"] = "Session #" + std::to_string(sessions_[i].id);
+      }
     }
     std::string out; serializeJson(doc, out); r->send(200, "application/json", out.c_str());
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/scan/delete", [this](roode_web::AsyncWebServerRequest *r) {
     if (!require_portal_auth_(r, "application/json")) return;
     if (r->hasParam("id")) {
-      size_t idx = atoi(r->getParam("id")->value().c_str());
-      if (idx < sessions_.size()) sessions_.erase(sessions_.begin() + idx);
+      uint32_t sid = strtoul(r->getParam("id")->value().c_str(), NULL, 10);
+      auto it = std::remove_if(sessions_.begin(), sessions_.end(), [sid](const CalibrationSession& s){ return s.id == sid; });
+      sessions_.erase(it, sessions_.end());
     }
     r->send(200, "application/json", "{\"ok\":true}");
   }));
@@ -343,7 +350,6 @@ void Roode::loop() {
       settings_prefs_.save(&cal_s); global_preferences->sync();
       publish_threshold_and_roi_states_();
     }
-    if (distanceSensor) distanceSensor->start_continuous_ranging();
     read_and_track_zone_(entry, true); read_and_track_zone_(exit, false); delay(polling_interval_ms_);
   }
 }
@@ -470,7 +476,7 @@ void Roode::sensor_task(void *p) {
       }
       
       if (self->scan_phase_ == PHASE_EMPTY) {
-        self->active_session_.ts = h.ts; self->active_session_.background = h; self->active_session_.complete = false;
+        self->active_session_.id = session_id_counter++; self->active_session_.ts = h.ts; self->active_session_.background = h; self->active_session_.complete = false;
       } else if (self->scan_phase_ == PHASE_PERSON) {
         self->active_session_.person = h; self->active_session_.complete = true;
         self->sessions_.push_back(self->active_session_);
@@ -485,7 +491,6 @@ void Roode::sensor_task(void *p) {
       }
       self->scan_state_ = SCAN_IDLE; continue;
     }
-    if (self->distanceSensor) self->distanceSensor->start_continuous_ranging();
     self->read_and_track_zone_(self->entry, true); self->read_and_track_zone_(self->exit, false);
     vTaskDelay(pdMS_TO_TICKS(self->polling_interval_ms_));
   }

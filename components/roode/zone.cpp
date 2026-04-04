@@ -26,6 +26,9 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
   uint16_t dist_to_filter;
   if (!result.has_value() || sensor_status != VL53L1_ERROR_NONE) {
     dist_to_filter = threshold->idle;
+    if (debug_mode_) {
+      ESP_LOGD(TAG, "Zone %d: read failed (status %d), falling back to idle %dmm", id, (int)sensor_status, dist_to_filter);
+    }
   } else {
     last_distance = result.value();
     dist_to_filter = result.value();
@@ -33,6 +36,9 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
 
   // If the sensor is out of range, feed the baseline idle distance into the filter so it clears out
   if (dist_to_filter > 4000 || dist_to_filter == 0) {
+    if (debug_mode_ && dist_to_filter == 0) {
+      ESP_LOGD(TAG, "Zone %d: read 0mm, falling back to idle %dmm", id, threshold->idle);
+    }
     dist_to_filter = threshold->idle;
   }
 

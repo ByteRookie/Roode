@@ -112,6 +112,7 @@ class PortalSwitch : public switch_::Switch, public Component {
 };
 
 struct CalibrationSession {
+  uint32_t id;
   uint32_t ts;
   HistoricalScan background;
   HistoricalScan person;

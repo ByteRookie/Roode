@@ -304,6 +304,7 @@ class Roode : public PollingComponent {
   enum FSMState { STATE_IDLE, STATE_ACTIVE };
   FSMState state_{STATE_IDLE};
   uint32_t state_started_ts{0};
+  uint32_t last_state_change_ts_{0};
   int PathTrack[16];
   int PathTrackFillingSize = 0;
   int LeftPreviousStatus = NOBODY;

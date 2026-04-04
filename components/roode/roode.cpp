@@ -310,25 +310,53 @@ void Roode::update() {
     float sum = 0; for (float f : rolling_lux_) sum += f;
     lux_avg_ = sum / rolling_lux_.size();
   }
-  if (active_sensors_ & 0x01 && distance_entry) distance_entry->publish_state(entry->getDistance());
-  if (active_sensors_ & 0x02 && distance_exit) distance_exit->publish_state(exit->getDistance());
-  if (active_sensors_ & 0x100 && status_sensor) status_sensor->publish_state((float)entry->sensor_status);
-  if (active_sensors_ & 0x800 && interrupt_status_sensor)
-    interrupt_status_sensor->publish_state(distanceSensor && distanceSensor->is_interrupt_enabled() ? 1.0f : 0.0f);
+  
+  if (distance_entry) {
+    if (active_sensors_ & 0x01) distance_entry->publish_state(entry->getDistance());
+    else if (!std::isnan(distance_entry->state)) distance_entry->publish_state(NAN);
+  }
+  if (distance_exit) {
+    if (active_sensors_ & 0x02) distance_exit->publish_state(exit->getDistance());
+    else if (!std::isnan(distance_exit->state)) distance_exit->publish_state(NAN);
+  }
+  if (status_sensor) {
+    if (active_sensors_ & 0x100) status_sensor->publish_state((float)entry->sensor_status);
+    else if (!std::isnan(status_sensor->state)) status_sensor->publish_state(NAN);
+  }
+  if (interrupt_status_sensor) {
+    if (active_sensors_ & 0x800) interrupt_status_sensor->publish_state(distanceSensor && distanceSensor->is_interrupt_enabled() ? 1.0f : 0.0f);
+    else if (!std::isnan(interrupt_status_sensor->state)) interrupt_status_sensor->publish_state(NAN);
+  }
+
   // Threshold and ROI sensors update every poll cycle so HA stays in sync with live values
-  if (active_sensors_ & 0x8000) {
-    if (max_threshold_entry_sensor) max_threshold_entry_sensor->publish_state(entry->threshold->max);
-    if (min_threshold_entry_sensor) min_threshold_entry_sensor->publish_state(entry->threshold->min);
+  if (max_threshold_entry_sensor) {
+    if (active_sensors_ & 0x8000) max_threshold_entry_sensor->publish_state(entry->threshold->max);
+    else if (!std::isnan(max_threshold_entry_sensor->state)) max_threshold_entry_sensor->publish_state(NAN);
   }
-  if (active_sensors_ & 0x10000) {
-    if (max_threshold_exit_sensor) max_threshold_exit_sensor->publish_state(exit->threshold->max);
-    if (min_threshold_exit_sensor) min_threshold_exit_sensor->publish_state(exit->threshold->min);
+  if (min_threshold_entry_sensor) {
+    if (active_sensors_ & 0x8000) min_threshold_entry_sensor->publish_state(entry->threshold->min);
+    else if (!std::isnan(min_threshold_entry_sensor->state)) min_threshold_entry_sensor->publish_state(NAN);
   }
+  
+  if (max_threshold_exit_sensor) {
+    if (active_sensors_ & 0x10000) max_threshold_exit_sensor->publish_state(exit->threshold->max);
+    else if (!std::isnan(max_threshold_exit_sensor->state)) max_threshold_exit_sensor->publish_state(NAN);
+  }
+  if (min_threshold_exit_sensor) {
+    if (active_sensors_ & 0x10000) min_threshold_exit_sensor->publish_state(exit->threshold->min);
+    else if (!std::isnan(min_threshold_exit_sensor->state)) min_threshold_exit_sensor->publish_state(NAN);
+  }
+
   if (active_sensors_ & 0x20000) {
     if (entry_roi_height_sensor) entry_roi_height_sensor->publish_state(entry->roi->height);
     if (entry_roi_width_sensor) entry_roi_width_sensor->publish_state(entry->roi->width);
     if (exit_roi_height_sensor) exit_roi_height_sensor->publish_state(exit->roi->height);
     if (exit_roi_width_sensor) exit_roi_width_sensor->publish_state(exit->roi->width);
+  } else {
+    if (entry_roi_height_sensor && !std::isnan(entry_roi_height_sensor->state)) entry_roi_height_sensor->publish_state(NAN);
+    if (entry_roi_width_sensor && !std::isnan(entry_roi_width_sensor->state)) entry_roi_width_sensor->publish_state(NAN);
+    if (exit_roi_height_sensor && !std::isnan(exit_roi_height_sensor->state)) exit_roi_height_sensor->publish_state(NAN);
+    if (exit_roi_width_sensor && !std::isnan(exit_roi_width_sensor->state)) exit_roi_width_sensor->publish_state(NAN);
   }
   update_metrics();
 }
@@ -337,13 +365,18 @@ void Roode::update_metrics() {
   uint32_t now = millis(); if (now - loop_window_start_ < 10000) return;
   loop_window_start_ = now;
 #ifdef CONFIG_IDF_TARGET_ESP32
-  if (active_sensors_ & 0x10 && ram_free_sensor)
-    ram_free_sensor->publish_state((float)ESP.getFreeHeap() / (float)ESP.getHeapSize() * 100.0f);
-  if (active_sensors_ & 0x20 && flash_free_sensor) {
-    uint32_t free_sketch = ESP.getFreeSketchSpace();
-    uint32_t total_sketch = free_sketch + ESP.getSketchSize();
-    if (total_sketch > 0)
-      flash_free_sensor->publish_state((float)free_sketch / (float)total_sketch * 100.0f);
+  if (ram_free_sensor) {
+    if (active_sensors_ & 0x10) ram_free_sensor->publish_state((float)ESP.getFreeHeap() / (float)ESP.getHeapSize() * 100.0f);
+    else if (!std::isnan(ram_free_sensor->state)) ram_free_sensor->publish_state(NAN);
+  }
+  if (flash_free_sensor) {
+    if (active_sensors_ & 0x20) {
+      uint32_t free_sketch = ESP.getFreeSketchSpace();
+      uint32_t total_sketch = free_sketch + ESP.getSketchSize();
+      if (total_sketch > 0) flash_free_sensor->publish_state((float)free_sketch / (float)total_sketch * 100.0f);
+    } else if (!std::isnan(flash_free_sensor->state)) {
+      flash_free_sensor->publish_state(NAN);
+    }
   }
 #endif
 }
@@ -351,12 +384,20 @@ void Roode::update_metrics() {
 void Roode::loop() {
   if (use_sensor_task_) {
 #ifdef CONFIG_IDF_TARGET_ESP32
-    if (presence_update_pending_ && active_sensors_ & 0x04 && presence_sensor) { presence_sensor->publish_state(presence_state_); presence_update_pending_ = false; }
+    if (presence_update_pending_ && presence_sensor) {
+      if (active_sensors_ & 0x04) presence_sensor->publish_state(presence_state_);
+      else if (!std::isnan(presence_sensor->state)) presence_sensor->publish_state(NAN);
+      presence_update_pending_ = false;
+    }
     if (people_counter_delta_ != 0 && people_counter) {
       int d = people_counter_delta_.exchange(0);
-      float cur = std::isnan(people_counter->state) ? 0.0f : people_counter->state;
-      ESP_LOGD(TAG, "Processing counter delta: %d, current: %f, new: %f", d, cur, cur + d);
-      auto c = people_counter->make_call(); c.set_value(cur + d); c.perform();
+      if (active_sensors_ & 0x08) {
+        float cur = std::isnan(people_counter->state) ? 0.0f : people_counter->state;
+        ESP_LOGD(TAG, "Processing counter delta: %d, current: %f, new: %f", d, cur, cur + d);
+        auto c = people_counter->make_call(); c.set_value(cur + d); c.perform();
+      } else if (!std::isnan(people_counter->state)) {
+        people_counter->publish_state(NAN);
+      }
     }
     if (direction_event_pending_ && entry_exit_event_sensor) {
       entry_exit_event_sensor->publish_state(pending_direction_event_);
@@ -423,10 +464,15 @@ void Roode::path_tracking(Zone *z) {
   }
 
   if (state_ == STATE_IDLE && AllZonesCurrentStatus != 0) {
-    state_ = STATE_ACTIVE; state_started_ts = millis();
+    state_ = STATE_ACTIVE; state_started_ts = last_state_change_ts_ = millis();
     // Someone just entered the doorway — update overall presence
     if (use_sensor_task_) { presence_state_ = true; presence_update_pending_ = true; }
     else if (presence_sensor) presence_sensor->publish_state(true);
+  }
+
+  if (state_ == STATE_ACTIVE && (millis() - last_state_change_ts_ > 5000)) {
+    ESP_LOGW(TAG, "Active state timeout — forcing reset to idle");
+    AllZonesCurrentStatus = 0; // Force logic to clear
   }
 
   if (AllZonesCurrentStatus == 0) {
@@ -497,6 +543,7 @@ void Roode::path_tracking(Zone *z) {
       else if (presence_sensor) presence_sensor->publish_state(false);
     }
   } else if (PathTrackFillingSize == 0 || AllZonesCurrentStatus != PathTrack[PathTrackFillingSize - 1]) {
+    last_state_change_ts_ = millis();
     if (PathTrackFillingSize < 16) PathTrack[PathTrackFillingSize++] = AllZonesCurrentStatus;
   }
 }

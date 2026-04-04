@@ -335,8 +335,9 @@ VL53L1_Error VL53L1X::wait_for_boot() {
   uint8_t device_state = 0;
   VL53L1_Error status = VL53L1_ERROR_CONTROL_INTERFACE;
   auto start = millis();
-  ESP_LOGD(TAG, "Waiting for boot, timeout: %dms", timeout);
-  while ((millis() - start) < this->timeout) {
+  uint16_t effective_timeout = this->timeout ? this->timeout : 250;
+  ESP_LOGD(TAG, "Waiting for boot, timeout: %dms", effective_timeout);
+  while ((millis() - start) < effective_timeout) {
     status = get_device_state(&device_state);
     if (status == VL53L1_ERROR_NONE && (device_state & 0x01) == 0x01) {
       ESP_LOGD(TAG, "Finished waiting for boot. Device state: %d", device_state);
@@ -486,7 +487,8 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     initial_state = this->interrupt_pin.value()->digital_read();
   }
   auto start_time = millis();
-  while (!dataReady && (millis() - start_time) < this->timeout) {
+  uint16_t effective_timeout = this->timeout ? this->timeout : 250;
+  while (!dataReady && (millis() - start_time) < effective_timeout) {
     if (use_int) {
       if (this->interrupt_pin.value()->digital_read() != initial_state) {
         dataReady = true;
@@ -518,7 +520,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     }
     // Fallback to polling for this measurement
     start_time = millis();
-    while (!dataReady && (millis() - start_time) < this->timeout) {
+    while (!dataReady && (millis() - start_time) < effective_timeout) {
       status = this->sensor.CheckForDataReady(&dataReady);
       if (status != VL53L1_ERROR_NONE) {
         ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
@@ -559,8 +561,13 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   // Get the results
   uint16_t distance;
   status = this->sensor.GetDistanceInMm(&distance);
-  if (status != VL53L1_ERROR_NONE) {
-    ESP_LOGE(TAG, "Could not get distance, error code: %d", status);
+  if (status != VL53L1_ERROR_NONE || distance == 0 || distance == 65535) {
+    if (status == VL53L1_ERROR_NONE) {
+      ESP_LOGD(TAG, "Invalid distance read: %dmm", distance);
+      status = VL53L1_ERROR_UNDEFINED;
+    } else {
+      ESP_LOGE(TAG, "Could not get distance, error code: %d", status);
+    }
     record_failure();
 #ifdef CONFIG_IDF_TARGET_ESP32
     roode::Roode::i2c_unlock();

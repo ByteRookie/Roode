@@ -92,12 +92,12 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.declare_id(Roode),
         cv.GenerateID(CONF_SENSOR): cv.use_id(VL53L1X),
         cv.Optional(CONF_ORIENTATION, default="parallel"): cv.enum(ORIENTATION_VALUES),
-        cv.Optional(CONF_SAMPLING, default=2): cv.All(cv.uint8_t, cv.Range(min=1)),
+        cv.Optional(CONF_SAMPLING, default=1): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_ROI, default={}): ROI_SCHEMA,
         cv.Optional(CONF_DETECTION_THRESHOLDS, default={}): THRESHOLDS_SCHEMA,
         cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=False): cv.boolean,
         cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(FILTER_MODES, upper=False),
-        cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
+        cv.Optional(CONF_FILTER_WINDOW, default=1): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_LOG_FALLBACK, default=False): cv.boolean,
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
         cv.Optional(CONF_INVALID_DISTANCE_LIMIT, default=10): cv.All(cv.uint8_t, cv.Range(min=1)),
@@ -109,7 +109,7 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_PORTAL_PASSWORD, default=""): cv.string,
-        cv.Optional(CONF_POLLING_INTERVAL, default="10ms"): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_POLLING_INTERVAL, default="1ms"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_PORTAL): switch.switch_schema(roode_ns.class_("PortalSwitch", switch.Switch, cg.Component)).extend(cv.COMPONENT_SCHEMA),
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {

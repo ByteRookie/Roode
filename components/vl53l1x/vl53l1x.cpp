@@ -417,15 +417,9 @@ void VL53L1X::stop_continuous_ranging() {
 
 optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   ScopedActiveSensor scoped(this);
-#ifdef CONFIG_IDF_TARGET_ESP32
-  if (!roode::Roode::i2c_lock()) return {};
-#endif
   if (this->is_failed()) {
     ESP_LOGW(TAG, "Cannot read distance while component is failed");
     record_failure();
-#ifdef CONFIG_IDF_TARGET_ESP32
-    roode::Roode::i2c_unlock();
-#endif
     return {};
   }
 
@@ -433,27 +427,24 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
 
   if (!has_last_roi_ || *roi != last_roi_val_) {
     ESP_LOGV(TAG, "Applying ROI to sensor: { width: %d, height: %d, center: %d }", roi->width, roi->height, roi->center);
-
+#ifdef CONFIG_IDF_TARGET_ESP32
+    if (!roode::Roode::i2c_lock()) return {};
+#endif
     status = this->sensor.SetROI(roi->width, roi->height);
-    if (status != VL53L1_ERROR_NONE) {
-      ESP_LOGE(TAG, "Could not set ROI width/height, error code: %d", status);
-      record_failure();
-#ifdef CONFIG_IDF_TARGET_ESP32
-      roode::Roode::i2c_unlock();
-#endif
-      return {};
+    if (status == VL53L1_ERROR_NONE) {
+      status = this->sensor.SetROICenter(roi->center);
     }
-    status = this->sensor.SetROICenter(roi->center);
-    if (status != VL53L1_ERROR_NONE) {
-      ESP_LOGE(TAG, "Could not set ROI center, error code: %d", status);
-      record_failure();
 #ifdef CONFIG_IDF_TARGET_ESP32
-      roode::Roode::i2c_unlock();
+    roode::Roode::i2c_unlock();
 #endif
+    if (status != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Could not set ROI, error code: %d", status);
+      record_failure();
       return {};
     }
     last_roi_val_ = *roi;
     has_last_roi_ = true;
+    delay(2); // Small stabilization delay after ROI change
   }
 
   // Decide whether we can use the interrupt pin for this reading
@@ -471,13 +462,16 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     }
   }
 
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (!roode::Roode::i2c_lock()) return {};
+#endif
   status = this->sensor.StartRanging();
+#ifdef CONFIG_IDF_TARGET_ESP32
+  roode::Roode::i2c_unlock();
+#endif
   if (status != VL53L1_ERROR_NONE) {
     ESP_LOGE(TAG, "Failed to start ranging, error code: %d", status);
     record_failure();
-#ifdef CONFIG_IDF_TARGET_ESP32
-    roode::Roode::i2c_unlock();
-#endif
     return {};
   }
 
@@ -494,17 +488,20 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
         dataReady = true;
       }
     } else {
+#ifdef CONFIG_IDF_TARGET_ESP32
+      roode::Roode::i2c_lock();
+#endif
       status = this->sensor.CheckForDataReady(&dataReady);
+#ifdef CONFIG_IDF_TARGET_ESP32
+      roode::Roode::i2c_unlock();
+#endif
       if (status != VL53L1_ERROR_NONE) {
         ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
         record_failure();
-#ifdef CONFIG_IDF_TARGET_ESP32
-        roode::Roode::i2c_unlock();
-#endif
         return {};
       }
     }
-    delay(1);
+    if (!dataReady) delay(1);
     App.feed_wdt();
   }
   if (use_int && !dataReady) {
@@ -521,27 +518,37 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     // Fallback to polling for this measurement
     start_time = millis();
     while (!dataReady && (millis() - start_time) < effective_timeout) {
+#ifdef CONFIG_IDF_TARGET_ESP32
+      roode::Roode::i2c_lock();
+#endif
       status = this->sensor.CheckForDataReady(&dataReady);
+#ifdef CONFIG_IDF_TARGET_ESP32
+      roode::Roode::i2c_unlock();
+#endif
       if (status != VL53L1_ERROR_NONE) {
         ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
         record_failure();
-#ifdef CONFIG_IDF_TARGET_ESP32
-        roode::Roode::i2c_unlock();
-#endif
         return {};
       }
-      delay(1);
+      if (!dataReady) delay(1);
       App.feed_wdt();
     }
   }
   if (!dataReady) {
     ESP_LOGW(TAG, "Timed out waiting for measurement ready");
     status = VL53L1_ERROR_TIME_OUT;
+#ifdef CONFIG_IDF_TARGET_ESP32
+    roode::Roode::i2c_lock();
+#endif
     this->sensor.StopRanging();
+#ifdef CONFIG_IDF_TARGET_ESP32
+    roode::Roode::i2c_unlock();
+#endif
     if (this->xshut_pin.has_value()) {
       this->xshut_pin.value()->digital_write(false);
       delay(100);
       this->xshut_pin.value()->digital_write(true);
+      delay(10);
       ESP_LOGW(TAG, "Sensor timeout — XShut reset triggered");
       auto recovery_status = this->reinitialize_after_hard_reset_();
       if (recovery_status == VL53L1_ERROR_NONE) {
@@ -552,52 +559,42 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
       }
     }
     record_failure();
-#ifdef CONFIG_IDF_TARGET_ESP32
-    roode::Roode::i2c_unlock();
-#endif
     return {};
   }
 
   // Get the results
   uint16_t distance;
+#ifdef CONFIG_IDF_TARGET_ESP32
+  roode::Roode::i2c_lock();
+#endif
   status = this->sensor.GetDistanceInMm(&distance);
+  ERangeStatus rs = RangeValid;
+  if (status == VL53L1_ERROR_NONE) {
+    this->sensor.GetRangeStatus(&rs);
+  }
+  status = this->sensor.ClearInterrupt();
+  VL53L1_Error stop_status = this->sensor.StopRanging();
+#ifdef CONFIG_IDF_TARGET_ESP32
+  roode::Roode::i2c_unlock();
+#endif
+
   if (status != VL53L1_ERROR_NONE || distance == 0 || distance == 65535) {
     if (status == VL53L1_ERROR_NONE) {
-      ESP_LOGD(TAG, "Invalid distance read: %dmm", distance);
+      ESP_LOGD(TAG, "Invalid distance read: %dmm (range status %d)", distance, (int)rs);
       status = VL53L1_ERROR_UNDEFINED;
     } else {
-      ESP_LOGE(TAG, "Could not get distance, error code: %d", status);
+      ESP_LOGE(TAG, "Could not get distance results, error code: %d", status);
     }
     record_failure();
-#ifdef CONFIG_IDF_TARGET_ESP32
-    roode::Roode::i2c_unlock();
-#endif
     return {};
   }
 
-  ERangeStatus rs; this->sensor.GetRangeStatus(&rs);
-  if (rs != RangeValid) {
+  if (rs != RangeValid && rs != RangeValidNoWrapCheck) {
     ESP_LOGV(TAG, "Range status: %d (distance: %dmm)", (int)rs, distance);
   }
 
-  // After reading the results reset the interrupt to be able to take another measurement
-  status = this->sensor.ClearInterrupt();
-  if (status != VL53L1_ERROR_NONE) {
-    ESP_LOGE(TAG, "Could not clear interrupt, error code: %d", status);
-    record_failure();
-#ifdef CONFIG_IDF_TARGET_ESP32
-    roode::Roode::i2c_unlock();
-#endif
-    return {};
-  }
-  status = this->sensor.StopRanging();
-  if (status != VL53L1_ERROR_NONE) {
-    ESP_LOGE(TAG, "Could not stop ranging, error code: %d", status);
-    record_failure();
-#ifdef CONFIG_IDF_TARGET_ESP32
-    roode::Roode::i2c_unlock();
-#endif
-    return {};
+  if (stop_status != VL53L1_ERROR_NONE) {
+    ESP_LOGE(TAG, "Could not stop ranging, error code: %d", stop_status);
   }
 
   if (use_int)
@@ -605,9 +602,6 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
 
   ESP_LOGD(TAG, "Finished distance read: %dmm", distance);
   consecutive_failures_ = 0;
-#ifdef CONFIG_IDF_TARGET_ESP32
-  roode::Roode::i2c_unlock();
-#endif
   return {distance};
 }
 

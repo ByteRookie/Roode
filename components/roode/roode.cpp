@@ -290,7 +290,14 @@ void Roode::register_portal_routes_() {
     std::string out; serializeJson(d, out); r->send(200, "application/json", out.c_str());
   }));
   base->add_handler_without_auth(new LambdaRequestHandler(HTTP_POST, "/api/roi/apply", [this](roode_web::AsyncWebServerRequest *r) {
-    entry->roi->center = exit->roi->center = recommended_settings_.entry_roi_center;
+    uint8_t c = recommended_settings_.entry_roi_center;
+    if (orientation_ == Parallel) {
+      entry->roi->center = (c >= 16) ? c - 16 : c;
+      exit->roi->center = (c <= 239) ? c + 16 : c;
+    } else {
+      entry->roi->center = (c % 16 > 0) ? c - 1 : c;
+      exit->roi->center = (c % 16 < 15) ? c + 1 : c;
+    }
     entry->threshold->max = exit->threshold->max = recommended_settings_.entry_max_threshold;
     recalibration();
     RoodeSettings s; if (!settings_prefs_.load(&s)) memset(&s, 0, sizeof(s));
@@ -400,7 +407,8 @@ void Roode::loop() {
       }
     }
     if (direction_event_pending_ && entry_exit_event_sensor) {
-      entry_exit_event_sensor->publish_state(pending_direction_event_);
+      if (active_sensors_ & 0x08) entry_exit_event_sensor->publish_state(pending_direction_event_);
+      else entry_exit_event_sensor->publish_state("Disabled");
       direction_event_pending_ = false;
     }
     if (calibration_update_pending_) { calibration_update_pending_ = false; publish_threshold_and_roi_states_(); }

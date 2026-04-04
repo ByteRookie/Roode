@@ -596,7 +596,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   if (use_int)
     interrupt_miss_count_ = 0;
 
-  ESP_LOGV(TAG, "Finished distance read: %dmm", distance);
+  ESP_LOGD(TAG, "Finished distance read: %dmm", distance);
   consecutive_failures_ = 0;
 #ifdef CONFIG_IDF_TARGET_ESP32
   roode::Roode::i2c_unlock();

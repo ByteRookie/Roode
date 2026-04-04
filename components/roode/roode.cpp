@@ -356,10 +356,16 @@ void Roode::loop() {
 
 VL53L1_Error Roode::read_and_track_zone_(Zone *zone, bool ut) {
   if (use_lux_ && lux_sensor_ && !std::isnan(lux_sensor_->state)) {
-    if (lux_sensor_->state < (lux_avg_ * 0.5f)) return VL53L1_ERROR_NONE;
+    if (lux_sensor_->state < (lux_avg_ * 0.5f)) {
+      ESP_LOGD(TAG, "Skipping measurement: lux too low (%f < %f)", lux_sensor_->state, lux_avg_ * 0.5f);
+      return VL53L1_ERROR_NONE;
+    }
   }
 #ifdef USE_SUN
-  if (use_sun_ && sun_ && sun_->elevation->state < 0.0f) return VL53L1_ERROR_NONE;
+  if (use_sun_ && sun_ && sun_->elevation->state < 0.0f) {
+    ESP_LOGD(TAG, "Skipping measurement: sun elevation below horizon (%f)", sun_->elevation->state);
+    return VL53L1_ERROR_NONE;
+  }
 #endif
   if (!counting_enabled_) return VL53L1_ERROR_NONE;
   if (manual_presence_) return VL53L1_ERROR_NONE;

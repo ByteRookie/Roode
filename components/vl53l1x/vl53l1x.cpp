@@ -151,6 +151,9 @@ int8_t VL53L1X::uld_read_register(uint8_t address, uint16_t register_address, ui
 }
 
 VL53L1_Error VL53L1X::init() {
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (!roode::Roode::i2c_lock()) return VL53L1_ERROR_CONTROL_INTERFACE;
+#endif
   static constexpr uint8_t FACTORY_DEFAULT = 0x29;
   // Common relocated address used by older firmware versions. If the sensor was previously
   // moved here and the ESP restarted (without power-cycling the sensor), we need to find it.
@@ -199,48 +202,31 @@ VL53L1_Error VL53L1X::init() {
   if (found_at == 0) {
     i2c_address_override_ = 0;
     ESP_LOGE(TAG, "VL53L1X not found at 0x%02X, 0x29, or 0x%02X", address_, ALT_ADDR);
+#ifdef CONFIG_IDF_TARGET_ESP32
+    roode::Roode::i2c_unlock();
+#endif
     return status;  // last non-VL53L1_ERROR_NONE status
   }
 
   // Initialize the sensor at the address where it was found.
   ESP_LOGD(TAG, "Initializing device at 0x%02X", found_at);
-#ifdef CONFIG_IDF_TARGET_ESP32
-  roode::Roode::i2c_lock();
-#endif
   status = sensor.Init();
-#ifdef CONFIG_IDF_TARGET_ESP32
-  roode::Roode::i2c_unlock();
-#endif
   if (status != VL53L1_ERROR_NONE) {
     i2c_address_override_ = 0;
     ESP_LOGE(TAG, "sensor.Init() failed at 0x%02X, error: %d", found_at, status);
+#ifdef CONFIG_IDF_TARGET_ESP32
+    roode::Roode::i2c_unlock();
+#endif
     return status;
   }
 
   // If found at a different address than configured, relocate the sensor.
-  // The override is still active (pointing at found_at).
-  //
-  // IMPORTANT: VL53L1X_ULD._i2c_address defaults to 0x52 (= 0x29 << 1).
-  // SetI2CAddress() has an early-exit: "if (new_address == _i2c_address) return OK".
-  // Calling SetI2CAddress(address_ << 1 = 0x52) would hit this guard and do nothing —
-  // the sensor stays at found_at and the override gets cleared → all I/O fails with -13.
-  //
-  // Fix: first sync the ULD's cache to found_at by calling SetI2CAddress(found_at << 1).
-  // That call won't early-exit (found_at<<1 != 0x52 when found_at=0x66).
-  // It writes "stay at found_at" to the hardware (no-op), but advances _i2c_address to found_at<<1.
-  // Now SetI2CAddress(address_ << 1) won't early-exit either, and actually relocates the sensor.
   if (found_at != address_) {
     ESP_LOGI(TAG, "Relocating sensor from 0x%02X to configured address 0x%02X", found_at, address_);
-#ifdef CONFIG_IDF_TARGET_ESP32
-    roode::Roode::i2c_lock();
-#endif
-    // Step 1: sync ULD cache → found_at (override still = found_at, so writes go to found_at)
+    // Step 1: sync ULD cache → found_at
     sensor.SetI2CAddress(found_at << 1);
     // Step 2: now relocate the sensor from found_at to address_
     status = sensor.SetI2CAddress(address_ << 1);
-#ifdef CONFIG_IDF_TARGET_ESP32
-    roode::Roode::i2c_unlock();
-#endif
     if (status != VL53L1_ERROR_NONE) {
       ESP_LOGE(TAG, "Failed to relocate sensor address, error: %d", status);
     } else {
@@ -250,6 +236,9 @@ VL53L1_Error VL53L1X::init() {
   }
 
   i2c_address_override_ = 0;
+#ifdef CONFIG_IDF_TARGET_ESP32
+  roode::Roode::i2c_unlock();
+#endif
   return status;
 }
 
@@ -692,33 +681,7 @@ bool VL53L1X::validate_interrupt() {
   return ok;
 }
 
-void VL53L1X::restart() {
-  ScopedActiveSensor scoped(this);
-  if (this->xshut_pin.has_value()) {
-    this->xshut_pin.value()->digital_write(false);
-    roode::Roode::log_event("xshut_pulse_off_sensor_" + std::to_string(sensor_id_));
-    roode::Roode::log_event("xshut_pulse_off");
-    ESP_LOGW(TAG, "XShut pin set LOW - restarting sensor");
-    delay(100);
-    this->xshut_pin.value()->digital_write(true);
-    delay(10); // Allow sensor time to stabilize
-    roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
-    roode::Roode::log_event("xshut_reinitialize");
-    ESP_LOGD(TAG, "XShut pin set HIGH - restart complete");
-    if (this->reinitialize_after_hard_reset_() == VL53L1_ERROR_NONE) {
-      roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
-      roode::Roode::log_event("sensor.recovered_via_xshut");
-      recovery_count_++;
-    } else {
-      this->mark_failed();
-    }
-  } else {
-    ESP_LOGW(TAG, "Restarting sensor without XSHUT pin");
-    if (this->reinitialize_after_hard_reset_() != VL53L1_ERROR_NONE) {
-      this->mark_failed();
-    }
-  }
-}
+void VL53L1X::restart() { soft_reset(); }
 
 void VL53L1X::soft_reset() {
   ScopedActiveSensor scoped(this);
@@ -743,7 +706,12 @@ void VL53L1X::soft_reset() {
       roode::Roode::log_event("sensor.recovered_via_xshut");
       recovery_count_++;
     } else {
-      this->mark_failed();
+      ESP_LOGW(TAG, "Reinitialization failed - attempting I2C bus recovery");
+      this->bus_->recover();
+      delay(50);
+      if (this->reinitialize_after_hard_reset_() != VL53L1_ERROR_NONE) {
+        this->mark_failed();
+      }
     }
   } else {
     ESP_LOGW(TAG, "Restarting sensor without XSHUT pin");

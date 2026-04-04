@@ -94,7 +94,7 @@ void Roode::setup() {
 #endif
   settings_prefs_ = global_preferences->make_preference<RoodeSettings>(0xB0);
   bool loaded_from_flash = false;
-  RoodeSettings s; if (settings_prefs_.load(&s) && s.version == 0x0001000A) {
+  RoodeSettings s; if (settings_prefs_.load(&s) && s.version == 0x0001000B) {
     loaded_from_flash = true;
     samples = s.sampling; orientation_ = s.orientation; invert_direction_ = s.invert_direction;
     calibration_persistence_ = s.calibration_persistence; filter_mode_ = s.filter_mode; filter_window_ = s.filter_window;
@@ -227,7 +227,7 @@ void Roode::register_portal_routes_() {
       if (s.ranging_mode < 7) distanceSensor->set_ranging_mode_override(ranging_modes[s.ranging_mode]);
     }
     entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
-    s.version = 0x0001000A;
+    s.version = 0x0001000B;
     settings_prefs_.save(&s); global_preferences->sync();
     publish_threshold_and_roi_states_();
     r->send(200, "application/json", "{\"ok\":true}");
@@ -304,7 +304,7 @@ void Roode::register_portal_routes_() {
     s.entry_roi_center = entry->roi->center; s.exit_roi_center = exit->roi->center;
     s.entry_max_threshold = entry->threshold->max; s.exit_max_threshold = exit->threshold->max;
     s.entry_idle_threshold = entry->threshold->idle; s.exit_idle_threshold = exit->threshold->idle;
-    s.version = 0x0001000A;
+    s.version = 0x0001000B;
     settings_prefs_.save(&s); global_preferences->sync();
     r->send(200, "application/json", "{\"ok\":true}");
   }));
@@ -428,7 +428,7 @@ void Roode::loop() {
       cal_s.entry_min_threshold = entry->threshold->min; cal_s.entry_max_threshold = entry->threshold->max; cal_s.entry_idle_threshold = entry->threshold->idle;
       cal_s.exit_roi_height = exit->roi->height; cal_s.exit_roi_width = exit->roi->width; cal_s.exit_roi_center = exit->roi->center;
       cal_s.exit_min_threshold = exit->threshold->min; cal_s.exit_max_threshold = exit->threshold->max; cal_s.exit_idle_threshold = exit->threshold->idle;
-      cal_s.version = 0x0001000A;
+      cal_s.version = 0x0001000B;
       settings_prefs_.save(&cal_s); global_preferences->sync();
       publish_threshold_and_roi_states_();
     }
@@ -576,7 +576,7 @@ void Roode::sensor_task(void *p) {
     cal_s.entry_min_threshold = self->entry->threshold->min; cal_s.entry_max_threshold = self->entry->threshold->max; cal_s.entry_idle_threshold = self->entry->threshold->idle;
     cal_s.exit_roi_height = self->exit->roi->height; cal_s.exit_roi_width = self->exit->roi->width; cal_s.exit_roi_center = self->exit->roi->center;
     cal_s.exit_min_threshold = self->exit->threshold->min; cal_s.exit_max_threshold = self->exit->threshold->max; cal_s.exit_idle_threshold = self->exit->threshold->idle;
-    cal_s.version = 0x0001000A;
+    cal_s.version = 0x0001000B;
     self->settings_prefs_.save(&cal_s); global_preferences->sync();
     // Signal main task (Core 0) to publish — publish_state() is not thread-safe from Core 1
     self->calibration_update_pending_ = true;
@@ -599,6 +599,7 @@ void Roode::sensor_task(void *p) {
       } else if (self->scan_phase_ == PHASE_PERSON) {
         self->active_session_.person = h; self->active_session_.complete = true;
         self->sessions_.push_back(self->active_session_);
+        if (self->sessions_.size() > 10) self->sessions_.erase(self->sessions_.begin());
         
         uint8_t bi = 0; int32_t md = 0;
         for(uint8_t i=0; i<64; i++) {

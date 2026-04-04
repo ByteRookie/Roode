@@ -109,7 +109,7 @@ CONFIG_SCHEMA = cv.Schema(
             }
         ),
         cv.Optional(CONF_PORTAL_PASSWORD, default=""): cv.string,
-        cv.Optional(CONF_POLLING_INTERVAL, default="1ms"): cv.positive_time_period_milliseconds,
+        cv.Optional(CONF_POLLING_INTERVAL, default="10ms"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_PORTAL): switch.switch_schema(roode_ns.class_("PortalSwitch", switch.Switch, cg.Component)).extend(cv.COMPONENT_SCHEMA),
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {

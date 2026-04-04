@@ -81,11 +81,13 @@ struct RoodeSettings {
   uint8_t entry_roi_center;
   uint16_t entry_min_threshold;
   uint16_t entry_max_threshold;
+  uint16_t entry_idle_threshold;
   uint8_t exit_roi_height;
   uint8_t exit_roi_width;
   uint8_t exit_roi_center;
   uint16_t exit_min_threshold;
   uint16_t exit_max_threshold;
+  uint16_t exit_idle_threshold;
 
   // Lux/Sun
   bool use_lux;

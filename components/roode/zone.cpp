@@ -25,21 +25,22 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
   auto result = distanceSensor->read_distance(roi, sensor_status);
   uint16_t dist_to_filter;
   if (!result.has_value() || sensor_status != VL53L1_ERROR_NONE) {
-    dist_to_filter = threshold->idle;
+    // If we have no valid baseline yet, fall back to a "far" distance to avoid false detection
+    dist_to_filter = (threshold->idle > 0) ? threshold->idle : 4000;
     if (debug_mode_) {
-      ESP_LOGD(TAG, "Zone %d: read failed (status %d), falling back to idle %dmm", id, (int)sensor_status, dist_to_filter);
+      ESP_LOGD(TAG, "Zone %d: read failed (status %d), falling back to %dmm", id, (int)sensor_status, dist_to_filter);
     }
   } else {
     last_distance = result.value();
     dist_to_filter = result.value();
   }
 
-  // If the sensor is out of range, feed the baseline idle distance into the filter so it clears out
+  // If the sensor is out of range or specifically 0 (error), feed the baseline/safe distance into the filter
   if (dist_to_filter > 4000 || dist_to_filter == 0) {
     if (debug_mode_ && dist_to_filter == 0) {
-      ESP_LOGD(TAG, "Zone %d: read 0mm, falling back to idle %dmm", id, threshold->idle);
+      ESP_LOGD(TAG, "Zone %d: read 0mm, falling back to safe distance", id);
     }
-    dist_to_filter = threshold->idle;
+    dist_to_filter = (threshold->idle > 0) ? threshold->idle : 4000;
   }
 
   samples[sample_idx_] = dist_to_filter;

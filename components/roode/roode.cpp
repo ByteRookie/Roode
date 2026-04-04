@@ -94,7 +94,7 @@ void Roode::setup() {
 #endif
   settings_prefs_ = global_preferences->make_preference<RoodeSettings>(0xB0);
   bool loaded_from_flash = false;
-  RoodeSettings s; if (settings_prefs_.load(&s) && s.version == 0x00010008) {
+  RoodeSettings s; if (settings_prefs_.load(&s) && s.version == 0x00010009) {
     loaded_from_flash = true;
     samples = s.sampling; orientation_ = s.orientation; invert_direction_ = s.invert_direction;
     calibration_persistence_ = s.calibration_persistence; filter_mode_ = s.filter_mode; filter_window_ = s.filter_window;
@@ -227,7 +227,7 @@ void Roode::register_portal_routes_() {
       if (s.ranging_mode < 7) distanceSensor->set_ranging_mode_override(ranging_modes[s.ranging_mode]);
     }
     entry->set_debug_mode(debug_mode_); exit->set_debug_mode(debug_mode_);
-    s.version = 0x00010008;
+    s.version = 0x00010009;
     settings_prefs_.save(&s); global_preferences->sync();
     publish_threshold_and_roi_states_();
     r->send(200, "application/json", "{\"ok\":true}");
@@ -303,7 +303,7 @@ void Roode::register_portal_routes_() {
     RoodeSettings s; if (!settings_prefs_.load(&s)) memset(&s, 0, sizeof(s));
     s.entry_roi_center = entry->roi->center; s.exit_roi_center = exit->roi->center;
     s.entry_max_threshold = entry->threshold->max; s.exit_max_threshold = exit->threshold->max;
-    s.version = 0x00010008;
+    s.version = 0x00010009;
     settings_prefs_.save(&s); global_preferences->sync();
     r->send(200, "application/json", "{\"ok\":true}");
   }));
@@ -425,7 +425,7 @@ void Roode::loop() {
       cal_s.entry_min_threshold = entry->threshold->min; cal_s.entry_max_threshold = entry->threshold->max;
       cal_s.exit_roi_height = exit->roi->height; cal_s.exit_roi_width = exit->roi->width; cal_s.exit_roi_center = exit->roi->center;
       cal_s.exit_min_threshold = exit->threshold->min; cal_s.exit_max_threshold = exit->threshold->max;
-      cal_s.version = 0x00010008;
+      cal_s.version = 0x00010009;
       settings_prefs_.save(&cal_s); global_preferences->sync();
       publish_threshold_and_roi_states_();
     }
@@ -528,11 +528,11 @@ void Roode::path_tracking(Zone *z) {
             path += std::to_string(PathTrack[i]) + (i == PathTrackFillingSize - 1 ? "" : ", ");
           }
           path += "]";
-          ESP_LOGD(TAG, "Path detected: %s -> direction: %s", path.c_str(), (start_zone == 2 && end_zone == 1) ? "entry" : "exit");
+          ESP_LOGD(TAG, "Path detected: %s -> direction: %s", path.c_str(), (start_zone == 1 && end_zone == 2) ? "entry" : "exit");
           
-          if (start_zone == 2 && end_zone == 1) {
+          if (start_zone == 1 && end_zone == 2) {
             updateCounter(1);
-          } else if (start_zone == 1 && end_zone == 2) {
+          } else if (start_zone == 2 && end_zone == 1) {
             updateCounter(-1);
           }
         } else if (PathTrackFillingSize > 0) {
@@ -590,7 +590,7 @@ void Roode::sensor_task(void *p) {
     cal_s.entry_min_threshold = self->entry->threshold->min; cal_s.entry_max_threshold = self->entry->threshold->max;
     cal_s.exit_roi_height = self->exit->roi->height; cal_s.exit_roi_width = self->exit->roi->width; cal_s.exit_roi_center = self->exit->roi->center;
     cal_s.exit_min_threshold = self->exit->threshold->min; cal_s.exit_max_threshold = self->exit->threshold->max;
-    cal_s.version = 0x00010008;
+    cal_s.version = 0x00010009;
     self->settings_prefs_.save(&cal_s); global_preferences->sync();
     // Signal main task (Core 0) to publish — publish_state() is not thread-safe from Core 1
     self->calibration_update_pending_ = true;

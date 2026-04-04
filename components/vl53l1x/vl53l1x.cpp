@@ -568,7 +568,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   }
 
   ERangeStatus rs; this->sensor.GetRangeStatus(&rs);
-  if (rs != RS_RANGE_VALID) {
+  if (rs != RangeValid) {
     ESP_LOGV(TAG, "Range status: %d (distance: %dmm)", (int)rs, distance);
   }
 

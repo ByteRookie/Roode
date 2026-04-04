@@ -332,7 +332,15 @@ void Roode::loop() {
   if (use_sensor_task_) {
 #ifdef CONFIG_IDF_TARGET_ESP32
     if (presence_update_pending_ && active_sensors_ & 0x04 && presence_sensor) { presence_sensor->publish_state(presence_state_); presence_update_pending_ = false; }
-    if (people_counter_update_pending_ && active_sensors_ & 0x08 && people_counter) { auto c = people_counter->make_call(); c.set_value(pending_people_counter_value_); c.perform(); people_counter_update_pending_ = false; }
+    if (people_counter_delta_ != 0 && active_sensors_ & 0x08 && people_counter) {
+      int d = people_counter_delta_; people_counter_delta_ -= d;
+      float cur = std::isnan(people_counter->state) ? 0.0f : people_counter->state;
+      auto c = people_counter->make_call(); c.set_value(cur + d); c.perform();
+    }
+    if (direction_event_pending_ && entry_exit_event_sensor) {
+      entry_exit_event_sensor->publish_state(pending_direction_event_);
+      direction_event_pending_ = false;
+    }
     if (calibration_update_pending_) { calibration_update_pending_ = false; publish_threshold_and_roi_states_(); }
     // sensor_task handles its own blocking — do not delay the main loop here
 #endif
@@ -403,26 +411,62 @@ void Roode::path_tracking(Zone *z) {
     if (state_ == STATE_ACTIVE) {
       if (PathTrackFillingSize >= 2) {
         int start_zone = 0;
+        int end_zone = 0;
+        
+        // Find the first unique zone that was hit (1 or 2)
         for (int i = 0; i < PathTrackFillingSize; i++) {
           if (PathTrack[i] == 1 || PathTrack[i] == 2) {
             start_zone = PathTrack[i];
             break;
           }
+          if (PathTrack[i] == 3) {
+            // If we started with 3, we can't be sure of the start zone from this alone.
+            // But we can look at the NEXT state to see which one was hit first? 
+            // Actually if we saw 3 then 2, it means 1 was hit first.
+            // If we saw 3 then 1, it means 2 was hit first.
+            if (i + 1 < PathTrackFillingSize) {
+              if (PathTrack[i+1] == 2) { start_zone = 1; break; }
+              if (PathTrack[i+1] == 1) { start_zone = 2; break; }
+            }
+          }
         }
-        int end_zone = 0;
+        
+        // Find the last unique zone that was hit (1 or 2)
         for (int i = PathTrackFillingSize - 1; i >= 0; i--) {
           if (PathTrack[i] == 1 || PathTrack[i] == 2) {
             end_zone = PathTrack[i];
             break;
           }
+          if (PathTrack[i] == 3) {
+            // If we ended with 3 then 0, we look at the PREVIOUS state.
+            if (i > 0) {
+              if (PathTrack[i-1] == 2) { end_zone = 1; break; }
+              if (PathTrack[i-1] == 1) { end_zone = 2; break; }
+            }
+          }
         }
 
         if (start_zone != 0 && end_zone != 0 && start_zone != end_zone) {
+          if (debug_mode_) {
+            std::string path = "[";
+            for (int i = 0; i < PathTrackFillingSize; i++) {
+              path += std::to_string(PathTrack[i]) + (i == PathTrackFillingSize - 1 ? "" : ", ");
+            }
+            path += "]";
+            ESP_LOGD(TAG, "Path detected: %s -> direction: %s", path.c_str(), (start_zone == 2 && end_zone == 1) ? "entry" : "exit");
+          }
           if (start_zone == 2 && end_zone == 1) {
             updateCounter(1);
           } else if (start_zone == 1 && end_zone == 2) {
             updateCounter(-1);
           }
+        } else if (debug_mode_ && PathTrackFillingSize > 0) {
+            std::string path = "[";
+            for (int i = 0; i < PathTrackFillingSize; i++) {
+              path += std::to_string(PathTrack[i]) + (i == PathTrackFillingSize - 1 ? "" : ", ");
+            }
+            path += "]";
+            ESP_LOGD(TAG, "Path ignored (ambiguous or same zone): %s", path.c_str());
         }
       }
       PathTrackFillingSize = 0;
@@ -438,11 +482,16 @@ void Roode::path_tracking(Zone *z) {
 
 void Roode::updateCounter(int d) {
   if (invert_direction_) d = -d;
-  if (entry_exit_event_sensor) entry_exit_event_sensor->publish_state(d > 0 ? "entry" : "exit");
-  if (!people_counter) return;
-  float nv = people_counter->state + d;
-  if (use_sensor_task_) { pending_people_counter_value_ = nv; people_counter_update_pending_ = true; }
-  else { auto c = people_counter->make_call(); c.set_value(nv); c.perform(); }
+  if (use_sensor_task_) {
+    people_counter_delta_ += d;
+    pending_direction_event_ = (d > 0 ? "entry" : "exit");
+    direction_event_pending_ = true;
+  } else {
+    if (entry_exit_event_sensor) entry_exit_event_sensor->publish_state(d > 0 ? "entry" : "exit");
+    if (!people_counter) return;
+    float cur = std::isnan(people_counter->state) ? 0.0f : people_counter->state;
+    auto c = people_counter->make_call(); c.set_value(cur + d); c.perform();
+  }
 }
 
 void Roode::recalibration() { run_zone_calibration(0); run_zone_calibration(1); }

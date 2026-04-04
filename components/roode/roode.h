@@ -323,8 +323,9 @@ class Roode : public PollingComponent {
 
   volatile bool presence_update_pending_{false};
   volatile bool presence_state_{false};
-  volatile bool people_counter_update_pending_{false};
-  float pending_people_counter_value_{0};
+  volatile int people_counter_delta_{0};
+  std::string pending_direction_event_{};
+  volatile bool direction_event_pending_{false};
   volatile bool calibration_update_pending_{false};
 
   std::string portal_password_{};

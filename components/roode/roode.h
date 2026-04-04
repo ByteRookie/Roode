@@ -5,6 +5,7 @@
 #include <vector>
 #include "Arduino.h"
 
+#include <atomic>
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
@@ -323,7 +324,7 @@ class Roode : public PollingComponent {
 
   volatile bool presence_update_pending_{false};
   volatile bool presence_state_{false};
-  volatile int people_counter_delta_{0};
+  std::atomic<int> people_counter_delta_{0};
   std::string pending_direction_event_{};
   volatile bool direction_event_pending_{false};
   volatile bool calibration_update_pending_{false};

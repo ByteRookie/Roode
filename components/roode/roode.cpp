@@ -74,7 +74,18 @@ static uint8_t get_ranging_mode_index(const RangingMode *mode) {
 }
 
 void Roode::log_event(const std::string &msg) { if (instance_ && instance_->debug_mode_) ESP_LOGI(TAG, "%s", msg.c_str()); }
-void Roode::dump_config() { ESP_LOGCONFIG(TAG, "Roode v%s", VERSION); }
+void Roode::dump_config() {
+  ESP_LOGCONFIG(TAG, "Roode v%s", VERSION);
+  ESP_LOGCONFIG(TAG, "  Orientation: %s", orientation_ == Parallel ? "Parallel" : "Perpendicular");
+  ESP_LOGCONFIG(TAG, "  Invert Direction: %s", invert_direction_ ? "Yes" : "No");
+  ESP_LOGCONFIG(TAG, "  Polling Interval: %dms", polling_interval_ms_);
+  ESP_LOGCONFIG(TAG, "  Sampling Size: %d", samples);
+  ESP_LOGCONFIG(TAG, "  Entry Zone: ROI center=%d, width=%d, height=%d, threshold=[%d, %d], idle=%d", 
+    entry->roi->center, entry->roi->width, entry->roi->height, entry->threshold->min, entry->threshold->max, entry->threshold->idle);
+  ESP_LOGCONFIG(TAG, "  Exit Zone:  ROI center=%d, width=%d, height=%d, threshold=[%d, %d], idle=%d", 
+    exit->roi->center, exit->roi->width, exit->roi->height, exit->threshold->min, exit->threshold->max, exit->threshold->idle);
+}
+
 Roode::~Roode() { instance_ = nullptr; }
 
 void Roode::setup() {
@@ -332,9 +343,10 @@ void Roode::loop() {
   if (use_sensor_task_) {
 #ifdef CONFIG_IDF_TARGET_ESP32
     if (presence_update_pending_ && active_sensors_ & 0x04 && presence_sensor) { presence_sensor->publish_state(presence_state_); presence_update_pending_ = false; }
-    if (people_counter_delta_ != 0 && active_sensors_ & 0x08 && people_counter) {
-      int d = people_counter_delta_; people_counter_delta_ -= d;
+    if (people_counter_delta_ != 0 && people_counter) {
+      int d = people_counter_delta_.exchange(0);
       float cur = std::isnan(people_counter->state) ? 0.0f : people_counter->state;
+      ESP_LOGD(TAG, "Processing counter delta: %d, current: %f, new: %f", d, cur, cur + d);
       auto c = people_counter->make_call(); c.set_value(cur + d); c.perform();
     }
     if (direction_event_pending_ && entry_exit_event_sensor) {
@@ -447,20 +459,19 @@ void Roode::path_tracking(Zone *z) {
         }
 
         if (start_zone != 0 && end_zone != 0 && start_zone != end_zone) {
-          if (debug_mode_) {
-            std::string path = "[";
-            for (int i = 0; i < PathTrackFillingSize; i++) {
-              path += std::to_string(PathTrack[i]) + (i == PathTrackFillingSize - 1 ? "" : ", ");
-            }
-            path += "]";
-            ESP_LOGD(TAG, "Path detected: %s -> direction: %s", path.c_str(), (start_zone == 2 && end_zone == 1) ? "entry" : "exit");
+          std::string path = "[";
+          for (int i = 0; i < PathTrackFillingSize; i++) {
+            path += std::to_string(PathTrack[i]) + (i == PathTrackFillingSize - 1 ? "" : ", ");
           }
+          path += "]";
+          ESP_LOGD(TAG, "Path detected: %s -> direction: %s", path.c_str(), (start_zone == 2 && end_zone == 1) ? "entry" : "exit");
+          
           if (start_zone == 2 && end_zone == 1) {
             updateCounter(1);
           } else if (start_zone == 1 && end_zone == 2) {
             updateCounter(-1);
           }
-        } else if (debug_mode_ && PathTrackFillingSize > 0) {
+        } else if (PathTrackFillingSize > 0) {
             std::string path = "[";
             for (int i = 0; i < PathTrackFillingSize; i++) {
               path += std::to_string(PathTrack[i]) + (i == PathTrackFillingSize - 1 ? "" : ", ");
@@ -482,6 +493,7 @@ void Roode::path_tracking(Zone *z) {
 
 void Roode::updateCounter(int d) {
   if (invert_direction_) d = -d;
+  ESP_LOGD(TAG, "Update counter requested: delta=%d", d);
   if (use_sensor_task_) {
     people_counter_delta_ += d;
     pending_direction_event_ = (d > 0 ? "entry" : "exit");

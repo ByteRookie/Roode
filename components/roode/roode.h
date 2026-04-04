@@ -50,6 +50,7 @@ static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
 
 struct RoodeSettings {
+  uint32_t version;
   // VL53L1X Hardware
   uint8_t sensor_id;
   uint16_t i2c_address;

@@ -142,6 +142,9 @@ async def to_code(config: Dict):
     cg.add(roode.set_polling_interval(config[CONF_POLLING_INTERVAL]))
     cg.add(roode.set_portal_password(config[CONF_PORTAL_PASSWORD]))
     
+    if CONF_ZONES in config:
+        cg.add(roode.set_invert_direction(config[CONF_ZONES][CONF_INVERT]))
+
     # Active sensors bitmask init (all on by default)
     cg.add(roode.set_active_sensors(0xFFFFFFFF))
 

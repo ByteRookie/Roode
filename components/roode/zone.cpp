@@ -76,10 +76,16 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
  * This is needed to do initial calibration of thresholds & ROI.
  */
 void Zone::reset_roi(uint8_t default_center) {
-  // Apply overrides or defaults only if current ROI is not yet set (e.g. not loaded from flash)
-  if (roi->width == 0) roi->width = roi_override->width ? roi_override->width : 6;
-  if (roi->height == 0) roi->height = roi_override->height ? roi_override->height : 16;
-  if (roi->center == 0) roi->center = roi_override->center ? roi_override->center : default_center;
+  // If YAML provided an override, use it (it takes priority over flash for those specific fields)
+  if (roi_override->width != 0) roi->width = roi_override->width;
+  if (roi_override->height != 0) roi->height = roi_override->height;
+  if (roi_override->center != 0) roi->center = roi_override->center;
+
+  // Fall back to defaults if still zero
+  if (roi->width == 0) roi->width = 6;
+  if (roi->height == 0) roi->height = 16;
+  if (roi->center == 0) roi->center = default_center;
+
   if (debug_mode_) {
     ESP_LOGD(TAG, "%s ROI current state: { width: %d, height: %d, center: %d }", id == 0U ? "Entry" : "Exit", roi->width,
              roi->height, roi->center);

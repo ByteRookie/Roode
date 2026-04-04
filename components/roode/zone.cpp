@@ -23,19 +23,16 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
   last_sensor_status = sensor_status;
 
   auto result = distanceSensor->read_distance(roi, sensor_status);
-  if (!result.has_value()) {
-    return sensor_status;
-  }
-
-  last_distance = result.value();
-  uint16_t dist_to_filter = result.value();
-
-  if (sensor_status != VL53L1_ERROR_NONE) {
-    return sensor_status;
+  uint16_t dist_to_filter;
+  if (!result.has_value() || sensor_status != VL53L1_ERROR_NONE) {
+    dist_to_filter = threshold->idle;
+  } else {
+    last_distance = result.value();
+    dist_to_filter = result.value();
   }
 
   // If the sensor is out of range, feed the baseline idle distance into the filter so it clears out
-  if (dist_to_filter > 4000) {
+  if (dist_to_filter > 4000 || dist_to_filter == 0) {
     dist_to_filter = threshold->idle;
   }
 
@@ -73,12 +70,12 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
  * This is needed to do initial calibration of thresholds & ROI.
  */
 void Zone::reset_roi(uint8_t default_center) {
-  // Apply overrides when provided, otherwise fall back to sensible defaults
-  roi->width = roi_override->width ? roi_override->width : 6;
-  roi->height = roi_override->height ? roi_override->height : 16;
-  roi->center = roi_override->center ? roi_override->center : default_center;
+  // Apply overrides or defaults only if current ROI is not yet set (e.g. not loaded from flash)
+  if (roi->width == 0) roi->width = roi_override->width ? roi_override->width : 6;
+  if (roi->height == 0) roi->height = roi_override->height ? roi_override->height : 16;
+  if (roi->center == 0) roi->center = roi_override->center ? roi_override->center : default_center;
   if (debug_mode_) {
-    ESP_LOGD(TAG, "%s ROI reset: { width: %d, height: %d, center: %d }", id == 0U ? "Entry" : "Exit", roi->width,
+    ESP_LOGD(TAG, "%s ROI current state: { width: %d, height: %d, center: %d }", id == 0U ? "Entry" : "Exit", roi->width,
              roi->height, roi->center);
   }
 }

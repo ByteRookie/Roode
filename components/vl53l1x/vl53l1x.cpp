@@ -462,22 +462,21 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
     initial_state = this->interrupt_pin.value()->digital_read();
   }
   auto start_time = millis();
-  while (!dataReady && (millis() - start_time) < this->timeout) {
-    if (use_int) {
-      if (this->interrupt_pin.value()->digital_read() != initial_state) {
-        dataReady = true;
+    while (!dataReady && (millis() - start_time) < this->timeout) {
+      if (use_int) {
+        if (this->interrupt_pin.value()->digital_read() != initial_state) {
+          dataReady = true;
+        }
+      } else {
+        status = this->sensor.CheckForDataReady(&dataReady);
+        if (status != VL53L1_ERROR_NONE) {
+          ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
+          record_failure();
+          return {};
+        }
       }
-    } else {
-      status = this->sensor.CheckForDataReady(&dataReady);
-      if (status != VL53L1_ERROR_NONE) {
-        ESP_LOGE(TAG, "Failed to check if data is ready, error code: %d", status);
-        record_failure();
-        return {};
-      }
+      App.feed_wdt();
     }
-    delay(1);
-    App.feed_wdt();
-  }
   if (use_int && !dataReady) {
     roode::Roode::log_event("int_pin_missed_sensor_" + std::to_string(sensor_id_));
     roode::Roode::log_event("int_pin_missed");
@@ -498,7 +497,6 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
         record_failure();
         return {};
       }
-      delay(1);
       App.feed_wdt();
     }
   }

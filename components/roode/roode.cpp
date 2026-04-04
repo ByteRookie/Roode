@@ -113,12 +113,8 @@ void Roode::setup() {
   // Apply YAML roi_override → roi for any zone whose roi is still zero (not loaded from flash).
   // This is the fix for the critical bug: roi starts as {0,0,0} and reset_roi() was never called,
   // causing every sensor.SetROI(0,0) to fail and return no valid readings.
-  if (entry->roi->width == 0 || entry->roi->height == 0) {
-    entry->reset_roi(orientation_ == Parallel ? 159 : 194);
-  }
-  if (exit->roi->width == 0 || exit->roi->height == 0) {
-    exit->reset_roi(orientation_ == Parallel ? 239 : 59);
-  }
+  entry->reset_roi(orientation_ == Parallel ? 159 : 194);
+  exit->reset_roi(orientation_ == Parallel ? 239 : 59);
 
   // If thresholds are zero, schedule calibration to run after VL53L1X setup()
   // completes. Roode has setup_priority::PROCESSOR=300, VL53L1X has DATA=200,

@@ -121,7 +121,7 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
     int avg = sum / zone_distances.size();
     threshold->idle = avg;
     uint8_t max_pct = threshold->max_percentage.value_or(80);
-    uint8_t min_pct = threshold->min_percentage.value_or(15);
+    uint8_t min_pct = threshold->min_percentage.value_or(0);
     threshold->max_percentage = max_pct;
     threshold->min_percentage = min_pct;
     threshold->max = (avg * max_pct) / 100;

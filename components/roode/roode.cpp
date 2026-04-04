@@ -389,21 +389,47 @@ void Roode::path_tracking(Zone *z) {
     if (use_sensor_task_) { presence_state_ = true; presence_update_pending_ = true; }
     else if (presence_sensor) presence_sensor->publish_state(true);
   }
+
   if (AllZonesCurrentStatus == 0) {
-    if (PathTrackFillingSize >= 3) {
-      if (PathTrack[PathTrackFillingSize-3] == 2 && PathTrack[PathTrackFillingSize-2] == 3 && PathTrack[PathTrackFillingSize-1] == 1) updateCounter(1);
-      else if (PathTrack[PathTrackFillingSize-3] == 1 && PathTrack[PathTrackFillingSize-2] == 3 && PathTrack[PathTrackFillingSize-1] == 2) updateCounter(-1);
+    if (state_ == STATE_ACTIVE) {
+      if (PathTrackFillingSize >= 2) {
+        int start_zone = 0;
+        for (int i = 0; i < PathTrackFillingSize; i++) {
+          if (PathTrack[i] == 1 || PathTrack[i] == 2) {
+            start_zone = PathTrack[i];
+            break;
+          }
+        }
+        int end_zone = 0;
+        for (int i = PathTrackFillingSize - 1; i >= 0; i--) {
+          if (PathTrack[i] == 1 || PathTrack[i] == 2) {
+            end_zone = PathTrack[i];
+            break;
+          }
+        }
+
+        if (start_zone != 0 && end_zone != 0 && start_zone != end_zone) {
+          if (start_zone == 2 && end_zone == 1) {
+            updateCounter(1);
+          } else if (start_zone == 1 && end_zone == 2) {
+            updateCounter(-1);
+          }
+        }
+      }
+      PathTrackFillingSize = 0;
+      state_ = STATE_IDLE;
+      // Doorway is clear — clear overall presence
+      if (use_sensor_task_) { presence_state_ = false; presence_update_pending_ = true; }
+      else if (presence_sensor) presence_sensor->publish_state(false);
     }
-    PathTrackFillingSize = 0; state_ = STATE_IDLE;
-    // Doorway is clear — clear overall presence
-    if (use_sensor_task_) { presence_state_ = false; presence_update_pending_ = true; }
-    else if (presence_sensor) presence_sensor->publish_state(false);
   } else if (PathTrackFillingSize == 0 || AllZonesCurrentStatus != PathTrack[PathTrackFillingSize - 1]) {
-    if (PathTrackFillingSize < 4) PathTrack[PathTrackFillingSize++] = AllZonesCurrentStatus;
+    if (PathTrackFillingSize < 16) PathTrack[PathTrackFillingSize++] = AllZonesCurrentStatus;
   }
 }
 
 void Roode::updateCounter(int d) {
+  if (invert_direction_) d = -d;
+  if (entry_exit_event_sensor) entry_exit_event_sensor->publish_state(d > 0 ? "entry" : "exit");
   if (!people_counter) return;
   float nv = people_counter->state + d;
   if (use_sensor_task_) { pending_people_counter_value_ = nv; people_counter_update_pending_ = true; }

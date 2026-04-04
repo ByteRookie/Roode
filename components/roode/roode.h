@@ -300,7 +300,7 @@ class Roode : public PollingComponent {
   enum FSMState { STATE_IDLE, STATE_ACTIVE };
   FSMState state_{STATE_IDLE};
   uint32_t state_started_ts{0};
-  int PathTrack[4] = {0, 0, 0, 0};
+  int PathTrack[16];
   int PathTrackFillingSize = 0;
   int LeftPreviousStatus = NOBODY;
   int RightPreviousStatus = NOBODY;
@@ -340,7 +340,6 @@ class Roode : public PollingComponent {
   void path_tracking(Zone *zone);
   bool handle_sensor_status();
   void update_status_text(const std::string &status);
-  const RangingMode *determine_ranging_mode(uint16_t ae, uint16_t ax);
 #ifdef CONFIG_IDF_TARGET_ESP32
   static void sensor_task(void *param);
 #endif

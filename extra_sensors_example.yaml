@@ -6,7 +6,6 @@ vl53l1x:
   timeout: 2s
 
 roode:
-  sampling: 2
 
 sensor:
   - platform: roode

@@ -3,10 +3,11 @@ substitutions:
   friendly_name: $devicename
 
 external_components:
-  - source:
-      type: git
-      url: https://github.com/Lyr3x/Roode
-      ref: master
+  refresh: always
+  source:
+    type: git
+    url: https://github.com/Lyr3x/Roode
+    ref: master
 
 esphome:
   name: $devicename
@@ -28,8 +29,7 @@ wifi:
 captive_portal:
 
 api:
-  encryption:
-    key: !secret api_encryption_key
+  password: !secret api_password
   reboot_timeout: 60min
   services:
     - service: recalibrate
@@ -37,8 +37,7 @@ api:
         - lambda: "id(roode_platform)->recalibration();"
 
 ota:
-  - platform: esphome
-    password: !secret ota_password
+  password: !secret ota_password
 
 web_server:
   port: 80
@@ -56,25 +55,23 @@ i2c:
 
 # VL53L1X sensor configuration is separate from Roode people counting algorithm
 vl53l1x:
-  id: distance_sensor
   sensor_id: 1
   calibration:
+    # The ranging mode is different based on how long the distance is that the sensor need to measure.
+    # The longer the distance, the more time the sensor needs to take a measurement.
+    # Available options are: auto, shortest, short, medium, long, longer, longest
     ranging: auto
   pins:
     xshut:
       number: GPIO3
-      mode: OUTPUT
+      mode: OUTPUT_PULLUP
+      ignore_strapping_warning: true
     interrupt:
       number: GPIO1
       mode: INPUT_PULLUP
 
 roode:
   id: roode_platform
-  sensor: distance_sensor
-  portal:
-    name: $friendly_name Portal
-  # Smooth out measurements by using the minimum distance from this number of readings
-  sampling: 2
   # This controls the size of the Region of Interest the sensor should take readings in.
   roi: { height: 16, width: 6 }
   # The detection thresholds for determining whether a measurement should count as a person crossing.
@@ -108,7 +105,7 @@ binary_sensor:
   - platform: status
     name: $friendly_name API Status
   - platform: roode
-    presence:
+    presence_sensor:
       name: $friendly_name presence
     sensor_xshut_state:
       name: $friendly_name xshut state

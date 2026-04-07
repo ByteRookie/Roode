@@ -21,7 +21,7 @@ static const char *const TAG = "VL53L1X";
  */
 class VL53L1X : public i2c::I2CDevice, public Component {
  public:
- void setup() override;
+  void setup() override;
   void dump_config() override;
   ~VL53L1X();
   /** This connects directly to a sensor */
@@ -42,29 +42,18 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   }
   int get_recovery_count() const { return recovery_count_; }
   void set_sensor_id(uint8_t id) { sensor_id_ = id; }
-  uint8_t get_sensor_id() const { return sensor_id_; }
   void set_desired_address(uint8_t addr) { desired_address_ = addr; }
-  uint8_t get_address() const { return address_; }
   void restart();
 
   void set_xshut_pin(GPIOPin *pin) { this->xshut_pin = pin; }
   void set_interrupt_pin(InternalGPIOPin *pin) { this->interrupt_pin = pin; }
   optional<const RangingMode *> get_ranging_mode_override() { return this->ranging_mode_override; }
   void set_ranging_mode_override(const RangingMode *mode) { this->ranging_mode_override = {mode}; }
-  const RangingMode *get_ranging_mode() const { return ranging_mode; }
   void set_offset(int16_t val) { this->offset = val; }
   void set_xtalk(uint16_t val) { this->xtalk = val; }
   void set_timeout(uint16_t val) { this->timeout = val; }
-  uint16_t get_timeout() const { return timeout; }
-  void start_continuous_ranging();
-  void stop_continuous_ranging();
-  static void set_active_sensor(VL53L1X *sensor) { active_sensor_ = sensor; }
-  static VL53L1X *get_active_sensor() { return active_sensor_; }
-  int8_t uld_write_register(uint8_t address, uint16_t register_address, const uint8_t *data, size_t len);
-  int8_t uld_read_register(uint8_t address, uint16_t register_address, uint8_t *data, size_t len);
 
   bool is_interrupt_enabled() const { return interrupt_active_ && interrupt_pin.has_value(); }
-  optional<uint16_t> get_signal_rate();
 
  protected:
   VL53L1X_ULD sensor;
@@ -76,23 +65,15 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   optional<int16_t> offset{};
   optional<uint16_t> xtalk{};
   uint16_t timeout{};
-  bool continuous_mode_{false};
-  // Value-copy of the last ROI pushed to the sensor hardware.
-  // A pointer was previously stored here, causing *roi != *last_roi to always
-  // return false (same struct address), so portal ROI changes were ignored.
-  ROI last_roi_val_{};
-  bool has_last_roi_{false};
-  int recovery_count_{0};
+ ROI *last_roi{};
+ int recovery_count_{0};
   uint8_t sensor_id_{0};
   uint8_t desired_address_{0x29};
   static std::vector<VL53L1X *> sensors;
-  static thread_local VL53L1X *active_sensor_;
 
   VL53L1_Error init();
   VL53L1_Error wait_for_boot();
   VL53L1_Error get_device_state(uint8_t *device_state);
-  VL53L1_Error apply_runtime_configuration_();
-  VL53L1_Error reinitialize_after_hard_reset_();
   /**
    * Validate optional pins and log their status.
    *
@@ -103,15 +84,16 @@ class VL53L1X : public i2c::I2CDevice, public Component {
 
   void soft_reset();
   void record_failure();
+  // Re-initialize the sensor fully after a power cycle (XSHUT toggle).
+  // Must be called after wait_for_boot() to restore all configuration.
+  void reinitialize_after_reset();
 
   bool interrupt_active_{false};
   uint8_t interrupt_miss_count_{0};
   uint32_t last_interrupt_retry_{0};
   uint8_t consecutive_failures_{0};
-  // When non-zero, all ULD I2C callbacks use this address instead of the ULD-managed one.
-  // Used during init() to probe the physical bus independently of ULD's cached address.
-  uint8_t i2c_address_override_{0};
 };
 
 }  // namespace vl53l1x
 }  // namespace esphome
+

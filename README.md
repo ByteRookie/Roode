@@ -1,6 +1,6 @@
 # RooDe
 
-[![GitHub release](https://img.shields.io/badge/release-1.8.0-blue?style=flat-square)](https://github.com/Lyr3x/Roode/releases/tag/1.8.0)
+[![GitHub release](https://img.shields.io/badge/release-1.7.0-blue?style=flat-square)](https://github.com/Lyr3x/Roode/releases/tag/1.7.0)
 
 [![Roode community](https://img.shields.io/discord/879407995837087804.svg?label=Discord&logo=Discord&colorB=7289da&style=for-the-badge)](https://discord.gg/hU9SvSXMHs)
 
@@ -89,11 +89,11 @@ Ps=0 (when connected to GND): In the IIC mode, the user can operate the chip by 
 
 ## Configuration
 
-Roode is provided as an external_component which means it is easy to set up in any ESPHome sensor configuration file. **Initial setup is done in YAML, while all calibration and advanced settings are handled via the Web UI at `/portal`.**
-
 ### Platform Setup
 
-Other than base ESPHome configuration the only config that's needed for Roode is:
+Roode is provided as an external_component which means it is easy to set up in any ESPHome sensor configuration file.
+
+Other than base ESPHome configuration the only config that's needed for Roode is
 
 ```yaml
 external_components:
@@ -101,15 +101,11 @@ external_components:
     refresh: always
 vl53l1x:
 roode:
-  sensor: my_vl53l1x_id
 ```
 
-Navigate to `http://<device_ip>/portal` to perform calibration, manage history, and adjust all advanced settings (Sampling, Filtering, Lux/Sun thresholds, and Sensor visibility).
+This uses the recommended default configuration.
 
----
-
-### YAML Configuration Reference
-While UI-based configuration is recommended, we still offer full flexibility via YAML for advanced users.
+However, we offer a lot of flexibility. Here's the full configuration spelled out.
 
 ```yml
 external_components:
@@ -144,7 +140,8 @@ vl53l1x:
     # Shutdown/Enable pin used to change the I2C address and recover the sensor if needed.
     xshut:
       number: GPIO3
-      mode: OUTPUT
+      mode: OUTPUT_PULLUP
+      ignore_strapping_warning: true
     # Interrupt pin with internal pull-up for the data ready signal
     interrupt:
       number: GPIO1
@@ -200,8 +197,6 @@ roode:
   invalid_distance_limit: 10
   # Minimum time between automatic sensor restarts
   restart_timeout: 30s
-  # Optional password for the calibration portal (/portal)
-  portal_password: "YOUR_PASSWORD"
   # Apply less aggressive filtering only when CPU usage is high
   cpu_optimization:
     activate: 90%
@@ -240,11 +235,6 @@ For example, an entryway with a shelf on one side might need a smaller ROI or
 stricter thresholds only in that zone. Start with small adjustments—change the
 ROI height or width by one or two units or nudge thresholds 5 % at a time—and
 test before making larger changes.
-
-### Calibration Portal
-
-Version 1.8.0 introduces a web-based calibration portal. Access it at `http://<device_ip>/portal`. If `portal_password` is set, you will need to provide it as a token (e.g., `http://<device_ip>/portal?token=YOUR_PASSWORD`).
-
 ### Interrupt vs Polling
 
 Roode prefers the interrupt pin for efficient updates. When `interrupt` is defined and validated, the VL53L1X notifies the MCU whenever a new sample is ready. If the INT pin is missing or stops working, Roode falls back to a 10 ms polling loop and tries interrupts again every 30 minutes. Polling also acts as a safety net during startup.
@@ -264,12 +254,6 @@ On ESP32 targets Roode tries to run the sensor loop on the second CPU core so
 Wi‑Fi and other ESPHome tasks stay responsive.  If the task fails to start or
 when running on an ESP8266 the code automatically falls back to a single‑core
 loop.  You can force single‑core mode with `force_single_core: true`.
-
-> [!WARNING]
-> #### ⚠️ IMPORTANT: Dual-Core I2C Limitations
-> The new CPU optimization feature runs the VL53L1X sensor on a dedicated CPU core for maximum accuracy. However, this requires exclusive access to the I2C bus. Do not attach other I2C devices (like OLED displays or temperature sensors) to the same ESP32.
->
-> If you must share the I2C bus with other components, you must disable the dual-core feature by setting `force_single_core: true` in your YAML configuration.
 
 ### Sampling and Filtering
 

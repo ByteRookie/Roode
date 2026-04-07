@@ -6,7 +6,6 @@ vl53l1x:
 
 roode:
   id: roode_platform
-  sampling: 1
   roi: { height: 16, width: 6 }
   detection_thresholds:
     max: 85%

@@ -3,15 +3,12 @@ substitutions:
   friendly_name: $devicename
 
 external_components:
-  - source:
-      type: git
-      url: https://github.com/Lyr3x/Roode
-      ref: master
+  refresh: always
+  source: components
 
 esphome:
   name: $devicename
-
-esp8266:
+  platform: ESP8266
   board: d1_mini
 
 wifi:
@@ -26,8 +23,7 @@ wifi:
 captive_portal:
 
 api:
-  encryption:
-    key: !secret api_encryption_key
+  password: !secret api_password
   reboot_timeout: 60min
   services:
     - service: recalibrate
@@ -62,15 +58,13 @@ vl53l1x:
   pins:
     xshut:
       number: GPIO3
-      mode: OUTPUT
+      mode: OUTPUT_PULLUP
+      ignore_strapping_warning: true
     interrupt:
       number: GPIO1
       mode: INPUT_PULLUP
 roode:
   id: roode_platform
-  # I removed the { size: 1 } option here since it was redundant.
-  # Can always add back later if we have more sampling paramaters.
-  sampling: 1
   # defaults for both zones
   roi:
     # height: 14

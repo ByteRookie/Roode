@@ -54,13 +54,10 @@ class Zone {
     samples.fill(0);
   }
   void set_max_samples(uint8_t max) { set_filter_window(max); };
-  void set_debug_mode(bool debug) { debug_mode_ = debug; }
 
- public:
-  VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
  protected:
-  bool debug_mode_{false};
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
+  VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
   uint16_t last_distance{0};
   uint16_t min_distance{0};
   static const uint8_t MAX_BUFFER_SIZE = 10;

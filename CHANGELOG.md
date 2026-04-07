@@ -1,19 +1,5 @@
 # Changelog
 
-## 1.8.0
-- Critical thread-safety fixes for FreeRTOS dual-core operation
-- I2C access protected via mutex on ESP32
-- Isolated state publishing and flash saves from sensor task core
-- Fixed "Out of Range" reboot loop by strictly checking I2C status
-- Fixed "Blind" auto-calibration by filtering invalid readings
-- Fixed "Ghost Occupancy" bug in path tracking logic
-- Fixed shared memory bug for multi-sensor configurations
-- Fixed NTP time-jump spurious recalibration by using millis()
-- Built Web Portal API backend for calibration and scanning
-- Fixed ESP8266 memory compilation errors
-- Added Wire library dependency for ESP32 linking
-- Updated YAML configurations for ESPHome 2026.2+
-
 ## 1.7.0
 - Restart sensor after consecutive invalid distance readings
 - Configurable `invalid_distance_limit` and `restart_timeout`
@@ -32,9 +18,26 @@
 ## 1.5.1
 - Add diagnostic sensors reporting loop time, CPU usage, and RAM and flash usage percentages
 
+
+
 ## 1.5.0
+
 - Manual ROI configuration fixed
 - Sensor initialization fixed
 - Fix setup priorities to ensure proper boot up
 - Code formatting
 - Cleanup
+
+## 1.4.1
+
+- Timing budget test by @Lyr3x in #60
+- Restructure configuration by @Lyr3x in #61
+- v1.4.0 by @Lyr3x in #55
+- Improve roi calibration by @Lyr3x in #64
+- Fix presence sensor and wdt crashes by @Lyr3x in #67
+- Improve sensor creation, initialization and measurement reads by @Lyr3x in #68
+- Use sampling always by @Lyr3x in #71
+- Improve error log and fix manual mode by @Lyr3x in #73
+- Configure IDE intellisense by @CarsonF in #74
+- Fix error handling by @Lyr3x in #75
+- Fix manual roi setting by @Lyr3x in #78

@@ -3,15 +3,15 @@ substitutions:
   friendly_name: $devicename
 
 external_components:
-  - source:
-      type: git
-      url: https://github.com/Lyr3x/Roode
-      ref: master
+  refresh: always
+  source:
+    type: git
+    url: https://github.com/Lyr3x/Roode
+    ref: master
 
 esphome:
   name: $devicename
-
-esp8266:
+  platform: ESP8266
   board: d1_mini
 
 wifi:
@@ -26,8 +26,7 @@ wifi:
 captive_portal:
 
 api:
-  encryption:
-    key: !secret api_encryption_key
+  password: !secret api_password
   reboot_timeout: 60min
   services:
     - service: recalibrate
@@ -35,8 +34,7 @@ api:
         - lambda: "id(roode_platform)->recalibration();"
 
 ota:
-  - platform: esphome
-    password: !secret ota_password
+  password: !secret ota_password
 
 web_server:
   port: 80
@@ -63,15 +61,14 @@ vl53l1x:
   pins:
     xshut:
       number: GPIO3
-      mode: OUTPUT
+      mode: OUTPUT_PULLUP
+      ignore_strapping_warning: true
     interrupt:
       number: GPIO1
       mode: INPUT_PULLUP
 
 roode:
   id: roode_platform
-  # Smooth out measurements by using the minimum distance from this number of readings
-  sampling: 2
   # This controls the size of the Region of Interest the sensor should take readings in.
   roi: { height: 16, width: 6 }
   # The detection thresholds for determining whether a measurement should count as a person crossing.
@@ -106,7 +103,7 @@ binary_sensor:
   - platform: status
     name: $friendly_name API Status
   - platform: roode
-    presence:
+    presence_sensor:
       name: $friendly_name presence
     sensor_xshut_state:
       name: $friendly_name xshut state

@@ -1,8 +1,7 @@
 <<: !include common.yaml
 esphome:
   name: $devicename
-
-esp8266:
+  platform: ESP8266
   board: d1_mini
 
 i2c:

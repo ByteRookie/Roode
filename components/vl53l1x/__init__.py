@@ -13,8 +13,6 @@ from esphome.const import (
     CONF_ADDRESS,
     CONF_OFFSET,
     CONF_PINS,
-    CONF_SCL,
-    CONF_SDA,
     CONF_TIMEOUT,
 )
 import esphome.pins as pins
@@ -113,6 +111,8 @@ CONFIG_SCHEMA = (
 
 
 async def to_code(config: Dict):
+    cg.add_library("rneurink", "1.2.3", "VL53L1X_ULD")
+
     vl53l1x = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(vl53l1x, config)
     await i2c.register_i2c_device(vl53l1x, config)

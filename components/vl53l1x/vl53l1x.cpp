@@ -6,6 +6,28 @@ namespace esphome {
 namespace vl53l1x {
 
 std::vector<VL53L1X *> VL53L1X::sensors{};
+thread_local VL53L1X *VL53L1X::active_sensor_ = nullptr;
+
+int8_t VL53L1X::uld_write_register(uint8_t address, uint16_t register_address, const uint8_t *data, size_t len) {
+  if (this->bus_ == nullptr || len > 64) {
+    return 1;
+  }
+  std::array<uint8_t, 66> buffer{};
+  buffer[0] = register_address >> 8;
+  buffer[1] = register_address & 0xFF;
+  if (len > 0) {
+    memcpy(buffer.data() + 2, data, len);
+  }
+  return this->bus_->write_readv(address, buffer.data(), len + 2, nullptr, 0) == i2c::ERROR_OK ? 0 : 1;
+}
+
+int8_t VL53L1X::uld_read_register(uint8_t address, uint16_t register_address, uint8_t *data, size_t len) {
+  if (this->bus_ == nullptr || len > 64) {
+    return 1;
+  }
+  std::array<uint8_t, 2> reg_buf{{static_cast<uint8_t>(register_address >> 8), static_cast<uint8_t>(register_address & 0xFF)}};
+  return this->bus_->write_readv(address, reg_buf.data(), reg_buf.size(), data, len) == i2c::ERROR_OK ? 0 : 1;
+}
 
 VL53L1X::~VL53L1X() {
   if (this->xshut_pin.has_value()) {
@@ -36,6 +58,7 @@ void VL53L1X::dump_config() {
 
 void VL53L1X::setup() {
   ESP_LOGD(TAG, "Beginning setup");
+  set_active_sensor(this);
 
   sensors.push_back(this);
   for (auto *s : sensors) {
@@ -218,6 +241,7 @@ void VL53L1X::set_ranging_mode(const RangingMode *mode) {
 }
 
 optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
+  set_active_sensor(this);
   if (this->is_failed()) {
     ESP_LOGW(TAG, "Cannot read distance while component is failed");
     record_failure();
@@ -456,6 +480,7 @@ bool VL53L1X::validate_interrupt() {
 }
 
 void VL53L1X::reinitialize_after_reset() {
+  set_active_sensor(this);
   // After an XSHUT power cycle + wait_for_boot(), the sensor loses all configuration.
   // Re-run Init() then restore offset, xtalk, and ranging mode so the sensor is
   // back in the same state it was after setup().
@@ -485,6 +510,7 @@ void VL53L1X::reinitialize_after_reset() {
 }
 
 void VL53L1X::restart() {
+  set_active_sensor(this);
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->digital_write(false);
     roode::Roode::log_event("xshut_pulse_off_sensor_" + std::to_string(sensor_id_));

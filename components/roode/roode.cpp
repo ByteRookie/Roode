@@ -13,6 +13,12 @@
 namespace esphome {
 namespace roode {
 
+static const char *filter_mode_to_str(FilterMode mode) {
+  if (mode == FILTER_MEDIAN) return "median";
+  if (mode == FILTER_PERCENTILE10) return "percentile10";
+  return "min";
+}
+
 // When disabled, fallback diagnostics are omitted from the log to reduce noise.
 bool Roode::log_fallback_events_ = false;
 Roode *Roode::instance_ = nullptr;
@@ -812,12 +818,6 @@ void Roode::update_status_text(const std::string &status) {
     status_text_sensor->publish_state(status);
     last_status_text_ = status;
   }
-}
-
-static const char *filter_mode_to_str(FilterMode mode) {
-  if (mode == FILTER_MEDIAN) return "median";
-  if (mode == FILTER_PERCENTILE10) return "percentile10";
-  return "min";
 }
 
 void Roode::apply_filter_mode(FilterMode mode) {

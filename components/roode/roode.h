@@ -4,6 +4,7 @@
 #include "Arduino.h"
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/core/application.h"
@@ -13,6 +14,12 @@
 #include "esphome/core/preferences.h"
 #include "orientation.h"
 #include "zone.h"
+
+namespace esphome {
+namespace roode {
+class FilterModeSelect;  // forward declaration — full type in select.h
+}
+}
 
 using namespace esphome::vl53l1x;
 using TofSensor = esphome::vl53l1x::VL53L1X;
@@ -70,6 +77,11 @@ class Roode : public PollingComponent {
   void set_tof_sensor(TofSensor *sensor) { this->distanceSensor = sensor; }
   void set_invert_direction(bool dir) { invert_direction_ = dir; }
   void set_orientation(Orientation val) { orientation_ = val; }
+  void set_sampling_size(uint8_t size) {
+    samples = size;
+    entry->set_max_samples(size);
+    exit->set_max_samples(size);
+  }
   void set_distance_entry(sensor::Sensor *distance_entry_) { distance_entry = distance_entry_; }
   void set_distance_exit(sensor::Sensor *distance_exit_) { distance_exit = distance_exit_; }
   void set_people_counter(number::Number *counter) { this->people_counter = counter; }
@@ -131,6 +143,9 @@ class Roode : public PollingComponent {
     entry->set_filter_window(window);
     exit->set_filter_window(window);
   }
+  void set_filter_mode_select(FilterModeSelect *sel) { filter_mode_select_ = sel; }
+  /** Apply a filter mode at runtime, updating zones and persisting to flash. */
+  void apply_filter_mode(FilterMode mode);
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
   void set_cpu_optimization_thresholds(float activate, float deactivate) {
@@ -151,6 +166,7 @@ class Roode : public PollingComponent {
  protected:
   TofSensor *distanceSensor;
   Zone *current_zone = entry;
+  FilterModeSelect *filter_mode_select_{nullptr};
   sensor::Sensor *distance_entry{nullptr};
   sensor::Sensor *distance_exit{nullptr};
   number::Number *people_counter{nullptr};
@@ -186,7 +202,8 @@ class Roode : public PollingComponent {
   };
   CalibrationPrefs calibration_data_[2];
   ESPPreferenceObject calibration_prefs_[2];
-  bool calibration_persistence_{false};
+  ESPPreferenceObject filter_mode_pref_;
+  bool calibration_persistence_{true};
   bool fail_safe_triggered_{false};
   uint32_t last_calibration_ts_{0};
   uint32_t auto_calibration_interval_sec_{4 * 60 * 60};
@@ -213,13 +230,6 @@ class Roode : public PollingComponent {
   FSMState state_{STATE_IDLE};
   uint32_t state_started_ts{0};
 
-  // PathTrack state - moved from static locals in path_tracking() so they can be reset
-  int path_track_[4]{0, 0, 0, 0};
-  int path_track_filling_size_{1};
-  int left_previous_status_{NOBODY};
-  int right_previous_status_{NOBODY};
-  uint32_t path_track_start_ms_{0};
-
   unsigned long last_valid_crossing_ts_{0};
   unsigned long zone_triggered_start_[2]{0, 0};
 
@@ -237,6 +247,7 @@ class Roode : public PollingComponent {
   void publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax);
   void updateCounter(int delta);
   Orientation orientation_{Parallel};
+  uint8_t samples{2};
   bool invert_direction_{false};
   int number_attempts = 20;  // TO DO: make this configurable
   int short_distance_threshold = 1300;
@@ -249,6 +260,7 @@ class Roode : public PollingComponent {
   uint32_t last_loop_update_ts_{0};
   uint32_t last_sensor_restart_ts_{0};
   uint32_t restart_timeout_ms_{30000};
+  uint32_t restart_backoff_ms_{30000};
   uint8_t invalid_distance_limit_{10};
   uint8_t invalid_read_count_{0};
   uint8_t restart_attempt_count_{0};

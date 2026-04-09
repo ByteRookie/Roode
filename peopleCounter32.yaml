@@ -72,6 +72,8 @@ vl53l1x:
 
 roode:
   id: roode_platform
+  # Smooth out measurements by using the minimum distance from this number of readings
+  sampling: 2
   # This controls the size of the Region of Interest the sensor should take readings in.
   roi: { height: 16, width: 6 }
   # The detection thresholds for determining whether a measurement should count as a person crossing.
@@ -81,10 +83,17 @@ roode:
   detection_thresholds: # defaults for both zones. These also default to 0% & 85% as previously done.
     # min: 234mm # absolute distance
     max: 85% # percent based on idle distance
+  # Save calibration thresholds to flash so they survive reboots without re-sampling from scratch.
+  calibration_persistence: true
   # The people counting algorithm works by splitting the sensor's capability reading area into two zones.
   # This allows for detecting whether a crossing is an entry or exit based on which zones was crossed first.
   zones:
     invert: true
+
+select:
+  - platform: roode
+    filter_mode:
+      name: $friendly_name filter mode
 
 button:
   - platform: restart

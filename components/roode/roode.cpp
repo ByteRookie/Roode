@@ -1,4 +1,5 @@
 #include "roode.h"
+#include "select.h"
 #include "Arduino.h"
 #ifdef CONFIG_IDF_TARGET_ESP32
 #include "esp_task_wdt.h"  // Access to the ESP32 task watchdog
@@ -121,7 +122,7 @@ Roode::~Roode() {
 }
 void Roode::dump_config() {
   ESP_LOGCONFIG(TAG, "Roode:");
-  ESP_LOGCONFIG(TAG, "  Filter window: %d", filter_window_);
+  ESP_LOGCONFIG(TAG, "  Sample size: %d", samples);
   LOG_UPDATE_INTERVAL(this);
   entry->dump_config();
   exit->dump_config();
@@ -132,7 +133,7 @@ void Roode::setup() {
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
   }
-  ESP_LOGI(SETUP, "Using filter window: %d, mode: %d", filter_window_, (int) filter_mode_);
+  ESP_LOGI(SETUP, "Using sampling with sampling size: %d", samples);
 
   if (this->distanceSensor->is_failed()) {
     this->mark_failed();
@@ -149,6 +150,17 @@ void Roode::setup() {
   exit->set_filter_mode(filter_mode_);
 
   if (calibration_persistence_) {
+    filter_mode_pref_ = global_preferences->make_preference<uint8_t>(0xB0);
+    uint8_t saved_mode;
+    if (filter_mode_pref_.load(&saved_mode) && saved_mode < 3) {
+      // Restore the filter mode the user last selected at runtime
+      auto mode = static_cast<FilterMode>(saved_mode);
+      filter_mode_ = mode;
+      default_filter_mode_ = mode;
+      entry->set_filter_mode(mode);
+      exit->set_filter_mode(mode);
+    }
+
     calibration_prefs_[0] = global_preferences->make_preference<CalibrationPrefs>(0xA0);
     calibration_prefs_[1] = global_preferences->make_preference<CalibrationPrefs>(0xA1);
     bool loaded = true;
@@ -248,6 +260,9 @@ void Roode::setup() {
     expected_counter_ = people_counter->state;
 
   publish_feature_list();
+  if (filter_mode_select_ != nullptr) {
+    filter_mode_select_->publish_state(filter_mode_to_str(filter_mode_));
+  }
   update_status_text("ok");
 }
 
@@ -289,14 +304,16 @@ void Roode::loop() {
   }
   uint32_t now = millis();
   if (last_loop_update_ts_ != 0 && (now - last_loop_update_ts_ > restart_timeout_ms_) &&
-      (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
+      (now - last_sensor_restart_ts_ > restart_backoff_ms_)) {
     ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", restart_timeout_ms_ / 1000);
     restart_sensor();
   }
   unsigned long start = micros();
   VL53L1_Error status = this->current_zone->readDistance(distanceSensor);
-  if (status == VL53L1_ERROR_NONE)
+  if (status == VL53L1_ERROR_NONE) {
     last_loop_update_ts_ = millis();
+    restart_backoff_ms_ = restart_timeout_ms_;  // reset backoff on successful read
+  }
   uint16_t dist = this->current_zone->getDistance();
   if (status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
     invalid_read_count_++;
@@ -304,7 +321,7 @@ void Roode::loop() {
     invalid_read_count_ = 0;
   }
   // Attempt to recover the sensor when repeated invalid distance values are observed
-  if (invalid_read_count_ > invalid_distance_limit_ && (now - last_sensor_restart_ts_ > restart_timeout_ms_)) {
+  if (invalid_read_count_ > invalid_distance_limit_ && (now - last_sensor_restart_ts_ > restart_backoff_ms_)) {
     ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
     restart_sensor();
   }
@@ -360,38 +377,17 @@ bool Roode::handle_sensor_status() {
 }
 
 void Roode::path_tracking(Zone *zone) {
+  static int PathTrack[] = {0, 0, 0, 0};
+  static int PathTrackFillingSize = 1;  // init this to 1 as we start from state
+                                        // where nobody is any of the zones
+  static int LeftPreviousStatus = NOBODY;
+  static int RightPreviousStatus = NOBODY;
   int CurrentZoneStatus = NOBODY;
   int AllZonesCurrentStatus = 0;
   int AnEventHasOccured = 0;
 
-  // Timeout for partial crossing sequences - applies regardless of which zone triggered first.
-  // Without this, a partial crossing (person backs out) permanently corrupts the PathTrack
-  // buffer, causing subsequent valid crossings to be missed or detected in the wrong direction.
-  if (path_track_filling_size_ > 1 && path_track_start_ms_ != 0 &&
-      millis() - path_track_start_ms_ > 3500) {
-    path_track_[0] = 0;
-    path_track_[1] = 0;
-    path_track_[2] = 0;
-    path_track_[3] = 0;
-    path_track_filling_size_ = 1;
-    left_previous_status_ = NOBODY;
-    right_previous_status_ = NOBODY;
-    path_track_start_ms_ = 0;
-    state_ = STATE_IDLE;
-    ESP_LOGW(TAG, "path_track_timeout_reset");
-  }
-
-  // Legacy FSM timeout (left-zone-first paths only) - also resets PathTrack
-  uint32_t fsm_timeout = state_ == STATE_ENTRY_ACTIVE ? 2500 : 3500;
-  if (state_ != STATE_IDLE && millis() - state_started_ts > fsm_timeout) {
-    path_track_[0] = 0;
-    path_track_[1] = 0;
-    path_track_[2] = 0;
-    path_track_[3] = 0;
-    path_track_filling_size_ = 1;
-    left_previous_status_ = NOBODY;
-    right_previous_status_ = NOBODY;
-    path_track_start_ms_ = 0;
+  uint32_t timeout = state_ == STATE_ENTRY_ACTIVE ? 2500 : 3500;
+  if (state_ != STATE_IDLE && millis() - state_started_ts > timeout) {
     state_ = STATE_IDLE;
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
@@ -436,7 +432,7 @@ void Roode::path_tracking(Zone *zone) {
 
   // left zone
   if (zone == (this->invert_direction_ ? this->exit : this->entry)) {
-    if (CurrentZoneStatus != left_previous_status_) {
+    if (CurrentZoneStatus != LeftPreviousStatus) {
       // event in left zone has occured
       AnEventHasOccured = 1;
 
@@ -449,17 +445,17 @@ void Roode::path_tracking(Zone *zone) {
         AllZonesCurrentStatus += 1;
       }
       // need to check right zone as well ...
-      if (right_previous_status_ == SOMEONE) {
+      if (RightPreviousStatus == SOMEONE) {
         // event in right zone has occured
         AllZonesCurrentStatus += 2;
       }
       // remember for next time
-      left_previous_status_ = CurrentZoneStatus;
+      LeftPreviousStatus = CurrentZoneStatus;
     }
   }
   // right zone
   else {
-    if (CurrentZoneStatus != right_previous_status_) {
+    if (CurrentZoneStatus != RightPreviousStatus) {
       // event in right zone has occured
       AnEventHasOccured = 1;
       if (CurrentZoneStatus == SOMEONE) {
@@ -470,42 +466,42 @@ void Roode::path_tracking(Zone *zone) {
         }
       }
       // need to check left zone as well ...
-      if (left_previous_status_ == SOMEONE) {
+      if (LeftPreviousStatus == SOMEONE) {
         // event in left zone has occured
         AllZonesCurrentStatus += 1;
       }
       // remember for next time
-      right_previous_status_ = CurrentZoneStatus;
+      RightPreviousStatus = CurrentZoneStatus;
     }
   }
 
   // if an event has occured
   if (AnEventHasOccured) {
     ESP_LOGD(TAG, "Event has occured, AllZonesCurrentStatus: %d", AllZonesCurrentStatus);
-    if (path_track_filling_size_ < 4) {
-      path_track_filling_size_++;
-    }
-    // Start the partial-path timeout clock on first event
-    if (path_track_start_ms_ == 0) {
-      path_track_start_ms_ = millis();
+    if (PathTrackFillingSize < 4) {
+      PathTrackFillingSize++;
     }
 
     // if nobody anywhere lets check if an exit or entry has happened
-    if ((left_previous_status_ == NOBODY) && (right_previous_status_ == NOBODY)) {
+    if ((LeftPreviousStatus == NOBODY) && (RightPreviousStatus == NOBODY)) {
       ESP_LOGD(TAG, "Nobody anywhere, AllZonesCurrentStatus: %d", AllZonesCurrentStatus);
-      // check exit or entry only if path_track_filling_size_ is 4 (for example 0 1
-      // 3 2) and last event is 0 (nobody anywhere)
-      if (path_track_filling_size_ == 4) {
-        if ((path_track_[1] == 1) && (path_track_[2] == 3) && (path_track_[3] == 2)) {
-          // Left zone first = Exit
+      // check exit or entry only if PathTrackFillingSize is 4 (for example 0 1
+      // 3 2) and last event is 0 (nobobdy anywhere)
+      if (PathTrackFillingSize == 4) {
+        // check exit or entry. no need to check PathTrack[0] == 0 , it is
+        // always the case
+
+        if ((PathTrack[1] == 1) && (PathTrack[2] == 3) && (PathTrack[3] == 2)) {
+          // This an exit
           ESP_LOGI("Roode pathTracking", "Exit detected.");
+
           this->updateCounter(-1);
           last_valid_crossing_ts_ = millis();
           if (entry_exit_event_sensor != nullptr) {
             entry_exit_event_sensor->publish_state("Exit");
           }
-        } else if ((path_track_[1] == 2) && (path_track_[2] == 3) && (path_track_[3] == 1)) {
-          // Right zone first = Entry
+        } else if ((PathTrack[1] == 2) && (PathTrack[2] == 3) && (PathTrack[3] == 1)) {
+          // This an entry
           ESP_LOGI("Roode pathTracking", "Entry detected.");
           this->updateCounter(1);
           last_valid_crossing_ts_ = millis();
@@ -515,21 +511,22 @@ void Roode::path_tracking(Zone *zone) {
         }
       }
 
-      path_track_filling_size_ = 1;
-      path_track_start_ms_ = 0;
+      PathTrackFillingSize = 1;
       state_ = STATE_IDLE;
     } else {
-      // update path_track_
-      // example of path_track_ update
+      // update PathTrack
+      // example of PathTrack update
       // 0
       // 0 1
       // 0 1 3
-      // 0 1 3 2 ==> if next is 0 : exit
-      path_track_[path_track_filling_size_ - 1] = AllZonesCurrentStatus;
+      // 0 1 3 1
+      // 0 1 3 3
+      // 0 1 3 2 ==> if next is 0 : check if exit
+      PathTrack[PathTrackFillingSize - 1] = AllZonesCurrentStatus;
     }
   }
   if (presence_sensor != nullptr) {
-    if (CurrentZoneStatus == NOBODY && left_previous_status_ == NOBODY && right_previous_status_ == NOBODY) {
+    if (CurrentZoneStatus == NOBODY && LeftPreviousStatus == NOBODY && RightPreviousStatus == NOBODY) {
       // nobody is in the sensing area
       presence_sensor->publish_state(false);
     }
@@ -552,10 +549,14 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;
   z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
+  // First pass: measure with reset ROI to get idle distance for ROI sizing
   z->calibrateThreshold(distanceSensor, 50);
-  // Recalculate ROI sizes so thresholds remain consistent
+  // Recalculate ROI sizes based on the measured idle distance
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
   exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
+  // Second pass: re-measure threshold with the calibrated ROI so thresholds match
+  // the actual ROI that will be used for detection (same as calibrate_zones() does)
+  z->calibrateThreshold(distanceSensor, 20);
   auto *mode = determine_ranging_mode(entry->threshold->idle, exit->threshold->idle);
   distanceSensor->set_ranging_mode(mode);
 
@@ -813,16 +814,49 @@ void Roode::update_status_text(const std::string &status) {
   }
 }
 
+static const char *filter_mode_to_str(FilterMode mode) {
+  if (mode == FILTER_MEDIAN) return "median";
+  if (mode == FILTER_PERCENTILE10) return "percentile10";
+  return "min";
+}
+
+void Roode::apply_filter_mode(FilterMode mode) {
+  filter_mode_ = mode;
+  default_filter_mode_ = mode;
+  entry->set_filter_mode(mode);
+  exit->set_filter_mode(mode);
+  if (calibration_persistence_) {
+    uint8_t mode_byte = static_cast<uint8_t>(mode);
+    filter_mode_pref_.save(&mode_byte);
+  }
+  if (filter_mode_select_ != nullptr) {
+    filter_mode_select_->publish_state(filter_mode_to_str(mode));
+  }
+  ESP_LOGI(TAG, "filter_mode_changed: %s", filter_mode_to_str(mode));
+}
+
+void FilterModeSelect::control(const std::string &value) {
+  FilterMode mode = FILTER_MIN;
+  if (value == "median") mode = FILTER_MEDIAN;
+  else if (value == "percentile10") mode = FILTER_PERCENTILE10;
+  hub_->apply_filter_mode(mode);
+}
+
 void Roode::restart_sensor() {
   uint32_t now = millis();
-  if (now - last_sensor_restart_ts_ > restart_timeout_ms_)
+  if (now - last_sensor_restart_ts_ > restart_backoff_ms_) {
+    // No restart was needed for the full backoff window — reset the counter
     restart_attempt_count_ = 0;
+    restart_backoff_ms_ = restart_timeout_ms_;
+  }
   restart_attempt_count_++;
-  ESP_LOGW(TAG, "sensor_restart_attempt_%u", restart_attempt_count_);
+  ESP_LOGW(TAG, "sensor_restart_attempt_%u (backoff=%us)", restart_attempt_count_, restart_backoff_ms_ / 1000);
   log_event(std::string("sensor_restart_attempt_") + std::to_string(restart_attempt_count_));
   distanceSensor->restart();
   last_sensor_restart_ts_ = now;
   invalid_read_count_ = 0;
+  // Double the backoff for the next attempt, capped at 120s
+  restart_backoff_ms_ = std::min(restart_backoff_ms_ * 2, static_cast<uint32_t>(120000));
   if (restart_attempt_count_ >= max_restart_attempts_) {
     ESP_LOGE(TAG, "sensor_restart_escalating_reset");
     log_event("sensor_restart_escalating_reset");
@@ -844,14 +878,16 @@ void Roode::sensor_task(void *param) {
     self->use_sensor_task_ = true;
     uint32_t now = millis();
     if (self->last_loop_update_ts_ != 0 && (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
-        (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
+        (now - self->last_sensor_restart_ts_ > self->restart_backoff_ms_)) {
       ESP_LOGW(TAG, "Sensor unresponsive >%ds, restarting...", self->restart_timeout_ms_ / 1000);
       self->restart_sensor();
     }
     unsigned long start = micros();
     VL53L1_Error status = self->current_zone->readDistance(self->distanceSensor);
-    if (status == VL53L1_ERROR_NONE)
+    if (status == VL53L1_ERROR_NONE) {
       self->last_loop_update_ts_ = millis();
+      self->restart_backoff_ms_ = self->restart_timeout_ms_;  // reset backoff on successful read
+    }
     uint16_t dist = self->current_zone->getDistance();
     if (status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
       self->invalid_read_count_++;
@@ -860,7 +896,7 @@ void Roode::sensor_task(void *param) {
     }
     // Similar recovery check for the asynchronous sensor task
     if (self->invalid_read_count_ > self->invalid_distance_limit_ &&
-        (now - self->last_sensor_restart_ts_ > self->restart_timeout_ms_)) {
+        (now - self->last_sensor_restart_ts_ > self->restart_backoff_ms_)) {
       ESP_LOGW(TAG, "Consecutive invalid distances, restarting...");
       self->restart_sensor();
     }
@@ -875,6 +911,21 @@ void Roode::sensor_task(void *param) {
     self->loop_time_sum_ += delta;
     self->loop_count_++;
     self->update_metrics();
+    // Run periodic auto-calibration from the sensor task (the main loop() returns early in dual-core
+    // mode, so calibration must be triggered here to actually execute on ESP32)
+    uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
+    if (self->auto_calibration_interval_sec_ > 0 &&
+        now_epoch - self->last_calibration_ts_ >= self->auto_calibration_interval_sec_) {
+      // Only calibrate when both zones are clear — calibrating with someone present corrupts the baseline
+      bool zones_clear = self->entry->getMinDistance() >= self->entry->threshold->max &&
+                         self->exit->getMinDistance() >= self->exit->threshold->max;
+      if (zones_clear) {
+        ESP_LOGI(TAG, "auto_calibration_running");
+        self->calibrate_zones();
+      } else {
+        ESP_LOGD(TAG, "auto_calibration_deferred: zones occupied");
+      }
+    }
     vTaskDelay(pdMS_TO_TICKS(self->polling_interval_ms_));
   }
 }

@@ -11,7 +11,7 @@ from esphome.const import (
 from ..vl53l1x import distance_as_mm, NullableSchema, VL53L1X
 
 DEPENDENCIES = ["vl53l1x"]
-AUTO_LOAD = ["vl53l1x", "sensor", "binary_sensor", "text_sensor", "number"]
+AUTO_LOAD = ["vl53l1x", "sensor", "binary_sensor", "text_sensor", "number", "select"]
 MULTI_CONF = True
 
 CONF_ROODE_ID = "roode_id"
@@ -28,6 +28,7 @@ CONF_CENTER = "center"
 CONF_MAX = "max"
 CONF_MIN = "min"
 CONF_ROI = "roi"
+CONF_SAMPLING = "sampling"
 CONF_ZONES = "zones"
 CONF_CALIBRATION_PERSISTENCE = "calibration_persistence"
 CONF_FILTER_MODE = "filter_mode"
@@ -39,8 +40,6 @@ CONF_RESTART_TIMEOUT = "restart_timeout"
 CONF_CPU_OPTIMIZATION = "cpu_optimization"
 CONF_ACTIVATE = "activate"
 CONF_DEACTIVATE = "deactivate"
-CONF_SAMPLING = "sampling"
-CONF_PORTAL_PASSWORD = "portal_password"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -89,13 +88,12 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.declare_id(Roode),
         cv.GenerateID(CONF_SENSOR): cv.use_id(VL53L1X),
         cv.Optional(CONF_ORIENTATION, default="parallel"): cv.enum(ORIENTATION_VALUES),
-        cv.Optional(CONF_SAMPLING): cv.All(cv.uint8_t, cv.Range(min=1)),
-        cv.Optional(CONF_PORTAL_PASSWORD): cv.string,
+        cv.Optional(CONF_SAMPLING, default=2): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_ROI, default={}): ROI_SCHEMA,
         cv.Optional(CONF_DETECTION_THRESHOLDS, default={}): THRESHOLDS_SCHEMA,
-        cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=False): cv.boolean,
+        cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=True): cv.boolean,
         cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(FILTER_MODES, upper=False),
-        cv.Optional(CONF_FILTER_WINDOW, default=2): cv.All(cv.uint8_t, cv.Range(min=1)),
+        cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_LOG_FALLBACK, default=False): cv.boolean,
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
         cv.Optional(CONF_INVALID_DISTANCE_LIMIT, default=10): cv.All(cv.uint8_t, cv.Range(min=1)),
@@ -125,10 +123,10 @@ async def to_code(config: Dict):
     cg.add(roode.set_tof_sensor(sens))
 
     cg.add(roode.set_orientation(config[CONF_ORIENTATION]))
+    cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
     cg.add(roode.set_calibration_persistence(config[CONF_CALIBRATION_PERSISTENCE]))
     cg.add(roode.set_filter_mode(config[CONF_FILTER_MODE]))
-    filter_window = config.get(CONF_SAMPLING, config[CONF_FILTER_WINDOW])
-    cg.add(roode.set_filter_window(filter_window))
+    cg.add(roode.set_filter_window(config[CONF_FILTER_WINDOW]))
     cg.add(roode.set_log_fallback_events(config[CONF_LOG_FALLBACK]))
     cg.add(roode.set_force_single_core(config[CONF_FORCE_SINGLE_CORE]))
     cg.add(roode.set_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT]))

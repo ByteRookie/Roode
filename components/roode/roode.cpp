@@ -1,5 +1,7 @@
 #include "roode.h"
 #include "select.h"
+#include "setting_number.h"
+#include "switch.h"
 #include "Arduino.h"
 #ifdef CONFIG_IDF_TARGET_ESP32
 #include "esp_task_wdt.h"  // Access to the ESP32 task watchdog
@@ -155,18 +157,11 @@ void Roode::setup() {
   exit->set_filter_window(filter_window_);
   exit->set_filter_mode(filter_mode_);
 
-  if (calibration_persistence_) {
-    filter_mode_pref_ = global_preferences->make_preference<uint8_t>(0xB0);
-    uint8_t saved_mode;
-    if (filter_mode_pref_.load(&saved_mode) && saved_mode < 3) {
-      // Restore the filter mode the user last selected at runtime
-      auto mode = static_cast<FilterMode>(saved_mode);
-      filter_mode_ = mode;
-      default_filter_mode_ = mode;
-      entry->set_filter_mode(mode);
-      exit->set_filter_mode(mode);
-    }
+  // Restore all runtime settings (filter mode, sampling, thresholds, ROI, ranging mode, direction)
+  // from flash before calibration so they are applied before the first measurement.
+  restore_settings_from_flash();
 
+  if (calibration_persistence_) {
     calibration_prefs_[0] = global_preferences->make_preference<CalibrationPrefs>(0xA0);
     calibration_prefs_[1] = global_preferences->make_preference<CalibrationPrefs>(0xA1);
     bool loaded = true;
@@ -266,10 +261,10 @@ void Roode::setup() {
     expected_counter_ = people_counter->state;
 
   publish_feature_list();
-  if (filter_mode_select_ != nullptr) {
-    filter_mode_select_->publish_state(filter_mode_to_str(filter_mode_));
-  }
-  update_status_text("ok");
+  publish_setting_entities();
+  // Only set "ok" if calibration didn't just run (calibrate_zones sets its own status + reset timer)
+  if (calibration_status_reset_ts_ == 0)
+    update_status_text("ok");
 }
 
 void Roode::update() {
@@ -345,11 +340,20 @@ void Roode::loop() {
   loop_time_sum_ += delta;
   loop_count_++;
   update_metrics();
+  // Periodic auto-calibration (single-core path).
+  // Guard: epoch must be valid (NTP synced), interval must be non-zero,
+  // and both zones must be clear so we never calibrate over a live reading.
   uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
-  if (auto_calibration_interval_sec_ > 0 &&
+  if (auto_calibration_interval_sec_ > 0 && now_epoch > 100000 &&
       now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
-    run_zone_calibration(0);
-    run_zone_calibration(1);
+    bool zones_clear = entry->getMinDistance() >= entry->threshold->max &&
+                       exit->getMinDistance() >= exit->threshold->max;
+    if (zones_clear) {
+      ESP_LOGI(TAG, "auto_calibration_running");
+      calibrate_zones();
+    } else {
+      ESP_LOGD(TAG, "auto_calibration_deferred: zones occupied");
+    }
   }
   delay(polling_interval_ms_);
 }
@@ -376,6 +380,13 @@ bool Roode::handle_sensor_status() {
       status_sensor->publish_state(sensor_status);
   }
 
+  // Don't overwrite a pending calibration status message with "ok" — let the
+  // 5-second reset timer in update_metrics() handle the transition back to "ok".
+  if (text_state == "ok" && calibration_status_reset_ts_ != 0) {
+    last_sensor_status = sensor_status;
+    sensor_status = VL53L1_ERROR_NONE;
+    return check_status;
+  }
   update_status_text(text_state);
   last_sensor_status = sensor_status;
   sensor_status = VL53L1_ERROR_NONE;
@@ -581,6 +592,13 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   last_calibration_ts_ =
       std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
+  char cal_msg[64];
+  snprintf(cal_msg, sizeof(cal_msg), "calibrated: idle=%dmm thresh=%d-%d%%",
+           z->threshold->idle,
+           z->threshold->min_percentage.value_or(15),
+           z->threshold->max_percentage.value_or(80));
+  update_status_text(std::string(cal_msg));
+  calibration_status_reset_ts_ = millis();
 }
 
 void Roode::apply_cpu_optimizations(float cpu) {
@@ -650,6 +668,12 @@ void Roode::update_metrics() {
   }
   apply_cpu_optimizations(cpu);
   reset_cpu_optimizations(cpu);
+  // Reset calibration status message back to "ok" after 5 seconds
+  if (calibration_status_reset_ts_ != 0 && (now - calibration_status_reset_ts_) >= 5000) {
+    calibration_status_reset_ts_ = 0;
+    last_status_text_ = "";  // Force re-publish even if previous text was also "ok"
+    update_status_text("ok");
+  }
   loop_time_sum_ = 0;
   loop_count_ = 0;
   loop_window_start_ = now;
@@ -678,6 +702,7 @@ const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_dis
 
 void Roode::calibrate_zones() {
   ESP_LOGI(SETUP, "Calibrating sensor zones");
+  update_status_text("calibrating...");
 
   entry->reset_roi(orientation_ == Parallel ? 167 : 195);
   exit->reset_roi(orientation_ == Parallel ? 231 : 60);
@@ -706,6 +731,13 @@ void Roode::calibrate_zones() {
   last_calibration_ts_ =
       std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
+  char cal_msg[64];
+  snprintf(cal_msg, sizeof(cal_msg), "calibrated: idle=%dmm thresh=%d-%d%%",
+           entry->threshold->idle,
+           entry->threshold->min_percentage.value_or(15),
+           entry->threshold->max_percentage.value_or(80));
+  update_status_text(std::string(cal_msg));
+  calibration_status_reset_ts_ = millis();
 }
 
 void Roode::calibrateDistance() {
@@ -835,11 +867,382 @@ void Roode::apply_filter_mode(FilterMode mode) {
   ESP_LOGI(TAG, "filter_mode_changed: %s", filter_mode_to_str(mode));
 }
 
+void Roode::restore_settings_from_flash() {
+  if (!calibration_persistence_)
+    return;
+
+  filter_mode_pref_       = global_preferences->make_preference<uint8_t>(0xB0);
+  sampling_pref_          = global_preferences->make_preference<uint8_t>(0xB1);
+  filter_window_pref_     = global_preferences->make_preference<uint8_t>(0xB2);
+  entry_max_pct_pref_     = global_preferences->make_preference<uint8_t>(0xB3);
+  entry_min_pct_pref_     = global_preferences->make_preference<uint8_t>(0xB4);
+  exit_max_pct_pref_      = global_preferences->make_preference<uint8_t>(0xB5);
+  exit_min_pct_pref_      = global_preferences->make_preference<uint8_t>(0xB6);
+  auto_cal_interval_pref_ = global_preferences->make_preference<uint8_t>(0xB7);
+  entry_roi_height_pref_  = global_preferences->make_preference<uint8_t>(0xB8);
+  entry_roi_width_pref_   = global_preferences->make_preference<uint8_t>(0xB9);
+  exit_roi_height_pref_   = global_preferences->make_preference<uint8_t>(0xBA);
+  exit_roi_width_pref_    = global_preferences->make_preference<uint8_t>(0xBB);
+  ranging_mode_pref_      = global_preferences->make_preference<uint8_t>(0xBC);
+  invert_direction_pref_  = global_preferences->make_preference<uint8_t>(0xBD);
+
+  uint8_t val;
+
+  if (filter_mode_pref_.load(&val) && val < 3) {
+    auto mode = static_cast<FilterMode>(val);
+    filter_mode_ = mode; default_filter_mode_ = mode;
+    entry->set_filter_mode(mode); exit->set_filter_mode(mode);
+  }
+  if (sampling_pref_.load(&val) && val >= 1) {
+    samples = val;
+    entry->set_max_samples(val); exit->set_max_samples(val);
+  }
+  if (filter_window_pref_.load(&val) && val >= 1) {
+    filter_window_ = val; default_filter_window_ = val;
+    entry->set_filter_window(val); exit->set_filter_window(val);
+  }
+  if (entry_max_pct_pref_.load(&val) && val <= 100)
+    entry->set_threshold_percentages(entry->threshold->min_percentage.value_or(15), val);
+  if (entry_min_pct_pref_.load(&val) && val <= 100)
+    entry->set_threshold_percentages(val, entry->threshold->max_percentage.value_or(80));
+  if (exit_max_pct_pref_.load(&val) && val <= 100)
+    exit->set_threshold_percentages(exit->threshold->min_percentage.value_or(15), val);
+  if (exit_min_pct_pref_.load(&val) && val <= 100)
+    exit->set_threshold_percentages(val, exit->threshold->max_percentage.value_or(80));
+  if (auto_cal_interval_pref_.load(&val))
+    auto_calibration_interval_sec_ = static_cast<uint32_t>(val) * 1800;  // stored in 30-min units
+  if (entry_roi_height_pref_.load(&val) && val >= 4 && val <= 16)
+    entry->roi_override->set_height(val);
+  if (entry_roi_width_pref_.load(&val) && val >= 4 && val <= 16)
+    entry->roi_override->set_width(val);
+  if (exit_roi_height_pref_.load(&val) && val >= 4 && val <= 16)
+    exit->roi_override->set_height(val);
+  if (exit_roi_width_pref_.load(&val) && val >= 4 && val <= 16)
+    exit->roi_override->set_width(val);
+  if (ranging_mode_pref_.load(&val) && val > 0 && val < 6) {
+    const RangingMode *modes[] = {nullptr, Ranging::Short, Ranging::Medium, Ranging::Long, Ranging::Longer, Ranging::Longest};
+    distanceSensor->set_ranging_mode_override(modes[val]);
+  }
+  if (invert_direction_pref_.load(&val))
+    invert_direction_ = (val != 0);
+}
+
+void Roode::publish_setting_entities() {
+  if (filter_mode_select_ != nullptr)
+    filter_mode_select_->publish_state(filter_mode_to_str(filter_mode_));
+  if (ranging_mode_select_ != nullptr) {
+    auto ov = distanceSensor->get_ranging_mode_override();
+    std::string rm = "auto";
+    if (ov.has_value()) {
+      auto *m = *ov;
+      if (m == Ranging::Short) rm = "short";
+      else if (m == Ranging::Medium) rm = "medium";
+      else if (m == Ranging::Long) rm = "long";
+      else if (m == Ranging::Longer) rm = "longer";
+      else if (m == Ranging::Longest) rm = "longest";
+    }
+    ranging_mode_select_->publish_state(rm);
+  }
+  if (invert_direction_switch_ != nullptr)
+    invert_direction_switch_->publish_state(invert_direction_);
+  if (cal_persistence_switch_ != nullptr)
+    cal_persistence_switch_->publish_state(calibration_persistence_);
+  if (filter_window_number_ != nullptr)
+    filter_window_number_->publish_state(filter_window_);
+  if (sampling_number_ != nullptr)
+    sampling_number_->publish_state(samples);
+  if (entry_max_threshold_number_ != nullptr)
+    entry_max_threshold_number_->publish_state(entry->threshold->max_percentage.value_or(80));
+  if (entry_min_threshold_number_ != nullptr)
+    entry_min_threshold_number_->publish_state(entry->threshold->min_percentage.value_or(15));
+  if (exit_max_threshold_number_ != nullptr)
+    exit_max_threshold_number_->publish_state(exit->threshold->max_percentage.value_or(80));
+  if (exit_min_threshold_number_ != nullptr)
+    exit_min_threshold_number_->publish_state(exit->threshold->min_percentage.value_or(15));
+  if (auto_cal_interval_number_ != nullptr)
+    auto_cal_interval_number_->publish_state(auto_calibration_interval_sec_ / 3600.0f);
+  if (entry_roi_height_number_ != nullptr)
+    entry_roi_height_number_->publish_state(entry->roi->height);
+  if (entry_roi_width_number_ != nullptr)
+    entry_roi_width_number_->publish_state(entry->roi->width);
+  if (exit_roi_height_number_ != nullptr)
+    exit_roi_height_number_->publish_state(exit->roi->height);
+  if (exit_roi_width_number_ != nullptr)
+    exit_roi_width_number_->publish_state(exit->roi->width);
+}
+
+void Roode::apply_sampling(uint8_t val) {
+  if (val < 1) val = 1;
+  samples = val;
+  entry->set_max_samples(val);
+  exit->set_max_samples(val);
+  if (calibration_persistence_) {
+    sampling_pref_.save(&val);
+  }
+  if (sampling_number_ != nullptr)
+    sampling_number_->publish_state(val);
+  ESP_LOGI(TAG, "sampling changed: %u", val);
+}
+
+void Roode::apply_filter_window(uint8_t val) {
+  if (val < 1) val = 1;
+  filter_window_ = val;
+  default_filter_window_ = val;
+  entry->set_filter_window(val);
+  exit->set_filter_window(val);
+  if (calibration_persistence_) {
+    filter_window_pref_.save(&val);
+  }
+  if (filter_window_number_ != nullptr)
+    filter_window_number_->publish_state(val);
+  ESP_LOGI(TAG, "filter_window changed: %u", val);
+}
+
+void Roode::apply_entry_max_threshold_pct(uint8_t pct) {
+  if (pct > 100) pct = 100;
+  entry->set_threshold_percentages(entry->threshold->min_percentage.value_or(15), pct);
+  if (calibration_persistence_)
+    entry_max_pct_pref_.save(&pct);
+  publish_sensor_configuration(entry, exit, true);
+  if (entry_max_threshold_number_ != nullptr)
+    entry_max_threshold_number_->publish_state(pct);
+}
+
+void Roode::apply_entry_min_threshold_pct(uint8_t pct) {
+  if (pct > 100) pct = 100;
+  entry->set_threshold_percentages(pct, entry->threshold->max_percentage.value_or(80));
+  if (calibration_persistence_)
+    entry_min_pct_pref_.save(&pct);
+  publish_sensor_configuration(entry, exit, false);
+  if (entry_min_threshold_number_ != nullptr)
+    entry_min_threshold_number_->publish_state(pct);
+}
+
+void Roode::apply_exit_max_threshold_pct(uint8_t pct) {
+  if (pct > 100) pct = 100;
+  exit->set_threshold_percentages(exit->threshold->min_percentage.value_or(15), pct);
+  if (calibration_persistence_)
+    exit_max_pct_pref_.save(&pct);
+  publish_sensor_configuration(entry, exit, true);
+  if (exit_max_threshold_number_ != nullptr)
+    exit_max_threshold_number_->publish_state(pct);
+}
+
+void Roode::apply_exit_min_threshold_pct(uint8_t pct) {
+  if (pct > 100) pct = 100;
+  exit->set_threshold_percentages(pct, exit->threshold->max_percentage.value_or(80));
+  if (calibration_persistence_)
+    exit_min_pct_pref_.save(&pct);
+  publish_sensor_configuration(entry, exit, false);
+  if (exit_min_threshold_number_ != nullptr)
+    exit_min_threshold_number_->publish_state(pct);
+}
+
+void Roode::apply_auto_calibration_interval(float hours) {
+  if (hours < 0) hours = 0;
+  auto_calibration_interval_sec_ = static_cast<uint32_t>(hours * 3600.0f);
+  if (calibration_persistence_) {
+    // Store in 30-min units (0–48 fits in uint8_t for 0–24h range)
+    uint8_t units = static_cast<uint8_t>(hours * 2.0f);
+    auto_cal_interval_pref_.save(&units);
+  }
+  if (auto_cal_interval_number_ != nullptr)
+    auto_cal_interval_number_->publish_state(hours);
+  ESP_LOGI(TAG, "auto_cal_interval changed: %.1fh", hours);
+}
+
+void Roode::apply_entry_roi(uint8_t h, uint8_t w) {
+  if (h < 4) h = 4; if (h > 16) h = 16;
+  if (w < 4) w = 4; if (w > 16) w = 16;
+  entry->roi_override->set_height(h);
+  entry->roi_override->set_width(w);
+  if (calibration_persistence_) {
+    entry_roi_height_pref_.save(&h);
+    entry_roi_width_pref_.save(&w);
+  }
+  update_status_text("calibrating...");
+  run_zone_calibration(0);
+  publish_sensor_configuration(entry, exit, true);
+  publish_sensor_configuration(entry, exit, false);
+  if (entry_roi_height_number_ != nullptr)
+    entry_roi_height_number_->publish_state(entry->roi->height);
+  if (entry_roi_width_number_ != nullptr)
+    entry_roi_width_number_->publish_state(entry->roi->width);
+}
+
+void Roode::apply_exit_roi(uint8_t h, uint8_t w) {
+  if (h < 4) h = 4; if (h > 16) h = 16;
+  if (w < 4) w = 4; if (w > 16) w = 16;
+  exit->roi_override->set_height(h);
+  exit->roi_override->set_width(w);
+  if (calibration_persistence_) {
+    exit_roi_height_pref_.save(&h);
+    exit_roi_width_pref_.save(&w);
+  }
+  update_status_text("calibrating...");
+  run_zone_calibration(1);
+  publish_sensor_configuration(entry, exit, true);
+  publish_sensor_configuration(entry, exit, false);
+  if (exit_roi_height_number_ != nullptr)
+    exit_roi_height_number_->publish_state(exit->roi->height);
+  if (exit_roi_width_number_ != nullptr)
+    exit_roi_width_number_->publish_state(exit->roi->width);
+}
+
+void Roode::apply_invert_direction(bool inv) {
+  invert_direction_ = inv;
+  if (calibration_persistence_) {
+    uint8_t val = inv ? 1 : 0;
+    invert_direction_pref_.save(&val);
+  }
+  if (invert_direction_switch_ != nullptr)
+    invert_direction_switch_->publish_state(inv);
+  ESP_LOGI(TAG, "invert_direction changed: %s", inv ? "true" : "false");
+}
+
+void Roode::apply_calibration_persistence(bool val) {
+  calibration_persistence_ = val;
+  if (cal_persistence_switch_ != nullptr)
+    cal_persistence_switch_->publish_state(val);
+  ESP_LOGI(TAG, "calibration_persistence changed: %s", val ? "true" : "false");
+}
+
+void Roode::apply_ranging_mode(const std::string &mode) {
+  uint8_t mode_idx = 0;  // 0 = auto
+  if (mode == "short") {
+    distanceSensor->set_ranging_mode_override(Ranging::Short); mode_idx = 1;
+    distanceSensor->set_ranging_mode(Ranging::Short);
+  } else if (mode == "medium") {
+    distanceSensor->set_ranging_mode_override(Ranging::Medium); mode_idx = 2;
+    distanceSensor->set_ranging_mode(Ranging::Medium);
+  } else if (mode == "long") {
+    distanceSensor->set_ranging_mode_override(Ranging::Long); mode_idx = 3;
+    distanceSensor->set_ranging_mode(Ranging::Long);
+  } else if (mode == "longer") {
+    distanceSensor->set_ranging_mode_override(Ranging::Longer); mode_idx = 4;
+    distanceSensor->set_ranging_mode(Ranging::Longer);
+  } else if (mode == "longest") {
+    distanceSensor->set_ranging_mode_override(Ranging::Longest); mode_idx = 5;
+    distanceSensor->set_ranging_mode(Ranging::Longest);
+  } else {
+    // "auto" — no override; ranging mode will be auto-selected on next full recalibration
+    mode_idx = 0;
+  }
+  if (calibration_persistence_) {
+    ranging_mode_pref_.save(&mode_idx);
+  }
+  if (ranging_mode_select_ != nullptr)
+    ranging_mode_select_->publish_state(mode);
+  ESP_LOGI(TAG, "ranging_mode changed: %s", mode.c_str());
+}
+
+void Roode::person_calibration() {
+  ESP_LOGI(CALIBRATION, "person_calibration: starting");
+  update_status_text("person cal: measuring...");
+  calibration_status_reset_ts_ = 0;
+
+  const int num_samples = 30;
+  bool any_adjusted = false;
+
+  for (int z = 0; z < 2; z++) {
+    Zone *zone = z == 0 ? entry : exit;
+    uint32_t sum = 0;
+    int valid = 0;
+    for (int i = 0; i < num_samples; i++) {
+      zone->readDistance(distanceSensor);
+      uint16_t d = zone->getDistance();
+      if (d > 0 && d < 4000) {
+        sum += d;
+        valid++;
+      }
+      delay(20);
+    }
+    if (valid == 0) {
+      update_status_text("cal failed: no valid readings");
+      calibration_status_reset_ts_ = millis();
+      return;
+    }
+    uint16_t avg_mm = static_cast<uint16_t>(sum / valid);
+    uint16_t idle = zone->threshold->idle;
+    if (idle == 0) continue;
+
+    // Person distance as percentage of idle distance
+    uint8_t person_pct = static_cast<uint8_t>((avg_mm * 100) / idle);
+    uint8_t cur_max = zone->threshold->max_percentage.value_or(80);
+    uint8_t cur_min = zone->threshold->min_percentage.value_or(15);
+
+    if (person_pct > cur_max || person_pct < cur_min) {
+      // Person is outside the detection window — adjust max upward with 5% margin
+      uint8_t new_max = static_cast<uint8_t>(std::min(static_cast<int>(person_pct) + 5, 100));
+      zone->set_threshold_percentages(cur_min, new_max);
+      // Save to flash
+      if (calibration_persistence_) {
+        if (z == 0) {
+          entry_max_pct_pref_.save(&new_max);
+        } else {
+          exit_max_pct_pref_.save(&new_max);
+        }
+      }
+      char msg[48];
+      snprintf(msg, sizeof(msg), "person cal: adjusted max to %u%%", new_max);
+      update_status_text(std::string(msg));
+      ESP_LOGI(CALIBRATION, "zone %d: person_pct=%u adjusted max to %u%%", z, person_pct, new_max);
+      any_adjusted = true;
+    }
+  }
+
+  publish_sensor_configuration(entry, exit, true);
+  publish_sensor_configuration(entry, exit, false);
+  // Publish updated threshold number entities
+  if (entry_max_threshold_number_ != nullptr)
+    entry_max_threshold_number_->publish_state(entry->threshold->max_percentage.value_or(80));
+  if (exit_max_threshold_number_ != nullptr)
+    exit_max_threshold_number_->publish_state(exit->threshold->max_percentage.value_or(80));
+
+  if (!any_adjusted) {
+    update_status_text("person cal: thresholds ok");
+  }
+  calibration_status_reset_ts_ = millis();
+}
+
+// ---- Entity control callbacks ----
+
 void FilterModeSelect::control(const std::string &value) {
   FilterMode mode = FILTER_MIN;
   if (value == "median") mode = FILTER_MEDIAN;
   else if (value == "percentile10") mode = FILTER_PERCENTILE10;
   hub_->apply_filter_mode(mode);
+}
+
+void RangingModeSelect::control(const std::string &value) {
+  hub_->apply_ranging_mode(value);
+}
+
+void RoodeSettingNumber::control(float value) {
+  switch (setting_) {
+    case FILTER_WINDOW:         hub_->apply_filter_window(static_cast<uint8_t>(value)); break;
+    case SAMPLING:              hub_->apply_sampling(static_cast<uint8_t>(value)); break;
+    case ENTRY_MAX_PCT:         hub_->apply_entry_max_threshold_pct(static_cast<uint8_t>(value)); break;
+    case ENTRY_MIN_PCT:         hub_->apply_entry_min_threshold_pct(static_cast<uint8_t>(value)); break;
+    case EXIT_MAX_PCT:          hub_->apply_exit_max_threshold_pct(static_cast<uint8_t>(value)); break;
+    case EXIT_MIN_PCT:          hub_->apply_exit_min_threshold_pct(static_cast<uint8_t>(value)); break;
+    case AUTO_CAL_INTERVAL_HOURS: hub_->apply_auto_calibration_interval(value); break;
+    case ENTRY_ROI_HEIGHT:      hub_->apply_entry_roi(static_cast<uint8_t>(value), hub_->entry->roi->width); break;
+    case ENTRY_ROI_WIDTH:       hub_->apply_entry_roi(hub_->entry->roi->height, static_cast<uint8_t>(value)); break;
+    case EXIT_ROI_HEIGHT:       hub_->apply_exit_roi(static_cast<uint8_t>(value), hub_->exit->roi->width); break;
+    case EXIT_ROI_WIDTH:        hub_->apply_exit_roi(hub_->exit->roi->height, static_cast<uint8_t>(value)); break;
+  }
+  publish_state(value);
+}
+
+void InvertDirectionSwitch::write_state(bool state) {
+  hub_->apply_invert_direction(state);
+  publish_state(state);
+}
+
+void CalibrationPersistenceSwitch::write_state(bool state) {
+  hub_->apply_calibration_persistence(state);
+  publish_state(state);
 }
 
 void Roode::restart_sensor() {
@@ -912,9 +1315,11 @@ void Roode::sensor_task(void *param) {
     self->loop_count_++;
     self->update_metrics();
     // Run periodic auto-calibration from the sensor task (the main loop() returns early in dual-core
-    // mode, so calibration must be triggered here to actually execute on ESP32)
+    // mode, so calibration must be triggered here to actually execute on ESP32).
+    // Guard: epoch > 100000 ensures NTP is synced (time(nullptr) returns 0 until then, which would
+    // cause uint32_t underflow and fire calibration spuriously on every boot before NTP sync).
     uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
-    if (self->auto_calibration_interval_sec_ > 0 &&
+    if (self->auto_calibration_interval_sec_ > 0 && now_epoch > 100000 &&
         now_epoch - self->last_calibration_ts_ >= self->auto_calibration_interval_sec_) {
       // Only calibrate when both zones are clear — calibrating with someone present corrupts the baseline
       bool zones_clear = self->entry->getMinDistance() >= self->entry->threshold->max &&

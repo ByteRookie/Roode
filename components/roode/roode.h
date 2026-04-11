@@ -4,8 +4,10 @@
 #include "Arduino.h"
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/components/number/number.h"
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/switch/switch.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/core/application.h"
 #include "esphome/core/component.h"
@@ -17,7 +19,11 @@
 
 namespace esphome {
 namespace roode {
-class FilterModeSelect;  // forward declaration — full type in select.h
+class FilterModeSelect;     // forward declaration — full type in select.h
+class RangingModeSelect;    // forward declaration — full type in select.h
+class RoodeSettingNumber;   // forward declaration — full type in setting_number.h
+class InvertDirectionSwitch;         // forward declaration — full type in switch.h
+class CalibrationPersistenceSwitch;  // forward declaration — full type in switch.h
 }
 }
 
@@ -28,7 +34,7 @@ namespace esphome {
 namespace roode {
 #define NOBODY 0
 #define SOMEONE 1
-#define VERSION "1.7.0"
+#define VERSION "1.8.0"
 static const char *const TAG = "Roode";
 static const char *const SETUP = "Setup";
 static const char *const CALIBRATION = "Sensor Calibration";
@@ -107,15 +113,12 @@ class Roode : public PollingComponent {
   void set_ram_free_sensor(sensor::Sensor *sens) { ram_free_sensor = sens; }
   void set_flash_free_sensor(sensor::Sensor *sens) { flash_free_sensor = sens; }
   void set_presence_binary_sensor(binary_sensor::BinarySensor *presence_sensor_) {
-    // Overall sensor indicating that any zone is occupied
     presence_sensor = presence_sensor_;
   }
   void set_entry_presence_binary_sensor(binary_sensor::BinarySensor *sensor) {
-    // Optional sensor dedicated to the entry zone
     entry_presence_sensor = sensor;
   }
   void set_exit_presence_binary_sensor(binary_sensor::BinarySensor *sensor) {
-    // Optional sensor dedicated to the exit zone
     exit_presence_sensor = sensor;
   }
   void set_version_text_sensor(text_sensor::TextSensor *version_sensor_) { version_sensor = version_sensor_; }
@@ -144,8 +147,23 @@ class Roode : public PollingComponent {
     exit->set_filter_window(window);
   }
   void set_filter_mode_select(FilterModeSelect *sel) { filter_mode_select_ = sel; }
-  /** Apply a filter mode at runtime, updating zones and persisting to flash. */
-  void apply_filter_mode(FilterMode mode);
+  void set_ranging_mode_select(RangingModeSelect *sel) { ranging_mode_select_ = sel; }
+  void set_invert_direction_switch(InvertDirectionSwitch *sw) { invert_direction_switch_ = sw; }
+  void set_calibration_persistence_switch(CalibrationPersistenceSwitch *sw) { cal_persistence_switch_ = sw; }
+
+  // Setting number entity setters
+  void set_filter_window_number(RoodeSettingNumber *n) { filter_window_number_ = n; }
+  void set_sampling_number(RoodeSettingNumber *n) { sampling_number_ = n; }
+  void set_entry_max_threshold_number(RoodeSettingNumber *n) { entry_max_threshold_number_ = n; }
+  void set_entry_min_threshold_number(RoodeSettingNumber *n) { entry_min_threshold_number_ = n; }
+  void set_exit_max_threshold_number(RoodeSettingNumber *n) { exit_max_threshold_number_ = n; }
+  void set_exit_min_threshold_number(RoodeSettingNumber *n) { exit_min_threshold_number_ = n; }
+  void set_auto_cal_interval_number(RoodeSettingNumber *n) { auto_cal_interval_number_ = n; }
+  void set_entry_roi_height_number(RoodeSettingNumber *n) { entry_roi_height_number_ = n; }
+  void set_entry_roi_width_number(RoodeSettingNumber *n) { entry_roi_width_number_ = n; }
+  void set_exit_roi_height_number(RoodeSettingNumber *n) { exit_roi_height_number_ = n; }
+  void set_exit_roi_width_number(RoodeSettingNumber *n) { exit_roi_width_number_ = n; }
+
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
   void set_cpu_optimization_thresholds(float activate, float deactivate) {
@@ -154,6 +172,7 @@ class Roode : public PollingComponent {
   }
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
+  void person_calibration();
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
   void set_exit_threshold_percentages(uint8_t min, uint8_t max) { exit->set_threshold_percentages(min, max); }
   void apply_cpu_optimizations(float cpu);
@@ -163,10 +182,42 @@ class Roode : public PollingComponent {
   Zone *exit = new Zone(1);
   static void log_event(const std::string &msg);
 
+  // Runtime apply methods — called by HA entity callbacks
+  void apply_filter_mode(FilterMode mode);
+  void apply_sampling(uint8_t val);
+  void apply_filter_window(uint8_t val);
+  void apply_entry_max_threshold_pct(uint8_t pct);
+  void apply_entry_min_threshold_pct(uint8_t pct);
+  void apply_exit_max_threshold_pct(uint8_t pct);
+  void apply_exit_min_threshold_pct(uint8_t pct);
+  void apply_auto_calibration_interval(float hours);
+  void apply_entry_roi(uint8_t h, uint8_t w);
+  void apply_exit_roi(uint8_t h, uint8_t w);
+  void apply_invert_direction(bool inv);
+  void apply_calibration_persistence(bool val);
+  void apply_ranging_mode(const std::string &mode);
+
  protected:
   TofSensor *distanceSensor;
   Zone *current_zone = entry;
   FilterModeSelect *filter_mode_select_{nullptr};
+  RangingModeSelect *ranging_mode_select_{nullptr};
+  InvertDirectionSwitch *invert_direction_switch_{nullptr};
+  CalibrationPersistenceSwitch *cal_persistence_switch_{nullptr};
+
+  // Setting number entity pointers
+  RoodeSettingNumber *filter_window_number_{nullptr};
+  RoodeSettingNumber *sampling_number_{nullptr};
+  RoodeSettingNumber *entry_max_threshold_number_{nullptr};
+  RoodeSettingNumber *entry_min_threshold_number_{nullptr};
+  RoodeSettingNumber *exit_max_threshold_number_{nullptr};
+  RoodeSettingNumber *exit_min_threshold_number_{nullptr};
+  RoodeSettingNumber *auto_cal_interval_number_{nullptr};
+  RoodeSettingNumber *entry_roi_height_number_{nullptr};
+  RoodeSettingNumber *entry_roi_width_number_{nullptr};
+  RoodeSettingNumber *exit_roi_height_number_{nullptr};
+  RoodeSettingNumber *exit_roi_width_number_{nullptr};
+
   sensor::Sensor *distance_entry{nullptr};
   sensor::Sensor *distance_exit{nullptr};
   number::Number *people_counter{nullptr};
@@ -183,9 +234,9 @@ class Roode : public PollingComponent {
   sensor::Sensor *cpu_usage_sensor{nullptr};
   sensor::Sensor *ram_free_sensor{nullptr};
   sensor::Sensor *flash_free_sensor{nullptr};
-  binary_sensor::BinarySensor *presence_sensor{nullptr};           // True when any zone is occupied
-  binary_sensor::BinarySensor *entry_presence_sensor{nullptr};     // Occupancy for the entry zone
-  binary_sensor::BinarySensor *exit_presence_sensor{nullptr};      // Occupancy for the exit zone
+  binary_sensor::BinarySensor *presence_sensor{nullptr};
+  binary_sensor::BinarySensor *entry_presence_sensor{nullptr};
+  binary_sensor::BinarySensor *exit_presence_sensor{nullptr};
   binary_sensor::BinarySensor *xshut_state_binary_sensor{nullptr};
   text_sensor::TextSensor *version_sensor{nullptr};
   text_sensor::TextSensor *entry_exit_event_sensor{nullptr};
@@ -202,11 +253,29 @@ class Roode : public PollingComponent {
   };
   CalibrationPrefs calibration_data_[2];
   ESPPreferenceObject calibration_prefs_[2];
+
+  // Flash preference keys: 0xA0-0xA1 calibration, 0xB0 filter_mode,
+  // 0xB1-0xBB settings, 0xBC ranging_mode, 0xBD invert_direction
   ESPPreferenceObject filter_mode_pref_;
+  ESPPreferenceObject sampling_pref_;
+  ESPPreferenceObject filter_window_pref_;
+  ESPPreferenceObject entry_max_pct_pref_;
+  ESPPreferenceObject entry_min_pct_pref_;
+  ESPPreferenceObject exit_max_pct_pref_;
+  ESPPreferenceObject exit_min_pct_pref_;
+  ESPPreferenceObject auto_cal_interval_pref_;
+  ESPPreferenceObject entry_roi_height_pref_;
+  ESPPreferenceObject entry_roi_width_pref_;
+  ESPPreferenceObject exit_roi_height_pref_;
+  ESPPreferenceObject exit_roi_width_pref_;
+  ESPPreferenceObject ranging_mode_pref_;
+  ESPPreferenceObject invert_direction_pref_;
+
   bool calibration_persistence_{true};
   bool fail_safe_triggered_{false};
   uint32_t last_calibration_ts_{0};
   uint32_t auto_calibration_interval_sec_{4 * 60 * 60};
+  uint32_t calibration_status_reset_ts_{0};
 
   FilterMode filter_mode_{FILTER_MIN};
   uint8_t filter_window_{5};
@@ -243,13 +312,15 @@ class Roode : public PollingComponent {
   void calibrateDistance();
   void calibrate_zones();
   void publish_feature_list();
+  void restore_settings_from_flash();
+  void publish_setting_entities();
   const RangingMode *determine_ranging_mode(uint16_t average_entry_zone_distance, uint16_t average_exit_zone_distance);
   void publish_sensor_configuration(Zone *entry, Zone *exit, bool isMax);
   void updateCounter(int delta);
   Orientation orientation_{Parallel};
   uint8_t samples{2};
   bool invert_direction_{false};
-  int number_attempts = 20;  // TO DO: make this configurable
+  int number_attempts = 20;
   int short_distance_threshold = 1300;
   int medium_distance_threshold = 2000;
   int medium_long_distance_threshold = 2700;

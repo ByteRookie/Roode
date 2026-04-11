@@ -22,5 +22,22 @@ class FilterModeSelect : public esphome::select::Select {
   Roode *hub_{nullptr};
 };
 
+/**
+ * ESPHome select entity that exposes the VL53L1X ranging mode at runtime.
+ * Options: "auto", "short", "medium", "long", "longer", "longest"
+ * "auto" means Roode will pick the best mode based on measured idle distance.
+ * The selection is persisted to flash when calibration_persistence is enabled.
+ */
+class RangingModeSelect : public esphome::select::Select {
+ public:
+  void set_roode_hub(Roode *hub) { hub_ = hub; }
+
+ protected:
+  void control(const std::string &value) override;
+
+ private:
+  Roode *hub_{nullptr};
+};
+
 }  // namespace roode
 }  // namespace esphome

@@ -303,6 +303,24 @@ class Roode : public PollingComponent {
   unsigned long zone_triggered_start_[2]{0, 0};
   bool zone_active_prev_[2]{false, false};  // tracks previous zone state for cpu-opt clearing events
 
+  // Dwell-time debounce: a zone must be continuously within threshold for
+  // kZoneDwellMs before it registers as SOMEONE, and continuously outside for
+  // kZoneClearMs before it registers as NOBODY.  Prevents single sensor frames
+  // of noise from advancing the FSM and generating phantom crossings.
+  uint32_t zone_dwell_first_active_[2]{0, 0};
+  uint32_t zone_dwell_first_clear_[2]{0, 0};
+  bool zone_debounced_active_[2]{false, false};
+
+  // Timestamp of the first FSM event in the current crossing sequence.
+  // Used to enforce a minimum sequence duration and reject rapid noise sequences.
+  uint32_t path_track_first_event_ts_{0};
+
+  // Timestamp of the last automatic counter update (from path_tracking).
+  // Used to suppress false "manual_adjust" detections caused by the race window
+  // between updateCounter() setting expected_counter_ and call.perform() updating
+  // people_counter->state on the dual-core sensor task.
+  uint32_t last_auto_update_ts_{0};
+
   std::string last_status_text_{};
 
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;

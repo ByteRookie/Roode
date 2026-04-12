@@ -171,6 +171,20 @@ void Roode::setup() {
         z->threshold->idle = calibration_data_[i].baseline_mm;
         z->threshold->min = calibration_data_[i].threshold_min_mm;
         z->threshold->max = calibration_data_[i].threshold_max_mm;
+        // Sanity-check the loaded calibration before trusting it.
+        // If max >= idle the zone triggers on any sub-idle noise reading (the
+        // specific failure seen when min_pct=1% / max_pct=100% was persisted),
+        // causing hundreds of false detections per minute.
+        if (z->threshold->idle < 200 || z->threshold->idle > 4000 ||
+            z->threshold->max >= z->threshold->idle ||
+            z->threshold->min < (z->threshold->idle * 2) / 100 ||
+            z->threshold->max < z->threshold->min + 100) {
+          ESP_LOGW(SETUP,
+                   "Rejecting invalid calibration for zone %d: idle=%d min=%d max=%d — forcing recalibration",
+                   i, z->threshold->idle, z->threshold->min, z->threshold->max);
+          loaded = false;
+          break;
+        }
         int valid_count = 0;
         for (int s = 0; s < 5; s++) {
           z->readDistance(distanceSensor);
@@ -288,14 +302,23 @@ void Roode::update() {
       interrupt_status_sensor->publish_state(*val ? 1 : 0);
   }
   if (people_counter != nullptr && fabs(people_counter->state - expected_counter_) > 0.001f) {
-    int diff = (int) roundf(people_counter->state - expected_counter_);
-    manual_adjustment_count_ += abs(diff);
-    expected_counter_ = people_counter->state;
-    if (manual_adjustment_sensor != nullptr)
-      manual_adjustment_sensor->publish_state(manual_adjustment_count_);
-    if (diff != 0) {
-      std::string sign = diff > 0 ? "+" : "";
-      log_event("manual_adjust " + sign + std::to_string(diff) + " total=" + std::to_string(manual_adjustment_count_));
+    // Suppress detection for 300 ms after an automatic counter update.
+    // On dual-core ESP32 the sensor task calls updateCounter() on core 1 while
+    // update() runs on core 0; the brief window between call.perform() and
+    // expected_counter_ being written caused legitimate automatic count changes
+    // to be logged as phantom "manual_adjust" events.
+    if (millis() - last_auto_update_ts_ < 300) {
+      expected_counter_ = people_counter->state;
+    } else {
+      int diff = (int) roundf(people_counter->state - expected_counter_);
+      manual_adjustment_count_ += abs(diff);
+      expected_counter_ = people_counter->state;
+      if (manual_adjustment_sensor != nullptr)
+        manual_adjustment_sensor->publish_state(manual_adjustment_count_);
+      if (diff != 0) {
+        std::string sign = diff > 0 ? "+" : "";
+        log_event("manual_adjust " + sign + std::to_string(diff) + " total=" + std::to_string(manual_adjustment_count_));
+      }
     }
   }
 }
@@ -421,14 +444,46 @@ void Roode::path_tracking(Zone *zone) {
     // that produces endless counts.
     PathTrackFillingSize = 1;
     PathTrack[0] = PathTrack[1] = PathTrack[2] = PathTrack[3] = 0;
+    path_track_first_event_ts_ = 0;
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
 
   ESP_LOGV(TAG, "Zone %d distance %u (min=%u max=%u)", zone->id, zone->getMinDistance(), zone->threshold->min,
            zone->threshold->max);
 
-  // PathTrack algorithm
-  if (zone->getMinDistance() < zone->threshold->max && zone->getMinDistance() > zone->threshold->min) {
+  // PathTrack algorithm — debounce zone status to reject brief noise spikes.
+  // A zone must be continuously within threshold for kZoneDwellMs before it
+  // registers as SOMEONE, and continuously outside for kZoneClearMs before it
+  // registers as NOBODY.  Single sensor frames of noise (< 150 ms) cannot
+  // advance the FSM, eliminating the primary source of phantom crossings.
+  {
+    static constexpr uint32_t kZoneDwellMs = 150;
+    static constexpr uint32_t kZoneClearMs = 80;
+    uint32_t now_deb = millis();
+    uint8_t zid = zone->id;
+    bool raw_active = zone->getMinDistance() < zone->threshold->max &&
+                      zone->getMinDistance() > zone->threshold->min;
+    if (raw_active) {
+      zone_dwell_first_clear_[zid] = 0;
+      if (zone_dwell_first_active_[zid] == 0)
+        zone_dwell_first_active_[zid] = now_deb;
+      if (!zone_debounced_active_[zid] &&
+          (now_deb - zone_dwell_first_active_[zid]) >= kZoneDwellMs)
+        zone_debounced_active_[zid] = true;
+    } else {
+      zone_dwell_first_active_[zid] = 0;
+      if (zone_debounced_active_[zid]) {
+        if (zone_dwell_first_clear_[zid] == 0)
+          zone_dwell_first_clear_[zid] = now_deb;
+        if ((now_deb - zone_dwell_first_clear_[zid]) >= kZoneClearMs)
+          zone_debounced_active_[zid] = false;
+      } else {
+        zone_dwell_first_clear_[zid] = 0;
+      }
+    }
+  }
+
+  if (zone_debounced_active_[zone->id]) {
     // Someone is in the sensing area
     CurrentZoneStatus = SOMEONE;
     if (presence_sensor != nullptr) {
@@ -523,6 +578,14 @@ void Roode::path_tracking(Zone *zone) {
     if (PathTrackFillingSize < 4) {
       PathTrackFillingSize++;
     }
+    // Record when the first event in a crossing sequence occurs.
+    // We use this below to enforce a minimum crossing duration and reject
+    // sequences that complete too quickly to be a real person traversal.
+    // (The 150 ms zone dwell debounce already enforces ~460 ms naturally;
+    // this 300 ms gate is a second independent layer of defence.)
+    if (PathTrackFillingSize == 2 && path_track_first_event_ts_ == 0) {
+      path_track_first_event_ts_ = millis();
+    }
 
     // if nobody anywhere lets check if an exit or entry has happened
     if ((LeftPreviousStatus == NOBODY) && (RightPreviousStatus == NOBODY)) {
@@ -533,28 +596,43 @@ void Roode::path_tracking(Zone *zone) {
         // check exit or entry. no need to check PathTrack[0] == 0 , it is
         // always the case
 
+        // Reject sequences that completed faster than a real person could walk
+        // through two zones.  300 ms is conservative — actual people take 700 ms+.
+        bool timing_ok = (path_track_first_event_ts_ == 0) ||
+                         ((millis() - path_track_first_event_ts_) >= 300);
+
         if ((PathTrack[1] == 1) && (PathTrack[2] == 3) && (PathTrack[3] == 2)) {
           // This an exit
-          ESP_LOGI("Roode pathTracking", "Exit detected.");
-
-          this->updateCounter(-1);
-          last_valid_crossing_ts_ = millis();
-          if (entry_exit_event_sensor != nullptr) {
-            entry_exit_event_sensor->publish_state("Exit");
+          if (timing_ok) {
+            ESP_LOGI("Roode pathTracking", "Exit detected.");
+            this->updateCounter(-1);
+            last_valid_crossing_ts_ = millis();
+            if (entry_exit_event_sensor != nullptr) {
+              entry_exit_event_sensor->publish_state("Exit");
+            }
+          } else {
+            ESP_LOGD(TAG, "crossing_rejected: exit sequence too fast (%ums)",
+                     (unsigned) (millis() - path_track_first_event_ts_));
           }
         } else if ((PathTrack[1] == 2) && (PathTrack[2] == 3) && (PathTrack[3] == 1)) {
           // This an entry
-          ESP_LOGI("Roode pathTracking", "Entry detected.");
-          this->updateCounter(1);
-          last_valid_crossing_ts_ = millis();
-          if (entry_exit_event_sensor != nullptr) {
-            entry_exit_event_sensor->publish_state("Entry");
+          if (timing_ok) {
+            ESP_LOGI("Roode pathTracking", "Entry detected.");
+            this->updateCounter(1);
+            last_valid_crossing_ts_ = millis();
+            if (entry_exit_event_sensor != nullptr) {
+              entry_exit_event_sensor->publish_state("Entry");
+            }
+          } else {
+            ESP_LOGD(TAG, "crossing_rejected: entry sequence too fast (%ums)",
+                     (unsigned) (millis() - path_track_first_event_ts_));
           }
         }
       }
 
       PathTrackFillingSize = 1;
       PathTrack[0] = PathTrack[1] = PathTrack[2] = PathTrack[3] = 0;
+      path_track_first_event_ts_ = 0;
       state_ = STATE_IDLE;
     } else {
       // update PathTrack
@@ -581,10 +659,19 @@ void Roode::updateCounter(int delta) {
   }
   auto next = this->people_counter->state + (float) delta;
   ESP_LOGI(TAG, "Updating people count: %d", (int) next);
-  expected_counter_ = next;
+  // Record the time before performing the update so update() can suppress the
+  // narrow race window where people_counter->state has not yet reflected the
+  // new value, which previously caused the automatic count change to be logged
+  // as a phantom "manual_adjust".
+  last_auto_update_ts_ = millis();
   auto call = this->people_counter->make_call();
   call.set_value(next);
   call.perform();
+  // Set expected AFTER perform() so that if update() runs on the main core
+  // between these two lines, it sees state==next and expected==old (diff=+delta)
+  // rather than state==old and expected==next (diff=-delta).  The suppression
+  // window in update() handles any remaining transient in either direction.
+  expected_counter_ = next;
 }
 void Roode::recalibration() { calibrate_zones(); }
 
@@ -927,13 +1014,18 @@ void Roode::restore_settings_from_flash() {
     filter_window_ = val; default_filter_window_ = val;
     entry->set_filter_window(val); exit->set_filter_window(val);
   }
-  if (entry_max_pct_pref_.load(&val) && val <= 100)
+  // Reject extreme percentages that produce degenerate thresholds.
+  // max_pct=100% makes threshold->max == idle, so any sub-idle noise triggers
+  // zone active (768 false detections/21 min observed in the field).
+  // min_pct=1% makes threshold->min ≈ 22 mm, matching virtually every reading.
+  // Out-of-range values are silently discarded; the defaults (15%/80%) apply.
+  if (entry_max_pct_pref_.load(&val) && val >= 51 && val <= 97)
     entry->set_threshold_percentages(entry->threshold->min_percentage.value_or(15), val);
-  if (entry_min_pct_pref_.load(&val) && val <= 100)
+  if (entry_min_pct_pref_.load(&val) && val >= 2 && val <= 49)
     entry->set_threshold_percentages(val, entry->threshold->max_percentage.value_or(80));
-  if (exit_max_pct_pref_.load(&val) && val <= 100)
+  if (exit_max_pct_pref_.load(&val) && val >= 51 && val <= 97)
     exit->set_threshold_percentages(exit->threshold->min_percentage.value_or(15), val);
-  if (exit_min_pct_pref_.load(&val) && val <= 100)
+  if (exit_min_pct_pref_.load(&val) && val >= 2 && val <= 49)
     exit->set_threshold_percentages(val, exit->threshold->max_percentage.value_or(80));
   if (auto_cal_interval_pref_.load(&val))
     auto_calibration_interval_sec_ = static_cast<uint32_t>(val) * 1800;  // stored in 30-min units
@@ -1025,7 +1117,8 @@ void Roode::apply_filter_window(uint8_t val) {
 }
 
 void Roode::apply_entry_max_threshold_pct(uint8_t pct) {
-  if (pct > 100) pct = 100;
+  if (pct < 51) pct = 51;
+  if (pct > 97) pct = 97;  // never let max reach idle (100% = instant false detection)
   entry->set_threshold_percentages(entry->threshold->min_percentage.value_or(15), pct);
   if (calibration_persistence_)
     entry_max_pct_pref_.save(&pct);
@@ -1035,7 +1128,8 @@ void Roode::apply_entry_max_threshold_pct(uint8_t pct) {
 }
 
 void Roode::apply_entry_min_threshold_pct(uint8_t pct) {
-  if (pct > 100) pct = 100;
+  if (pct < 2) pct = 2;
+  if (pct > 49) pct = 49;
   entry->set_threshold_percentages(pct, entry->threshold->max_percentage.value_or(80));
   if (calibration_persistence_)
     entry_min_pct_pref_.save(&pct);
@@ -1045,7 +1139,8 @@ void Roode::apply_entry_min_threshold_pct(uint8_t pct) {
 }
 
 void Roode::apply_exit_max_threshold_pct(uint8_t pct) {
-  if (pct > 100) pct = 100;
+  if (pct < 51) pct = 51;
+  if (pct > 97) pct = 97;  // never let max reach idle (100% = instant false detection)
   exit->set_threshold_percentages(exit->threshold->min_percentage.value_or(15), pct);
   if (calibration_persistence_)
     exit_max_pct_pref_.save(&pct);
@@ -1055,7 +1150,8 @@ void Roode::apply_exit_max_threshold_pct(uint8_t pct) {
 }
 
 void Roode::apply_exit_min_threshold_pct(uint8_t pct) {
-  if (pct > 100) pct = 100;
+  if (pct < 2) pct = 2;
+  if (pct > 49) pct = 49;
   exit->set_threshold_percentages(pct, exit->threshold->max_percentage.value_or(80));
   if (calibration_persistence_)
     exit_min_pct_pref_.save(&pct);

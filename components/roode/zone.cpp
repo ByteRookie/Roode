@@ -100,10 +100,21 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
     threshold->idle = avg;
     uint8_t max_pct = threshold->max_percentage.value_or(80);
     uint8_t min_pct = threshold->min_percentage.value_or(15);
+    // Clamp percentages to safe operating ranges before computing absolute thresholds.
+    // max_pct >= 98% means threshold->max >= idle, so any sub-idle reading triggers
+    // zone active (root cause of the 768 false-detections/21-min incident).
+    // Values outside the safe window are reset to the defaults (15% / 80%).
+    if (max_pct > 95) max_pct = 95;
+    if (max_pct < 51) max_pct = 80;
+    if (min_pct < 2)  min_pct = 15;
+    if (min_pct > 49) min_pct = 15;
     threshold->max_percentage = max_pct;
     threshold->min_percentage = min_pct;
     threshold->max = (avg * max_pct) / 100;
     threshold->min = (avg * min_pct) / 100;
+    // Hard floor: never allow min < 100 mm regardless of idle distance.
+    // Prevents near-zero thresholds from matching virtually all sensor readings.
+    if (threshold->min < 100) threshold->min = 100;
   }
 
   ESP_LOGI(CALIBRATION, "Calibrated threshold for zone. zoneId: %d, idle: %d, min: %d (%d%%), max: %d (%d%%)", id,

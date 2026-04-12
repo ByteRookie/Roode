@@ -128,8 +128,8 @@ sensor:
       name: $friendly_name Loop Time
     cpu_usage:
       name: $friendly_name CPU Usage
-    ram_usage:
-      name: $friendly_name RAM Usage
+    ram_free:
+      name: $friendly_name RAM Free
 
 # ── Presence binary sensors ───────────────────────────────────────────────────
 binary_sensor:

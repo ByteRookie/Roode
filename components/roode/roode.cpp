@@ -413,6 +413,12 @@ void Roode::path_tracking(Zone *zone) {
   uint32_t timeout = state_ == STATE_ENTRY_ACTIVE ? 2500 : 3500;
   if (state_ != STATE_IDLE && millis() - state_started_ts > timeout) {
     state_ = STATE_IDLE;
+    // Reset all path tracking state so stale data from this incomplete crossing
+    // cannot combine with the next one to produce a spurious count.
+    PathTrackFillingSize = 1;
+    PathTrack[0] = PathTrack[1] = PathTrack[2] = PathTrack[3] = 0;
+    LeftPreviousStatus = NOBODY;
+    RightPreviousStatus = NOBODY;
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
 
@@ -546,6 +552,7 @@ void Roode::path_tracking(Zone *zone) {
       }
 
       PathTrackFillingSize = 1;
+      PathTrack[0] = PathTrack[1] = PathTrack[2] = PathTrack[3] = 0;
       state_ = STATE_IDLE;
     } else {
       // update PathTrack

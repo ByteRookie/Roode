@@ -1,0 +1,139 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Roode HA Entities Package
+# Include this in your main YAML with one line:
+#
+#   packages:
+#     roode_entities: !include roode_entities.yaml
+#
+# Substitutions below are defaults — override them in your main YAML if needed:
+#   friendly_name — prefix used for all entity names (default: "Roode")
+#   roode_id      — must match the `id:` of your `roode:` block (default: roode_platform)
+# ─────────────────────────────────────────────────────────────────────────────
+substitutions:
+  friendly_name: Roode
+  roode_id: roode_platform
+
+# ── Calibration buttons ───────────────────────────────────────────────────────
+button:
+  - platform: restart
+    name: $friendly_name Restart
+    entity_category: config
+
+  - platform: template
+    name: $friendly_name Calibrate Empty Room
+    icon: mdi:ruler-square-compass
+    entity_category: config
+    on_press:
+      - lambda: "id(${roode_id})->recalibration();"
+
+  - platform: template
+    name: $friendly_name Calibrate With Person
+    icon: mdi:human-greeting
+    entity_category: config
+    on_press:
+      - lambda: "id(${roode_id})->person_calibration();"
+
+# ── Runtime number entities (all changes saved to flash automatically) ────────
+number:
+  - platform: roode
+    roode_id: ${roode_id}
+    filter_window:
+      name: $friendly_name Filter Window
+    sampling:
+      name: $friendly_name Sampling
+    entry_max_threshold:
+      name: $friendly_name Entry Max Threshold
+    entry_min_threshold:
+      name: $friendly_name Entry Min Threshold
+    exit_max_threshold:
+      name: $friendly_name Exit Max Threshold
+    exit_min_threshold:
+      name: $friendly_name Exit Min Threshold
+    auto_calibration_interval:
+      name: $friendly_name Auto Calibration Interval
+    entry_roi_height:
+      name: $friendly_name Entry ROI Height
+    entry_roi_width:
+      name: $friendly_name Entry ROI Width
+    exit_roi_height:
+      name: $friendly_name Exit ROI Height
+    exit_roi_width:
+      name: $friendly_name Exit ROI Width
+
+# ── Runtime select entities ───────────────────────────────────────────────────
+select:
+  - platform: roode
+    roode_id: ${roode_id}
+    filter_mode:
+      name: $friendly_name Filter Mode
+    ranging_mode:
+      name: $friendly_name Ranging Mode
+
+# ── Runtime switch entities ───────────────────────────────────────────────────
+switch:
+  - platform: roode
+    roode_id: ${roode_id}
+    invert_direction:
+      name: $friendly_name Invert Direction
+    calibration_persistence:
+      name: $friendly_name Save Settings to Flash
+
+# ── Text sensors ──────────────────────────────────────────────────────────────
+text_sensor:
+  - platform: roode
+    roode_id: ${roode_id}
+    sensor_status:
+      name: $friendly_name Status
+    version:
+      name: $friendly_name Version
+    entry_exit_event:
+      name: $friendly_name Last Direction
+    enabled_features:
+      name: $friendly_name Features
+
+# ── Diagnostic sensors (shown in HA; disable in entity registry if not needed) ─
+sensor:
+  - platform: roode
+    id: roode_sensors
+    roode_id: ${roode_id}
+    distance_entry:
+      name: $friendly_name Distance Zone 0
+      filters:
+        - delta: 100
+    distance_exit:
+      name: $friendly_name Distance Zone 1
+      filters:
+        - delta: 100
+    max_threshold_entry:
+      name: $friendly_name Max Zone 0
+    max_threshold_exit:
+      name: $friendly_name Max Zone 1
+    min_threshold_entry:
+      name: $friendly_name Min Zone 0
+    min_threshold_exit:
+      name: $friendly_name Min Zone 1
+    roi_height_entry:
+      name: $friendly_name ROI Height Zone 0
+    roi_width_entry:
+      name: $friendly_name ROI Width Zone 0
+    roi_height_exit:
+      name: $friendly_name ROI Height Zone 1
+    roi_width_exit:
+      name: $friendly_name ROI Width Zone 1
+    sensor_status:
+      name: $friendly_name Sensor Status Code
+    manual_adjustment_count:
+      name: $friendly_name Manual Adjustments
+    loop_time:
+      name: $friendly_name Loop Time
+    cpu_usage:
+      name: $friendly_name CPU Usage
+    ram_usage:
+      name: $friendly_name RAM Usage
+
+# ── Presence binary sensors ───────────────────────────────────────────────────
+binary_sensor:
+  - platform: roode
+    roode_id: ${roode_id}
+    presence:
+      name: $friendly_name Presence

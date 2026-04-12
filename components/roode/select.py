@@ -3,7 +3,6 @@ from typing import OrderedDict
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import select
-from esphome.const import CONF_ID
 
 from . import Roode, roode_ns, CONF_ROODE_ID
 
@@ -22,16 +21,8 @@ RANGING_MODE_OPTIONS = ["auto", "short", "medium", "long", "longer", "longest"]
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(CONF_ROODE_ID): cv.use_id(Roode),
-        cv.Optional(CONF_FILTER_MODE): select.SELECT_SCHEMA.extend(
-            {
-                cv.GenerateID(): cv.declare_id(FilterModeSelect),
-            }
-        ),
-        cv.Optional(CONF_RANGING_MODE): select.SELECT_SCHEMA.extend(
-            {
-                cv.GenerateID(): cv.declare_id(RangingModeSelect),
-            }
-        ),
+        cv.Optional(CONF_FILTER_MODE): select.select_schema(FilterModeSelect),
+        cv.Optional(CONF_RANGING_MODE): select.select_schema(RangingModeSelect),
     }
 )
 
@@ -41,14 +32,12 @@ async def to_code(config: OrderedDict):
 
     if CONF_FILTER_MODE in config:
         conf = config[CONF_FILTER_MODE]
-        sel = cg.new_Pvariable(conf[CONF_ID])
-        await select.register_select(sel, conf, options=FILTER_MODE_OPTIONS)
+        sel = await select.new_select(conf, options=FILTER_MODE_OPTIONS)
         cg.add(sel.set_roode_hub(hub))
         cg.add(hub.set_filter_mode_select(sel))
 
     if CONF_RANGING_MODE in config:
         conf = config[CONF_RANGING_MODE]
-        sel = cg.new_Pvariable(conf[CONF_ID])
-        await select.register_select(sel, conf, options=RANGING_MODE_OPTIONS)
+        sel = await select.new_select(conf, options=RANGING_MODE_OPTIONS)
         cg.add(sel.set_roode_hub(hub))
         cg.add(hub.set_ranging_mode_select(sel))

@@ -413,12 +413,14 @@ void Roode::path_tracking(Zone *zone) {
   uint32_t timeout = state_ == STATE_ENTRY_ACTIVE ? 2500 : 3500;
   if (state_ != STATE_IDLE && millis() - state_started_ts > timeout) {
     state_ = STATE_IDLE;
-    // Reset all path tracking state so stale data from this incomplete crossing
-    // cannot combine with the next one to produce a spurious count.
+    // Clear the PathTrack array and filling size so stale partial sequence data
+    // cannot combine with the NEXT crossing to fire a spurious count.
+    // Do NOT reset LeftPreviousStatus / RightPreviousStatus here — those reflect
+    // real zone occupancy. Resetting them while a zone is still occupied would
+    // immediately re-fire events on the next call, creating rapid state cycling
+    // that produces endless counts.
     PathTrackFillingSize = 1;
     PathTrack[0] = PathTrack[1] = PathTrack[2] = PathTrack[3] = 0;
-    LeftPreviousStatus = NOBODY;
-    RightPreviousStatus = NOBODY;
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
 

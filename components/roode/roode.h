@@ -301,6 +301,7 @@ class Roode : public PollingComponent {
 
   unsigned long last_valid_crossing_ts_{0};
   unsigned long zone_triggered_start_[2]{0, 0};
+  bool zone_active_prev_[2]{false, false};  // tracks previous zone state for cpu-opt clearing events
 
   std::string last_status_text_{};
 

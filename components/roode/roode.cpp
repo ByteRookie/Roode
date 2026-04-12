@@ -207,13 +207,13 @@ void Roode::setup() {
   if (!force_single_core_) {
     log_event("use_dual_core");
     vTaskDelay(pdMS_TO_TICKS(200));
-    BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 4096, this, 1, &sensor_task_handle_, 1);
+    BaseType_t res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 8192, this, 1, &sensor_task_handle_, 1);
     multicore_retry_count_ = 0;
     while (res != pdPASS && multicore_retry_count_ < 2) {
       multicore_retry_count_++;
       log_event(std::string("retry_multicore_") + std::to_string(multicore_retry_count_));
       vTaskDelay(pdMS_TO_TICKS(200));
-      res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 4096, this, 1, &sensor_task_handle_, 1);
+      res = xTaskCreatePinnedToCore(sensor_task, "SensorTask", 8192, this, 1, &sensor_task_handle_, 1);
     }
     if (res == pdPASS) {
       use_sensor_task_ = true;
@@ -259,6 +259,9 @@ void Roode::setup() {
   }
   if (people_counter != nullptr)
     expected_counter_ = people_counter->state;
+
+  // Seed crossing timestamp so fail-safe calibration doesn't fire in the first 2 minutes of operation.
+  last_valid_crossing_ts_ = millis();
 
   publish_feature_list();
   publish_setting_entities();
@@ -328,7 +331,11 @@ void Roode::loop() {
   }
   bool zone_trig = current_zone->getMinDistance() < current_zone->threshold->max &&
                    current_zone->getMinDistance() > current_zone->threshold->min;
-  if (!cpu_optimizations_active_ || zone_trig)
+  // Also call path_tracking when zone was previously occupied but just cleared,
+  // so the algorithm can register the NOBODY transition and fire count events.
+  bool zone_was_active = zone_active_prev_[current_zone->id];
+  zone_active_prev_[current_zone->id] = zone_trig;
+  if (!cpu_optimizations_active_ || zone_trig || zone_was_active)
     path_tracking(this->current_zone);
   handle_sensor_status();
   this->current_zone = this->current_zone == this->entry ? this->exit : this->entry;
@@ -441,10 +448,20 @@ void Roode::path_tracking(Zone *zone) {
     zone_triggered_start_[zone->id] = 0;
   } else if (zone_triggered_start_[zone->id] != 0 && millis() - zone_triggered_start_[zone->id] >= 10000 &&
              millis() - last_valid_crossing_ts_ >= 120000) {
-    ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone->id);
-    run_zone_calibration(zone->id);
-    fail_safe_triggered_ = true;
-    zone_triggered_start_[zone->id] = 0;
+    // Only fire fail-safe calibration when both zones are clear.
+    // Calibrating with someone present corrupts the idle baseline and breaks all future detection.
+    bool zones_clear = entry->getMinDistance() >= entry->threshold->max &&
+                       exit->getMinDistance() >= exit->threshold->max;
+    if (zones_clear) {
+      ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone->id);
+      run_zone_calibration(zone->id);
+      fail_safe_triggered_ = true;
+      zone_triggered_start_[zone->id] = 0;
+    } else {
+      // Zone still occupied — defer and restart the 10s window so we keep checking
+      ESP_LOGD(CALIBRATION, "Fail safe deferred: zone %d still occupied", zone->id);
+      zone_triggered_start_[zone->id] = millis();
+    }
   }
 
   // left zone
@@ -1305,7 +1322,9 @@ void Roode::sensor_task(void *param) {
     }
     bool zone_trig = self->current_zone->getMinDistance() < self->current_zone->threshold->max &&
                      self->current_zone->getMinDistance() > self->current_zone->threshold->min;
-    if (!self->cpu_optimizations_active_ || zone_trig)
+    bool zone_was_active = self->zone_active_prev_[self->current_zone->id];
+    self->zone_active_prev_[self->current_zone->id] = zone_trig;
+    if (!self->cpu_optimizations_active_ || zone_trig || zone_was_active)
       self->path_tracking(self->current_zone);
     self->handle_sensor_status();
     self->current_zone = self->current_zone == self->entry ? self->exit : self->entry;

@@ -376,8 +376,9 @@ void Roode::loop() {
   uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
   if (auto_calibration_interval_sec_ > 0 && now_epoch > 100000 &&
       now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
-    bool zones_clear = entry->getMinDistance() >= entry->threshold->max &&
-                       exit->getMinDistance() >= exit->threshold->max;
+    // Use debounced state — a momentary raw reading above threshold->max does not
+    // mean the zone is truly empty (noise can produce false clearances).
+    bool zones_clear = !zone_debounced_active_[0] && !zone_debounced_active_[1];
     if (zones_clear) {
       ESP_LOGI(TAG, "auto_calibration_running");
       calibrate_zones();
@@ -445,6 +446,14 @@ void Roode::path_tracking(Zone *zone) {
     PathTrackFillingSize = 1;
     PathTrack[0] = PathTrack[1] = PathTrack[2] = PathTrack[3] = 0;
     path_track_first_event_ts_ = 0;
+    // If both zones are genuinely idle (debounced), also clear the static
+    // previous-status variables.  Without this, a stale SOMEONE value can
+    // survive the timeout and combine with the very next zone event to fire
+    // a phantom count — the primary cause of counts drifting up over time.
+    if (!zone_debounced_active_[0] && !zone_debounced_active_[1]) {
+      LeftPreviousStatus = NOBODY;
+      RightPreviousStatus = NOBODY;
+    }
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
 
@@ -511,10 +520,11 @@ void Roode::path_tracking(Zone *zone) {
     zone_triggered_start_[zone->id] = 0;
   } else if (zone_triggered_start_[zone->id] != 0 && millis() - zone_triggered_start_[zone->id] >= 10000 &&
              millis() - last_valid_crossing_ts_ >= 120000) {
-    // Only fire fail-safe calibration when both zones are clear.
-    // Calibrating with someone present corrupts the idle baseline and breaks all future detection.
-    bool zones_clear = entry->getMinDistance() >= entry->threshold->max &&
-                       exit->getMinDistance() >= exit->threshold->max;
+    // Only fire fail-safe calibration when BOTH zones are debounced-clear.
+    // Using raw getMinDistance() is insufficient: noise can temporarily push a
+    // reading above threshold->max even while the zone is genuinely oscillating,
+    // causing calibration to fire with a person present and corrupt the baseline.
+    bool zones_clear = !zone_debounced_active_[0] && !zone_debounced_active_[1];
     if (zones_clear) {
       ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone->id);
       run_zone_calibration(zone->id);
@@ -647,8 +657,11 @@ void Roode::path_tracking(Zone *zone) {
     }
   }
   if (presence_sensor != nullptr) {
-    if (CurrentZoneStatus == NOBODY && LeftPreviousStatus == NOBODY && RightPreviousStatus == NOBODY) {
-      // nobody is in the sensing area
+    // Use debounced zone state rather than the FSM static variables
+    // (LeftPreviousStatus / RightPreviousStatus).  The statics can carry a
+    // stale SOMEONE value across a timeout or recalibration event, leaving
+    // presence permanently stuck true even when the room is empty.
+    if (!zone_debounced_active_[0] && !zone_debounced_active_[1]) {
       presence_sensor->publish_state(false);
     }
   }
@@ -1446,8 +1459,9 @@ void Roode::sensor_task(void *param) {
     if (self->auto_calibration_interval_sec_ > 0 && now_epoch > 100000 &&
         now_epoch - self->last_calibration_ts_ >= self->auto_calibration_interval_sec_) {
       // Only calibrate when both zones are clear — calibrating with someone present corrupts the baseline
-      bool zones_clear = self->entry->getMinDistance() >= self->entry->threshold->max &&
-                         self->exit->getMinDistance() >= self->exit->threshold->max;
+      // Use debounced state — a momentary raw reading above threshold->max does not
+      // mean the zone is truly empty (noise can produce false clearances).
+      bool zones_clear = !self->zone_debounced_active_[0] && !self->zone_debounced_active_[1];
       if (zones_clear) {
         ESP_LOGI(TAG, "auto_calibration_running");
         self->calibrate_zones();

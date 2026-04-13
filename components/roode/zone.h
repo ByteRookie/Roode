@@ -48,10 +48,17 @@ class Zone {
   Threshold *threshold = new Threshold();
   void set_filter_mode(FilterMode mode) { filter_mode_ = mode; }
   void set_filter_window(uint8_t window) {
-    max_samples = std::min<uint8_t>(window, MAX_BUFFER_SIZE);
-    sample_idx_ = 0;
-    sample_count_ = 0;
-    samples.fill(0);
+    uint8_t new_max = std::min<uint8_t>(window, MAX_BUFFER_SIZE);
+    // Do NOT wipe the sample buffer.  On dual-core ESP32 the sensor task reads
+    // this buffer continuously; a full reset races with readDistance() and can
+    // produce a frame of garbage distances that advance the FSM.
+    // Instead just shrink the live count / write index so the buffer self-heals
+    // within new_max readings — existing samples up to the new limit stay valid.
+    max_samples = new_max;
+    if (sample_count_ > max_samples)
+      sample_count_ = max_samples;
+    if (sample_idx_ >= max_samples)
+      sample_idx_ = 0;
   }
   void set_max_samples(uint8_t max) { set_filter_window(max); };
 

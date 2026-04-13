@@ -3,9 +3,9 @@
 [![GitHub release](https://img.shields.io/badge/release-1.8.0--Dev-blue?style=flat-square)](https://github.com/ByteRookie/Roode/tree/1.8.0-Dev)
 [![Roode community](https://img.shields.io/discord/879407995837087804.svg?label=Discord&logo=Discord&colorB=7289da&style=for-the-badge)](https://discord.gg/hU9SvSXMHs)
 
-A stable, production-ready people counter built on ESPHome and the VL53L1X time-of-flight sensor. Works with any smart home system that supports ESPHome or MQTT (e.g. Home Assistant). All entities are created automatically.
+A stable, production-ready people counter built on ESPHome and the VL53L1X time-of-flight sensor. Works with any smart home system that supports ESPHome or MQTT (e.g. Home Assistant). All entities are created automatically via the included package.
 
-**Branch: `1.8.0-Dev` — repo: [`ByteRookie/Roode`](https://github.com/ByteRookie/Roode)**
+**Repo:** [`ByteRookie/Roode`](https://github.com/ByteRookie/Roode) · **Branch:** `1.8.0-Dev`
 
 ---
 
@@ -16,7 +16,7 @@ A stable, production-ready people counter built on ESPHome and the VL53L1X time-
 - [Hardware](#hardware)
 - [Wiring](#wiring)
 - [Configuration Reference](#configuration-reference)
-- [Sensors](#sensors)
+- [What the Entity Package Provides](#what-the-entity-package-provides)
 - [Algorithm](#algorithm)
 - [Threshold Distance](#threshold-distance)
 - [Sampling and Filtering](#sampling-and-filtering)
@@ -27,71 +27,46 @@ A stable, production-ready people counter built on ESPHome and the VL53L1X time-
 
 ## Quick Start
 
-### 1. Add the external component
+### Minimal YAML (copy, adjust 4 lines, flash)
 
 ```yaml
-external_components:
-  - source: github://ByteRookie/Roode@1.8.0-Dev
-    refresh: always
-```
-
-### 2. Pull the standard entity package
-
-```yaml
-packages:
-  roode: github://ByteRookie/Roode/roode_entities.yaml@1.8.0-Dev
-```
-
-### 3. Copy and adapt the example below, flash, and you're done
-
-```yaml
-# ─── Substitutions ────────────────────────────────────────────────────────────
 substitutions:
-  name: "office-door-sensor"
-  sensor_name: "Office Entree"
-  project_name: "J-Sensor.Doorway-Counter"
-  project_version: "1.0.0"
-  sensor_invert: "false"   # set "true" to flip entry/exit direction
-  sensor_min: "15%"        # minimum detection threshold (clamped to 2–49 %)
-  sensor_max: "85%"        # maximum detection threshold (clamped to 51–95 %)
-  occupancy_delay: "1min"  # how long after the last detection before "vacant"
+  name: "my-door-sensor"        # ESPHome device name
+  friendly_name: "Doorway"      # Prefix for all HA entity names
+  sensor_invert: "false"        # "true" to flip entry/exit direction
+  sensor_min: "15%"             # Min detection threshold (2–49 %)
+  sensor_max: "85%"             # Max detection threshold (51–95 %)
 
-# ─── ESPHome core ─────────────────────────────────────────────────────────────
 esphome:
   name: $name
-  project:
-    name: $project_name
-    version: $project_version
 
 esp32:
   board: wemos_d1_mini32
 
-# ─── External component ───────────────────────────────────────────────────────
+# ── Roode external component ──────────────────────────────────────────────────
 external_components:
   - source: github://ByteRookie/Roode@1.8.0-Dev
     refresh: always
 
-# ─── Standard Roode entity package ───────────────────────────────────────────
+# ── All HA entities (buttons, sensors, sliders, switches) created here ────────
 packages:
-  roode: github://ByteRookie/Roode/roode_entities.yaml@1.8.0-Dev
+  roode_entities: github://ByteRookie/Roode/roode_entities.yaml@1.8.0-Dev
 
-# ─── Connectivity ─────────────────────────────────────────────────────────────
+# ── Connectivity ──────────────────────────────────────────────────────────────
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-
 api:
 ota:
   - platform: esphome
 logger:
 
-# ─── I²C bus ──────────────────────────────────────────────────────────────────
+# ── I²C ──────────────────────────────────────────────────────────────────────
 i2c:
   sda: GPIO21
   scl: GPIO22
-  scan: true
 
-# ─── VL53L1X sensor ───────────────────────────────────────────────────────────
+# ── VL53L1X sensor ────────────────────────────────────────────────────────────
 vl53l1x:
   calibration:
     ranging: auto
@@ -103,86 +78,29 @@ vl53l1x:
       number: GPIO18
       mode: INPUT_PULLUP
 
-# ─── People-counting algorithm ────────────────────────────────────────────────
+# ── People counting algorithm ─────────────────────────────────────────────────
 roode:
+  id: roode_platform            # must match roode_id in the package (default)
   sampling: 2
   orientation: parallel
-  calibration_persistence: true   # thresholds survive reboots
+  calibration_persistence: true
   filter_mode: median
   filter_window: 5
-
   detection_thresholds:
     min: $sensor_min
     max: $sensor_max
-
   zones:
     invert: $sensor_invert
 
-# ─── Occupancy (people present = occupied) ────────────────────────────────────
-binary_sensor:
-  - platform: roode
-    presence:
-      name: "$sensor_name Presence"
-      id: roode_presence
-
-  - platform: template
-    name: "$sensor_name Occupancy"
-    device_class: occupancy
-    lambda: return id(roode_presence).state;
-    filters:
-      - delayed_off: $occupancy_delay
-
-# ─── People counter (adjustable in HA) ───────────────────────────────────────
+# ── People counter (adjustable number in HA) ──────────────────────────────────
 number:
   - platform: roode
+    roode_id: roode_platform
     people_counter:
-      name: "$sensor_name People Count"
-
-# ─── Extra environmental sensors ──────────────────────────────────────────────
-sensor:
-  - platform: shtcx
-    temperature:
-      name: "$sensor_name Temperature"
-    humidity:
-      name: "$sensor_name Humidity"
-    address: 0x70
-    update_interval: 60s
-
-  - platform: bh1750
-    name: "$sensor_name Illuminance"
-    address: 0x23
-    update_interval: 60s
-
-  - platform: wifi_signal
-    name: "$sensor_name WiFi Signal"
-    update_interval: 60s
-
-  - platform: uptime
-    name: "$sensor_name Uptime"
-    id: uptime_sensor
-    update_interval: 60s
-    internal: true
-    on_value:
-      then:
-        - text_sensor.template.publish:
-            id: uptime_human
-            state: !lambda |-
-              uint32_t s = (uint32_t)x;
-              uint32_t d = s / 86400; s %= 86400;
-              uint32_t h = s / 3600;  s %= 3600;
-              uint32_t m = s / 60;    s %= 60;
-              char buf[32];
-              snprintf(buf, sizeof(buf), "%ud %02uh %02um %02us", d, h, m, s);
-              return std::string(buf);
-
-text_sensor:
-  - platform: template
-    name: "$sensor_name Uptime (human)"
-    id: uptime_human
-    icon: mdi:clock-start
+      name: "$friendly_name People Count"
 ```
 
-**Walk through the door once each way.** Entry and Exit counts should each increment by 1. If they appear reversed, set `sensor_invert: "true"` and reflash.
+> **First boot:** leave the doorway clear for ~10 s while the sensor measures the idle distance. Walk through once each way — entry and exit should each count +1. If reversed, set `sensor_invert: "true"` and reflash.
 
 ---
 
@@ -191,35 +109,28 @@ text_sensor:
 Version `1.8.0-Dev` includes a comprehensive set of hardening fixes targeted at long-term, always-on deployments.
 
 ### Zone dwell-time debounce
-A zone must measure a presence continuously for **150 ms** before it registers as occupied. It must read clear for **80 ms** before it unregisters. This eliminates single-frame noise spikes from advancing the crossing state machine (FSM) — the primary cause of false counts in noisy environments.
+A zone must read as occupied continuously for **150 ms** before it registers. It must read clear for **80 ms** before it unregisters. Single-frame noise spikes cannot advance the crossing state machine (FSM).
 
 ### Crossing sequence timing guard
-The full entry/exit crossing sequence (zone 0 active → both active → zone 1 active → both clear) must span **≥ 300 ms** before a count fires. Sequences faster than a real person walking are discarded.
+The full entry/exit sequence must span **≥ 300 ms** before a count fires. Sub-300 ms sequences (door swings, reflections) are discarded.
 
 ### Threshold validation on boot
-Calibration data loaded from flash is rejected if:
-- Idle distance is outside 200–4000 mm
-- `threshold_max >= idle` (catches the "100% = idle" corruption bug)
-- `threshold_min` is below 2% of idle
-- `threshold_max - threshold_min < 100 mm`
+Calibration data loaded from flash is rejected if any of these are true:
+- Idle distance outside 200–4000 mm
+- `threshold_max ≥ idle` (catches the "100% = idle" corruption bug)
+- `threshold_min < 2 %` of idle
+- `threshold_max − threshold_min < 100 mm`
 
-Invalid data triggers a fresh calibration instead of using corrupt values.
+Bad data triggers a fresh calibration instead of using corrupt values.
 
 ### Percentage clamping (5 layers)
-`min_pct` is clamped to **2–49 %** and `max_pct` to **51–95 %** in:
-1. `restore_settings_from_flash()` — flash values outside range are ignored
-2. `apply_*_threshold_pct()` — HA slider calls are clamped
-3. `calibrateThreshold()` — hard floor applied before computing thresholds
-4. `setup()` — calibration rejected if percentages produce bad thresholds
-5. `set_threshold_percentages()` — runtime API calls are safe
-
-This prevents the "768 false detections in 21 minutes" failure mode where a corrupted flash value (e.g. `max_pct=100%`) made `threshold_max = idle_distance`, causing any sub-idle noise to trigger a crossing.
+`min_pct` is clamped to **2–49 %** and `max_pct` to **51–95 %** at every entry point: flash restore, HA slider calls, `calibrateThreshold()`, boot validation, and the runtime API. This prevents the "768 false detections in 21 minutes" failure mode caused by corrupted flash values (e.g. `max_pct=100%` → `threshold_max = idle` → every sub-idle noise reading triggers a count).
 
 ### Dual-core race fix
-`expected_counter_` is now set **after** `call.perform()` completes (not before), eliminating the window where a core-0 update() could see a stale counter value and log a phantom "manual adjustment".
+`expected_counter_` is now set **after** `call.perform()` completes, eliminating the window where a core-0 `update()` could see a stale counter value and log a phantom "manual adjustment".
 
 ### Debounced calibration triggers
-Fail-safe and periodic recalibration only fire when both zones have been continuously clear (debounced) — not just when the raw distance happens to be above the threshold. This prevents calibration from interrupting a slow-moving person.
+Fail-safe and periodic recalibration only fire when both zones have been continuously clear (debounced state, not raw distance). Calibration cannot interrupt a slow-moving person.
 
 ---
 
@@ -227,9 +138,9 @@ Fail-safe and periodic recalibration only fire when both zones have been continu
 
 | Part | Recommended | Alternatives |
 |------|-------------|--------------|
-| MCU | Wemos D1 Mini ESP32 | NodeMCU V2, any ESP32 |
-| Sensor | Pololu VL53L1X | GY-53, Pimoroni, Adafruit |
-| Power | 1 A USB supply | — |
+| MCU | Wemos D1 Mini ESP32 | NodeMCU V2, any ESP32 board |
+| ToF sensor | Pololu VL53L1X | GY-53, Pimoroni, Adafruit |
+| Power supply | 1 A USB adapter | — |
 
 > Do **not** power from a computer USB port — insufficient current causes sensor brown-outs and false readings.
 
@@ -240,25 +151,25 @@ Fail-safe and periodic recalibration only fire when both zones have been continu
 ### ESP32
 
 ```
-              ESP32   VL53L1X
---------------------- -------
-                3V3 - VIN
-                GND - GND
-  SDA (GPIO21)      - SDA
-  SCL (GPIO22)      - SCL
-  XSHUT (GPIO13)    - XSHUT
-  INT   (GPIO18)    - GPIO1
+              ESP32     VL53L1X
+─────────────────────   ───────
+              3V3     ─  VIN
+              GND     ─  GND
+  SDA  GPIO21         ─  SDA
+  SCL  GPIO22         ─  SCL
+  XSHUT GPIO13        ─  XSHUT
+  INT   GPIO18        ─  GPIO1 (interrupt)
 ```
 
 ### ESP8266
 
 ```
               ESP8266   VL53L1X
------------------------ -------
-                  3V3 - VIN
-                  GND - GND
-  D2 (GPIO4)        - SDA
-  D1 (GPIO5)        - SCL
+─────────────────────   ───────
+              3V3     ─  VIN
+              GND     ─  GND
+  D2  GPIO4           ─  SDA
+  D1  GPIO5           ─  SCL
 ```
 
 ---
@@ -269,30 +180,31 @@ Fail-safe and periodic recalibration only fire when both zones have been continu
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `calibration.ranging` | `auto` | Ranging preset: `auto`, `short`, `medium`, `long` |
-| `calibration.offset` | — | Distance offset correction in mm |
-| `calibration.crosstalk` | — | Crosstalk correction in cps |
-| `pins.xshut` | — | GPIO for power-cycling the sensor on hang |
-| `pins.interrupt` | — | GPIO for data-ready signal (preferred over polling) |
-| `timeout` | `2s` | Max wait time per measurement |
+| `calibration.ranging` | `auto` | `auto`, `short`, `medium`, `long` |
+| `calibration.offset` | — | Distance offset correction (mm) |
+| `calibration.crosstalk` | — | Crosstalk correction (cps) |
+| `pins.xshut` | — | GPIO for power-cycling on sensor hang |
+| `pins.interrupt` | — | GPIO for data-ready signal (preferred) |
+| `timeout` | `2s` | Max wait per measurement |
 
 ### `roode:`
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `sampling` | `2` | Raw readings averaged per distance update |
-| `orientation` | `parallel` | `parallel` or `perpendicular` sensor mounting |
-| `roi` | `h16 w6` | Region of interest size; `auto` for automatic |
-| `detection_thresholds.min` | `15%` | Minimum distance (% of idle or absolute mm) |
-| `detection_thresholds.max` | `85%` | Maximum distance (% of idle or absolute mm) |
+| `id` | `roode_platform` | Must match `roode_id` in the entity package |
+| `sampling` | `2` | Raw readings averaged per update |
+| `orientation` | `parallel` | `parallel` or `perpendicular` mounting |
+| `roi` | `h16 w6` | Region of interest; `auto` for automatic |
+| `detection_thresholds.min` | `15%` | Min distance (% of idle or absolute mm) |
+| `detection_thresholds.max` | `85%` | Max distance (% of idle or absolute mm) |
 | `calibration_persistence` | `false` | Save calibration to flash across reboots |
 | `filter_mode` | `min` | `min`, `median`, or `percentile10` |
-| `filter_window` | `5` | Number of samples in the filter buffer |
+| `filter_window` | `5` | Samples in the filter buffer |
 | `zones.invert` | `false` | Swap entry/exit zones |
 | `force_single_core` | `false` | Disable dual-core tasking |
-| `invalid_distance_limit` | `10` | Consecutive bad readings before sensor restart |
+| `invalid_distance_limit` | `10` | Consecutive bad readings before restart |
 | `restart_timeout` | `30s` | Cooldown between sensor restarts |
-| `log_fallback_events` | `false` | Log interrupt fallbacks and XSHUT recoveries |
+| `log_fallback_events` | `false` | Log INT fallbacks and XSHUT recoveries |
 
 ### Per-zone overrides
 
@@ -305,7 +217,7 @@ roode:
         min: 10%
         max: 80%
     exit:
-      roi: { height: 8, width: 6, center: 124 }
+      roi: { height: 8, width: 6 }
       detection_thresholds:
         min: 10%
         max: 70%
@@ -313,118 +225,74 @@ roode:
 
 ---
 
-## Sensors
+## What the Entity Package Provides
 
-### People counter (adjustable in HA)
+Including `roode_entities.yaml` automatically creates all of these in Home Assistant — no manual sensor definitions needed.
+
+The package uses two substitutions you can override in your main YAML:
+
+| Substitution | Default | Purpose |
+|--------------|---------|---------|
+| `friendly_name` | `Roode` | Prefix for all entity names |
+| `roode_id` | `roode_platform` | Must match the `id:` in your `roode:` block |
+
+### Entities created by the package
+
+| Entity | Type | Description |
+|--------|------|-------------|
+| Restart | button | Reboot the device |
+| Calibrate Empty Room | button | Re-measure idle distance |
+| Calibrate With Person | button | Person-present calibration |
+| Filter Window | number | Samples in filter buffer (live, saved to flash) |
+| Sampling | number | Readings averaged per update (live, saved) |
+| Entry / Exit Max Threshold | number | Upper detection limit per zone (live, saved) |
+| Entry / Exit Min Threshold | number | Lower detection limit per zone (live, saved) |
+| Auto Calibration Interval | number | Minutes between auto-calibrations |
+| Entry / Exit ROI Height & Width | number | ROI size per zone (live, saved) |
+| Filter Mode | select | `min` / `median` / `percentile10` (live, saved) |
+| Ranging Mode | select | `auto` / `short` / `medium` / `long` (live, saved) |
+| Invert Direction | switch | Flip entry/exit (live, saved) |
+| Save Settings to Flash | switch | Toggle calibration persistence |
+| Status | text_sensor | `ok` / `timeout` / `reinitializing` / `error` / `offline` |
+| Version | text_sensor | Firmware version string |
+| Last Direction | text_sensor | Most recent entry or exit event |
+| Features | text_sensor | Active runtime features summary |
+| Distance Zone 0 / 1 | sensor | Measured distance per zone (mm) |
+| Max / Min Zone 0 / 1 | sensor | Active thresholds per zone |
+| ROI Height / Width Zone 0 / 1 | sensor | Active ROI dimensions |
+| Sensor Status Code | sensor | Numeric VL53L1X status (0 = ok) |
+| Manual Adjustments | sensor | Total manual people-count corrections |
+| Loop Time | sensor | Average sensor loop time |
+| CPU Usage | sensor | Estimated MCU CPU % |
+| RAM Free | sensor | Free heap % |
+| Presence | binary_sensor | True while a crossing zone is active |
+
+The **People Counter** number entity is not in the package (it is user-named). Add it yourself:
 
 ```yaml
 number:
   - platform: roode
+    roode_id: roode_platform
     people_counter:
-      name: People Count
+      name: "$friendly_name People Count"
 ```
-
-### Full sensor block
-
-```yaml
-binary_sensor:
-  - platform: roode
-    presence:
-      name: $sensor_name Presence
-    zones:
-      entry:
-        presence:
-          name: $sensor_name Entry Occupied
-      exit:
-        presence:
-          name: $sensor_name Exit Occupied
-
-sensor:
-  - platform: roode
-    distance_entry:
-      name: $sensor_name Distance Entry
-    distance_exit:
-      name: $sensor_name Distance Exit
-    max_threshold_entry:
-      name: $sensor_name Max Threshold Entry
-    max_threshold_exit:
-      name: $sensor_name Max Threshold Exit
-    min_threshold_entry:
-      name: $sensor_name Min Threshold Entry
-    min_threshold_exit:
-      name: $sensor_name Min Threshold Exit
-    roi_height_entry:
-      name: $sensor_name ROI Height Entry
-    roi_width_entry:
-      name: $sensor_name ROI Width Entry
-    loop_time:
-      name: $sensor_name Loop Time
-    cpu_usage:
-      name: $sensor_name CPU Usage
-    ram_free:
-      name: $sensor_name RAM Free
-    sensor_status:
-      name: $sensor_name Sensor Status
-    manual_adjustment_count:
-      name: $sensor_name Manual Adjustments
-
-text_sensor:
-  - platform: roode
-    version:
-      name: $sensor_name Version
-  - platform: roode
-    entry_exit_event:
-      name: $sensor_name Last Direction
-  - platform: roode
-    sensor_status:
-      name: $sensor_name Sensor Status Text
-  - platform: roode
-    enabled_features:
-      name: $sensor_name Enabled Features
-```
-
-### Sensor Reference
-
-| Name | Type | Description |
-|------|------|-------------|
-| `people_counter` | number | Adjustable tally of detected people |
-| `presence` | binary_sensor | True while a crossing zone is active |
-| `zones.entry.presence` | binary_sensor | Entry zone currently occupied |
-| `zones.exit.presence` | binary_sensor | Exit zone currently occupied |
-| `distance_entry` | sensor | Measured distance in entry zone (mm) |
-| `distance_exit` | sensor | Measured distance in exit zone (mm) |
-| `max_threshold_entry/exit` | sensor | Upper detection threshold per zone |
-| `min_threshold_entry/exit` | sensor | Lower detection threshold per zone |
-| `roi_height/width_entry/exit` | sensor | ROI size per zone in SPAD units |
-| `loop_time` | sensor | Average sensor loop time |
-| `cpu_usage` | sensor | Estimated MCU CPU usage % |
-| `ram_free` | sensor | Free heap % |
-| `flash_free` | sensor | Free flash % |
-| `sensor_status` | sensor | Numeric VL53L1X status code (0 = ok) |
-| `manual_adjustment_count` | sensor | Total manual count corrections |
-| `version` | text_sensor | Firmware version string |
-| `entry_exit_event` | text_sensor | Last entry or exit direction |
-| `sensor_status` (text) | text_sensor | `ok` / `timeout` / `reinitializing` / `error` / `offline` |
-| `enabled_features` | text_sensor | Active runtime features summary |
 
 ---
 
 ## Algorithm
 
-The sensor's 16×16 SPAD grid is split into two Regions of Interest (ROI). The PathTrack FSM looks for this sequence to decide direction:
+The sensor's 16×16 SPAD grid is split into two Regions of Interest. The PathTrack FSM watches for this crossing sequence:
 
 | Step | Zone 0 | Zone 1 | Meaning |
 |------|--------|--------|---------|
 | 1 | SOMEONE | NOBODY | Person enters from zone 0 side |
 | 2 | SOMEONE | SOMEONE | Person spans both zones |
 | 3 | NOBODY | SOMEONE | Person has crossed to zone 1 side |
-| 4 | NOBODY | NOBODY | Crossing complete → **Entry counted** |
+| 4 | NOBODY | NOBODY | Crossing complete → **Entry +1** |
 
-The reverse sequence (`[0,1,3,2]`) counts an **Exit**.
+Reverse sequence → **Exit +1**. Zone states are debounced (150 ms / 80 ms) and the full sequence must take ≥ 300 ms.
 
-Zone states are debounced (150 ms active / 80 ms clear) and the full sequence must take ≥ 300 ms, so noise and door movements cannot advance the FSM.
-
-### SPAD center table
+### SPAD center reference
 
 ```
 128,136,144,152,160,168,176,184,  192,200,208,216,224,232,240,248
@@ -446,20 +314,20 @@ Zone states are debounced (150 ms active / 80 ms clear) and the full sequence mu
 120,112,104, 96, 88, 80, 72, 64,   56, 48, 40, 32, 24, 16,  8,  0  ← Pin 1
 ```
 
+199 is the default center. The lens inverts the image — to shift the FOV toward the upper-left, pick a center SPAD in the lower-right.
+
 ---
 
 ## Threshold Distance
 
-On first boot (or after a reset), leave the doorway clear for ~10 seconds. Roode measures the idle distance to the floor/ceiling and sets:
+On first boot (or after a reset) leave the doorway clear for ~10 s. Roode samples the idle distance and sets:
 
-- `threshold_max = idle × max_pct` (default 85%)
-- `threshold_min = idle × min_pct` (default 15%)
+- `threshold_max = idle × max_pct` (default 85 %)
+- `threshold_min = idle × min_pct` (default 15 %)
 
 A crossing registers when the measured distance in a zone is **between** min and max.
 
-### Threshold protection (v1.8.0-Dev)
-
-The firmware now validates thresholds after loading from flash. If `threshold_max ≥ idle` (e.g. from a corrupted `max_pct = 100%`), the stored data is discarded and a fresh calibration runs. Percentages are also clamped: `min_pct` to 2–49 %, `max_pct` to 51–95 %. This prevents the flash-corruption failure mode where any sub-idle noise reading triggers a false count.
+With `calibration_persistence: true` these values survive reboots. If they become corrupted (e.g. via an HA slider set to 100 %), the boot-time validator in v1.8.0-Dev automatically discards them and recalibrates.
 
 ---
 
@@ -467,41 +335,40 @@ The firmware now validates thresholds after loading from flash. If `threshold_ma
 
 Two independent stages smooth raw sensor output:
 
-1. **`sampling`** — averages N consecutive raw measurements into one distance reading
-2. **Filter** (`filter_mode` + `filter_window`) — applies min/median/percentile10 across the last W readings
+1. **`sampling`** — averages N consecutive raw measurements into one distance value
+2. **Filter** (`filter_mode` + `filter_window`) — applies min / median / percentile10 across the last W values
 
-Total raw readings per reported value = `sampling × filter_window`.
+Total raw reads per reported value = `sampling × filter_window`.
 
-| Mode | Best for | Tradeoff |
-|------|----------|----------|
-| `min` | Fast response, low-noise areas | Sensitive to spikes |
+| Mode | Best for | Trade-off |
+|------|----------|-----------|
+| `min` | Fast response, clean areas | Sensitive to spikes |
 | `median` | General use | Ignores outliers, slight lag |
 | `percentile10` | Noisy/reflective areas | Balanced responsiveness |
 
-**Recommended starting point:** `sampling: 2`, `filter_mode: median`, `filter_window: 5`.
-For very noisy areas raise `filter_window` to 7–9. For maximum responsiveness drop to 3.
+**Recommended starting point:** `sampling: 2`, `filter_mode: median`, `filter_window: 5`. Raise `filter_window` to 7–9 for heavy noise; drop to 3 for faster response.
 
 ---
 
 ## FAQ / Troubleshoot
 
 **Counter counts backwards.**
-Set `sensor_invert: "true"` (or `zones.invert: true`) and reflash.
+Set `sensor_invert: "true"` (or flip the `Invert Direction` switch in HA) and the zones will swap without a reflash.
 
 **False counts in empty room.**
-Check boot logs for `Threshold:` lines. `max` should be less than `idle`. If not, clear flash preferences and let the sensor recalibrate. With v1.8.0-Dev, corrupted flash thresholds are now automatically rejected on boot.
+Check boot logs for `Threshold:` lines. `max` must be less than `idle`. If not, press **Calibrate Empty Room** in HA, or clear flash preferences and reboot. With v1.8.0-Dev, corrupted flash thresholds are automatically rejected on boot.
 
 **Sensor not measuring correct distances.**
 1. Remove the yellow protective film from the sensor lens.
-2. Check I²C wiring — SDA/SCL swaps are common.
-3. Rule out strong ambient IR light (sunlight, halogen lamps).
-4. Try a different power supply.
+2. Check I²C wiring — SDA/SCL swaps are the most common mistake.
+3. Rule out strong IR sources (sunlight, halogen lamps).
+4. Use a dedicated 1 A USB power supply.
 
-**Counts stop after hours/days.**
-Enable `calibration_persistence: true`. Roode recalibrates automatically when zones are clear, keeping thresholds fresh as temperature drifts. The debounce and sequence timing guards (v1.8.0-Dev) also prevent the FSM from getting stuck.
+**Counts degrade or stop after hours/days.**
+Enable `calibration_persistence: true`. Roode auto-recalibrates when zones are clear, keeping thresholds fresh as temperature changes. The debounce and timing guards in v1.8.0-Dev also prevent the FSM from getting stuck.
 
-**"Manual adjustment" logged with no one touching HA.**
-Fixed in v1.8.0-Dev — was a dual-core race condition where `expected_counter_` was set before `call.perform()` completed.
+**"Manual adjustment" logged with nobody touching HA.**
+Fixed in v1.8.0-Dev — was a dual-core race condition where `expected_counter_` was written before the HA number update completed.
 
 ---
 

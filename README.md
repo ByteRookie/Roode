@@ -27,40 +27,34 @@ A stable, production-ready people counter built on ESPHome and the VL53L1X time-
 
 ## Quick Start
 
-### Complete YAML (copy, fill in the 9 substitutions, flash)
+### Complete YAML (copy, fill in the 6 substitutions, flash)
 
 ```yaml
 # ── Substitutions — only these lines need editing ─────────────────────────────
 substitutions:
-  name: "my-door-sensor"        # ESPHome device hostname (no spaces)
-  friendly_name: "Doorway"      # Prefix for all HA entity names
-  project_name: "my-org.door-counter"   # esphome.project name
-  project_version: "1.0.0"      # esphome.project version
-  roode_id: "roode_platform"    # links roode: block ↔ entity package (keep default)
-  sensor_invert: "false"        # "true" to flip entry/exit direction
-  sensor_min: "15%"             # Min detection threshold — clamped to 2–49 %
-  sensor_max: "85%"             # Max detection threshold — clamped to 51–95 %
-  occupancy_delay: "30s"        # Delay before occupancy clears after last detection
+  name: "my-door-sensor"     # ESPHome device hostname (no spaces)
+  friendly_name: "Doorway"   # Prefix for all HA entity names
+  sensor_invert: "false"     # "true" to flip entry/exit direction
+  sensor_min: "15%"          # Min detection threshold — clamped to 2–49 %
+  sensor_max: "85%"          # Max detection threshold — clamped to 51–95 %
+  occupancy_delay: "30s"     # Delay before occupancy clears after last detection
 
 # ── ESPHome core ──────────────────────────────────────────────────────────────
 esphome:
   name: $name
-  project:
-    name: $project_name
-    version: $project_version
 
 esp32:
   board: wemos_d1_mini32
 
 # ── Roode external component ──────────────────────────────────────────────────
-# Note: source URLs are resolved before substitutions, so this stays hardcoded.
+# Note: source URLs are resolved before substitutions — this line stays hardcoded.
 external_components:
   - source: github://ByteRookie/Roode@1.8.0-Dev
     refresh: always
 
 # ── Entity package — creates ALL HA entities automatically ────────────────────
 # Buttons, sliders, switches, sensors, text sensors — nothing to define manually.
-# Uses $friendly_name and $roode_id from substitutions above.
+# Uses $friendly_name from substitutions above; roode_id defaults to roode_platform.
 packages:
   roode_entities: github://ByteRookie/Roode/roode_entities.yaml@1.8.0-Dev
 
@@ -92,7 +86,7 @@ vl53l1x:
 
 # ── People counting algorithm ─────────────────────────────────────────────────
 roode:
-  id: $roode_id
+  id: roode_platform          # must match roode_id default in the entity package
   sampling: 2
   orientation: parallel
   calibration_persistence: true
@@ -105,17 +99,17 @@ roode:
     invert: $sensor_invert
 
 # ── People counter (adjustable number in HA) ──────────────────────────────────
-# This is the only entity not included in the package — add it here.
+# The one entity not included in the package — name it here.
 number:
   - platform: roode
-    roode_id: $roode_id
+    roode_id: roode_platform
     people_counter:
       name: "$friendly_name People Count"
 
 # ── Occupancy binary sensor (clears after no presence for occupancy_delay) ────
 binary_sensor:
   - platform: roode
-    roode_id: $roode_id
+    roode_id: roode_platform
     presence:
       name: "$friendly_name Presence"
       id: roode_presence

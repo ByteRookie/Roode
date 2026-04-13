@@ -686,7 +686,33 @@ void Roode::updateCounter(int delta) {
   // window in update() handles any remaining transient in either direction.
   expected_counter_ = next;
 }
-void Roode::recalibration() { calibrate_zones(); }
+void Roode::suspend_sensor_task_for_calibration(uint32_t timeout_ms) {
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (!use_sensor_task_) return;
+  calibration_in_progress_ = true;
+  // Spin-wait until any in-flight readDistance() call on Core 1 has returned.
+  uint32_t deadline = millis() + timeout_ms;
+  while (sensor_task_reading_ && millis() < deadline) {
+    delay(1);
+  }
+  if (sensor_task_reading_) {
+    ESP_LOGW(CALIBRATION, "sensor_task_reading timed out — proceeding anyway");
+  }
+#endif
+}
+
+void Roode::resume_sensor_task_after_calibration() {
+#ifdef CONFIG_IDF_TARGET_ESP32
+  if (!use_sensor_task_) return;
+  calibration_in_progress_ = false;
+#endif
+}
+
+void Roode::recalibration() {
+  suspend_sensor_task_for_calibration();
+  calibrate_zones();
+  resume_sensor_task_after_calibration();
+}
 
 void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
@@ -828,15 +854,19 @@ const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_dis
 
 void Roode::calibrate_zones() {
   ESP_LOGI(SETUP, "Calibrating sensor zones");
-  update_status_text("calibrating...");
+  update_status_text("cal: keep room empty...");
 
   entry->reset_roi(orientation_ == Parallel ? 167 : 195);
   exit->reset_roi(orientation_ == Parallel ? 231 : 60);
 
+  update_status_text("cal: measuring baseline...");
   calibrateDistance();
 
+  update_status_text("cal: calibrating entry zone...");
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
   entry->calibrateThreshold(distanceSensor, 50);
+
+  update_status_text("cal: calibrating exit zone...");
   exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
   exit->calibrateThreshold(distanceSensor, 50);
 
@@ -858,7 +888,7 @@ void Roode::calibrate_zones() {
       std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
   char cal_msg[64];
-  snprintf(cal_msg, sizeof(cal_msg), "calibrated: idle=%dmm thresh=%d-%d%%",
+  snprintf(cal_msg, sizeof(cal_msg), "cal done: idle=%dmm thresh=%d-%d%%",
            entry->threshold->idle,
            entry->threshold->min_percentage.value_or(15),
            entry->threshold->max_percentage.value_or(80));
@@ -1272,8 +1302,9 @@ void Roode::apply_ranging_mode(const std::string &mode) {
 }
 
 void Roode::person_calibration() {
+  suspend_sensor_task_for_calibration();
   ESP_LOGI(CALIBRATION, "person_calibration: starting");
-  update_status_text("person cal: measuring...");
+  update_status_text("person cal: stand in doorway...");
   calibration_status_reset_ts_ = 0;
 
   const int num_samples = 30;
@@ -1281,6 +1312,10 @@ void Roode::person_calibration() {
 
   for (int z = 0; z < 2; z++) {
     Zone *zone = z == 0 ? entry : exit;
+    char zone_msg[48];
+    snprintf(zone_msg, sizeof(zone_msg), "person cal: measuring zone %d...", z);
+    update_status_text(std::string(zone_msg));
+
     uint32_t sum = 0;
     int valid = 0;
     for (int i = 0; i < num_samples; i++) {
@@ -1293,8 +1328,9 @@ void Roode::person_calibration() {
       delay(20);
     }
     if (valid == 0) {
-      update_status_text("cal failed: no valid readings");
+      update_status_text("person cal: failed - no readings");
       calibration_status_reset_ts_ = millis();
+      resume_sensor_task_after_calibration();
       return;
     }
     uint16_t avg_mm = static_cast<uint16_t>(sum / valid);
@@ -1318,8 +1354,8 @@ void Roode::person_calibration() {
           exit_max_pct_pref_.save(&new_max);
         }
       }
-      char msg[48];
-      snprintf(msg, sizeof(msg), "person cal: adjusted max to %u%%", new_max);
+      char msg[56];
+      snprintf(msg, sizeof(msg), "person cal: zone %d max -> %u%%", z, new_max);
       update_status_text(std::string(msg));
       ESP_LOGI(CALIBRATION, "zone %d: person_pct=%u adjusted max to %u%%", z, person_pct, new_max);
       any_adjusted = true;
@@ -1335,9 +1371,167 @@ void Roode::person_calibration() {
     exit_max_threshold_number_->publish_state(exit->threshold->max_percentage.value_or(80));
 
   if (!any_adjusted) {
-    update_status_text("person cal: thresholds ok");
+    update_status_text("person cal: thresholds already ok");
+  } else {
+    update_status_text("person cal: done");
   }
   calibration_status_reset_ts_ = millis();
+  resume_sensor_task_after_calibration();
+}
+
+void Roode::calibrate_low_obstacle() {
+  // Low obstacle (e.g. pet, plant) — reads at a FAR distance, ~70-90% of idle.
+  // Lower the max threshold so the obstacle distance falls outside the detection window.
+  suspend_sensor_task_for_calibration();
+  ESP_LOGI(CALIBRATION, "calibrate_low_obstacle: starting");
+  update_status_text("low obs cal: keep obstacle in place...");
+  calibration_status_reset_ts_ = 0;
+
+  const int num_samples = 30;
+
+  for (int z = 0; z < 2; z++) {
+    Zone *zone = z == 0 ? entry : exit;
+    char zone_msg[56];
+    snprintf(zone_msg, sizeof(zone_msg), "low obs cal: measuring zone %d...", z);
+    update_status_text(std::string(zone_msg));
+
+    uint32_t sum = 0;
+    int valid = 0;
+    for (int i = 0; i < num_samples; i++) {
+      zone->readDistance(distanceSensor);
+      uint16_t d = zone->getDistance();
+      if (d > 0 && d < 4000) {
+        sum += d;
+        valid++;
+      }
+      delay(20);
+    }
+    if (valid == 0) {
+      update_status_text("low obs cal: failed - no readings");
+      calibration_status_reset_ts_ = millis();
+      resume_sensor_task_after_calibration();
+      return;
+    }
+
+    uint16_t obs_avg = static_cast<uint16_t>(sum / valid);
+    uint16_t idle = zone->threshold->idle;
+    if (idle == 0) continue;
+
+    // Set max 40mm below the obstacle so it falls outside the detection window
+    int new_max_mm = static_cast<int>(obs_avg) - 40;
+    if (new_max_mm < 100) {
+      update_status_text("low obs cal: obstacle too close to sensor");
+      calibration_status_reset_ts_ = millis();
+      resume_sensor_task_after_calibration();
+      return;
+    }
+    uint8_t new_max_pct = static_cast<uint8_t>((static_cast<uint32_t>(new_max_mm) * 100) / idle);
+    new_max_pct = std::max<uint8_t>(51, std::min<uint8_t>(95, new_max_pct));
+    uint8_t cur_min = zone->threshold->min_percentage.value_or(15);
+    if (new_max_pct <= cur_min + 2) {
+      update_status_text("low obs cal: no detection window - check placement");
+      calibration_status_reset_ts_ = millis();
+      resume_sensor_task_after_calibration();
+      return;
+    }
+
+    zone->set_threshold_percentages(cur_min, new_max_pct);
+    if (calibration_persistence_) {
+      if (z == 0) entry_max_pct_pref_.save(&new_max_pct);
+      else         exit_max_pct_pref_.save(&new_max_pct);
+    }
+    char msg[64];
+    snprintf(msg, sizeof(msg), "low obs cal: zone %d max -> %u%% (%dmm)", z, new_max_pct, new_max_mm);
+    update_status_text(std::string(msg));
+    ESP_LOGI(CALIBRATION, "zone %d low obs: avg=%dmm new_max=%dmm (%u%%)", z, obs_avg, new_max_mm, new_max_pct);
+  }
+
+  publish_sensor_configuration(entry, exit, true);
+  publish_sensor_configuration(entry, exit, false);
+  if (entry_max_threshold_number_ != nullptr)
+    entry_max_threshold_number_->publish_state(entry->threshold->max_percentage.value_or(80));
+  if (exit_max_threshold_number_ != nullptr)
+    exit_max_threshold_number_->publish_state(exit->threshold->max_percentage.value_or(80));
+
+  update_status_text("low obs cal: done");
+  calibration_status_reset_ts_ = millis();
+  resume_sensor_task_after_calibration();
+}
+
+void Roode::calibrate_high_obstacle() {
+  // High obstacle (e.g. open door, cabinet) — reads at a CLOSE distance, ~20-50% of idle.
+  // Raise the min threshold so the obstacle distance falls outside the detection window.
+  suspend_sensor_task_for_calibration();
+  ESP_LOGI(CALIBRATION, "calibrate_high_obstacle: starting");
+  update_status_text("high obs cal: keep obstacle in place...");
+  calibration_status_reset_ts_ = 0;
+
+  const int num_samples = 30;
+
+  for (int z = 0; z < 2; z++) {
+    Zone *zone = z == 0 ? entry : exit;
+    char zone_msg[56];
+    snprintf(zone_msg, sizeof(zone_msg), "high obs cal: measuring zone %d...", z);
+    update_status_text(std::string(zone_msg));
+
+    uint32_t sum = 0;
+    int valid = 0;
+    for (int i = 0; i < num_samples; i++) {
+      zone->readDistance(distanceSensor);
+      uint16_t d = zone->getDistance();
+      if (d > 0 && d < 4000) {
+        sum += d;
+        valid++;
+      }
+      delay(20);
+    }
+    if (valid == 0) {
+      update_status_text("high obs cal: failed - no readings");
+      calibration_status_reset_ts_ = millis();
+      resume_sensor_task_after_calibration();
+      return;
+    }
+
+    uint16_t obs_avg = static_cast<uint16_t>(sum / valid);
+    uint16_t idle = zone->threshold->idle;
+    if (idle == 0) continue;
+
+    // Set min 40mm above the obstacle so it falls outside the detection window
+    int new_min_mm = static_cast<int>(obs_avg) + 40;
+    uint8_t new_min_pct = static_cast<uint8_t>((static_cast<uint32_t>(new_min_mm) * 100) / idle);
+    new_min_pct = std::max<uint8_t>(2, std::min<uint8_t>(49, new_min_pct));
+    // Enforce 100mm absolute floor
+    if ((idle * new_min_pct) / 100 < 100) {
+      new_min_pct = static_cast<uint8_t>(std::min<int>((100 * 100) / idle + 1, 49));
+    }
+    uint8_t cur_max = zone->threshold->max_percentage.value_or(80);
+    if (new_min_pct + 2 >= cur_max) {
+      update_status_text("high obs cal: no detection window - check placement");
+      calibration_status_reset_ts_ = millis();
+      resume_sensor_task_after_calibration();
+      return;
+    }
+
+    zone->set_threshold_percentages(new_min_pct, cur_max);
+    if (calibration_persistence_) {
+      if (z == 0) entry_min_pct_pref_.save(&new_min_pct);
+      else         exit_min_pct_pref_.save(&new_min_pct);
+    }
+    char msg[64];
+    snprintf(msg, sizeof(msg), "high obs cal: zone %d min -> %u%% (%dmm)", z, new_min_pct, new_min_mm);
+    update_status_text(std::string(msg));
+    ESP_LOGI(CALIBRATION, "zone %d high obs: avg=%dmm new_min=%dmm (%u%%)", z, obs_avg, new_min_mm, new_min_pct);
+  }
+
+  publish_sensor_configuration(entry, exit, false);
+  if (entry_min_threshold_number_ != nullptr)
+    entry_min_threshold_number_->publish_state(entry->threshold->min_percentage.value_or(15));
+  if (exit_min_threshold_number_ != nullptr)
+    exit_min_threshold_number_->publish_state(exit->threshold->min_percentage.value_or(15));
+
+  update_status_text("high obs cal: done");
+  calibration_status_reset_ts_ = millis();
+  resume_sensor_task_after_calibration();
 }
 
 // ---- Entity control callbacks ----
@@ -1414,6 +1608,12 @@ void Roode::sensor_task(void *param) {
     esp_task_wdt_reset();
 #endif
     self->use_sensor_task_ = true;
+    // Yield the sensor bus to Core 0 whenever a calibration is in progress.
+    // vTaskDelay keeps the watchdog fed via esp_task_wdt_reset() on the next iteration.
+    if (self->calibration_in_progress_) {
+      vTaskDelay(pdMS_TO_TICKS(10));
+      continue;
+    }
     uint32_t now = millis();
     if (self->last_loop_update_ts_ != 0 && (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
         (now - self->last_sensor_restart_ts_ > self->restart_backoff_ms_)) {
@@ -1421,7 +1621,9 @@ void Roode::sensor_task(void *param) {
       self->restart_sensor();
     }
     unsigned long start = micros();
+    self->sensor_task_reading_ = true;
     VL53L1_Error status = self->current_zone->readDistance(self->distanceSensor);
+    self->sensor_task_reading_ = false;
     if (status == VL53L1_ERROR_NONE) {
       self->last_loop_update_ts_ = millis();
       self->restart_backoff_ms_ = self->restart_timeout_ms_;  // reset backoff on successful read

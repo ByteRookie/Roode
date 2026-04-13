@@ -33,6 +33,20 @@ button:
     on_press:
       - lambda: "id(${roode_id})->person_calibration();"
 
+  - platform: template
+    name: $friendly_name Calibrate Low Obstacle
+    icon: mdi:dog
+    entity_category: config
+    on_press:
+      - lambda: "id(${roode_id})->calibrate_low_obstacle();"
+
+  - platform: template
+    name: $friendly_name Calibrate High Obstacle
+    icon: mdi:door-open
+    entity_category: config
+    on_press:
+      - lambda: "id(${roode_id})->calibrate_high_obstacle();"
+
 # ── Runtime number entities (all changes saved to flash automatically) ────────
 number:
   - platform: roode

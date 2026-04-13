@@ -173,6 +173,8 @@ class Roode : public PollingComponent {
   void run_zone_calibration(uint8_t zone_id);
   void recalibration();
   void person_calibration();
+  void calibrate_low_obstacle();
+  void calibrate_high_obstacle();
   void set_entry_threshold_percentages(uint8_t min, uint8_t max) { entry->set_threshold_percentages(min, max); }
   void set_exit_threshold_percentages(uint8_t min, uint8_t max) { exit->set_threshold_percentages(min, max); }
   void apply_cpu_optimizations(float cpu);
@@ -358,6 +360,16 @@ class Roode : public PollingComponent {
   static void sensor_task(void *param);
   bool use_sensor_task_{false};
   void restart_sensor();
+  // Cross-core calibration synchronization.
+  // calibration_in_progress_: Core 0 sets true before calibrating; Core 1
+  // checks this flag at the top of sensor_task and yields until it is cleared.
+  // sensor_task_reading_: Core 1 sets true while inside readDistance() and
+  // clears it immediately after; Core 0 spin-waits until false before
+  // proceeding so it never interrupts an in-flight sensor read.
+  volatile bool calibration_in_progress_{false};
+  volatile bool sensor_task_reading_{false};
+  void suspend_sensor_task_for_calibration(uint32_t timeout_ms = 500);
+  void resume_sensor_task_after_calibration();
 };
 
 }  // namespace roode

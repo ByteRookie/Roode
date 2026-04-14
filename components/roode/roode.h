@@ -2,6 +2,8 @@
 #include <math.h>
 #include <string>
 #include "esphome/core/hal.h"
+#include "freertos/FreeRTOS.h"  // BaseType_t, TickType_t
+#include "freertos/task.h"      // TaskHandle_t, xTaskCreatePinnedToCore, vTaskDelay
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/number/number.h"

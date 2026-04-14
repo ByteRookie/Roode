@@ -282,29 +282,34 @@ The package uses two substitutions you can override in your main YAML:
 
 ### Entities by HA section
 
-| Entity | Type | Section | Description |
-|--------|------|---------|-------------|
+> **Note:** HA's device page has three fixed section labels: Main, Configuration, and Diagnostic. It is not possible to add custom section names like "Calibration" via ESPHome. Within Configuration, HA sorts entities alphabetically — entity names are prefixed `Cal …` (calibration) and `Ctrl …` (controls/settings) so the two groups naturally sort apart.
+
+| Entity name | Type | HA section | Description |
+|-------------|------|-----------|-------------|
+| Distance Zone 0 / 1 | sensor | Main | Measured distance per zone (mm) — live readout |
 | Last Direction | text_sensor | Main | Most recent entry or exit event |
 | Presence | binary_sensor | Main | True while a crossing zone is active |
-| Status | text_sensor | Configuration | `ok` / `timeout` / `reinitializing` / `error` / `offline` |
-| Calibrate Empty Room | button | Configuration | Re-measure idle distance |
-| Calibrate With Person | button | Configuration | Person-present calibration |
-| Calibrate Low Obstacle | button | Configuration | Calibrate ignoring low objects (e.g. pets) |
-| Calibrate High Obstacle | button | Configuration | Calibrate for door-open scenario |
-| Auto Calibration Interval | number | Configuration | Hours between auto-calibrations (0 = off) |
-| Save Calibration to Flash | switch | Configuration | Persist calibration thresholds across reboots |
-| Entry / Exit Max Threshold | number | Configuration | Upper detection limit per zone (live, saved) |
-| Entry / Exit Min Threshold | number | Configuration | Lower detection limit per zone (live, saved) |
-| Filter Window | number | Configuration | Samples in filter buffer (live, saved) |
-| Sampling | number | Configuration | Readings averaged per update (live, saved) |
-| Filter Mode | select | Configuration | `min` / `median` / `percentile10` (live, saved) |
-| Ranging Mode | select | Configuration | `auto` / `short` / `medium` / `long` (live, saved) |
-| Entry / Exit ROI Height & Width | number | Configuration | ROI size per zone (live, saved) |
-| Invert Direction | switch | Configuration | Flip entry/exit (live, saved) |
-| Restart | button | Configuration | Reboot the device |
-| Performance Mode | switch | Configuration | Suppress diagnostic publishing to reduce overhead |
-| Distance Zone 0 / 1 | sensor | Diagnostic | Measured distance per zone (mm) |
-| Max / Min Zone 0 / 1 | sensor | Diagnostic | Active thresholds per zone (mm) |
+| **— Calibration (sorted first by "Cal" prefix) —** | | Configuration | |
+| Cal Status | text_sensor | Configuration | `ok` / `timeout` / `reinitializing` / `error` / `offline` |
+| Cal Empty Room | button | Configuration | Re-measure idle distance |
+| Cal With Person | button | Configuration | Person-present calibration |
+| Cal Low Obstacle | button | Configuration | Calibrate ignoring low objects (e.g. pets) |
+| Cal High Obstacle | button | Configuration | Calibrate for door-open scenario |
+| Cal Auto Interval | number | Configuration | Hours between auto-calibrations (0 = off) |
+| Cal Save to Flash | switch | Configuration | Persist calibration thresholds across reboots |
+| Cal Entry Max / Min | number | Configuration | Upper/lower detection limit, entry zone (live, saved) |
+| Cal Exit Max / Min | number | Configuration | Upper/lower detection limit, exit zone (live, saved) |
+| **— Controls (sorted after by "Ctrl" prefix) —** | | Configuration | |
+| Ctrl Filter Mode | select | Configuration | `min` / `median` / `percentile10` (live, saved) |
+| Ctrl Filter Window | number | Configuration | Samples in filter buffer (live, saved) |
+| Ctrl Invert Direction | switch | Configuration | Flip entry/exit direction (live, saved) |
+| Ctrl Performance Mode | switch | Configuration | Suppress diagnostic publishing to reduce overhead |
+| Ctrl Ranging Mode | select | Configuration | `auto` / `short` / `medium` / `long` (live, saved) |
+| Ctrl Restart | button | Configuration | Reboot the device |
+| Ctrl ROI Entry / Exit Height & Width | number | Configuration | ROI dimensions per zone (live, saved) |
+| Ctrl Sampling | number | Configuration | Raw readings averaged per update (live, saved) |
+| **— Diagnostic (collapsed by default) —** | | Diagnostic | |
+| Max / Min Zone 0 / 1 | sensor | Diagnostic | Active threshold values per zone (mm) |
 | ROI Height / Width Zone 0 / 1 | sensor | Diagnostic | Active ROI dimensions |
 | Sensor Status Code | sensor | Diagnostic | Numeric VL53L1X status (0 = ok) |
 | Manual Adjustments | sensor | Diagnostic | Total manual people-count corrections |
@@ -324,13 +329,13 @@ number:
       name: "$friendly_name People Count"
 ```
 
-### About "Save Calibration to Flash"
+### About "Cal Save to Flash"
 
 This switch controls whether **calibration threshold data** (idle distance, min/max thresholds) survives reboots. All other settings (filter mode, ROI, ranging mode, etc.) are always saved to flash automatically via ESPHome preferences.
 
 Turn it **off** if you want to test threshold changes in HA without committing them permanently — they will reset on the next reboot. Turn it **on** (or set `calibration_persistence: true` in your YAML) for normal long-term use.
 
-### About "Performance Mode"
+### About "Ctrl Performance Mode"
 
 When **on**, the following are suppressed to reduce overhead during normal operation:
 - CPU Usage, RAM Free, Loop Time sensor publishing
@@ -434,7 +439,7 @@ Enable `calibration_persistence: true`. Roode auto-recalibrates when zones are c
 Fixed in 1.8.0 — was a dual-core race condition where `expected_counter_` was written before the HA number update completed.
 
 **Diagnostic sensors stopped updating.**
-Performance Mode is probably on. Go to the device in HA → Configuration → Performance Mode and turn it off. The diagnostic sensors (CPU, RAM, Distance Zones, etc.) resume publishing immediately.
+Performance Mode is probably on. Go to the device in HA → Configuration → **Ctrl Performance Mode** and turn it off. The diagnostic sensors (CPU, RAM, etc.) resume publishing immediately. Distance Zone sensors are in the Main section and are unaffected by Performance Mode.
 
 ---
 

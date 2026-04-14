@@ -11,164 +11,156 @@
 #
 # ── Entity layout in Home Assistant ──────────────────────────────────────────
 #
-# NOTE: HA's device page has three fixed section labels:
-#   Main | Configuration | Diagnostic
-# You cannot add custom section names (e.g. "Calibration") in HA.
-# Within the Configuration section, HA sorts entities alphabetically.
-# Entity names below are prefixed so calibration items sort before controls:
-#   "Cal …"  → calibration items (appear first alphabetically)
-#   "Ctrl …" → configuration/control items (appear after)
+# HA splits entities with no entity_category by domain automatically:
+#   Controls   — numbers, switches, selects, text_sensors (no entity_category)
+#   Sensors    — sensors, binary_sensors (no entity_category)
+#   Configuration — entity_category: config
+#   Diagnostic — entity_category: diagnostic
 #
-#   Main  (device card, always visible)
-#     • Distance Zone 0 / 1   • Last Direction   • Presence
-#     (People Count and Occupancy live in your main YAML)
+#   Controls
+#     • People Count (in your main YAML)
+#     • Last Direction
+#     • Filter Window  • Sampling       • Filter Mode    • Ranging Mode
+#     • Entry / Exit Max & Min Threshold
+#     • Entry / Exit ROI Height & Width
+#     • Invert Direction  • Save Calibration to Flash
+#     • Auto Calibration Interval
 #
-#   Configuration  (HA label — two logical groups sorted alphabetically)
-#     ── Calibration ──
-#     • Cal Status             • Cal Empty Room    • Cal With Person
-#     • Cal Low Obstacle       • Cal High Obstacle
-#     • Cal Auto Interval      • Cal Save to Flash
-#     • Cal Entry Max / Min    • Cal Exit Max / Min
-#     ── Controls / Configuration ──
-#     • Ctrl Filter Mode       • Ctrl Filter Window  • Ctrl Invert Direction
-#     • Ctrl Performance Mode  • Ctrl Ranging Mode   • Ctrl Restart
-#     • Ctrl ROI Entry H/W     • Ctrl ROI Exit H/W   • Ctrl Sampling
+#   Sensors
+#     • Distance Zone 0  • Distance Zone 1  • Presence
 #
-#   Diagnostic  (collapsed by default)
-#     • CPU Usage  • Loop Time  • Manual Adjustments  • RAM Free
-#     • ROI / Threshold sensors • Sensor Status Code  • Version  • Features
+#   Configuration  (calibration controls + device settings)
+#     • Status
+#     • Calibrate Empty Room   • Calibrate With Person
+#     • Calibrate Low Obstacle • Calibrate High Obstacle
+#     • Performance Mode
+#     • Restart
+#
+#   Diagnostic  (collapsed by default — setup and troubleshooting)
+#     • Threshold sensors  • ROI sensors
+#     • Sensor Status Code • Manual Adjustments
+#     • Loop Time  • CPU Usage  • RAM Free
+#     • Version    • Features
 #
 # ─────────────────────────────────────────────────────────────────────────────
 substitutions:
   friendly_name: Roode
   roode_id: roode_platform
 
-# ── Main: day-to-day operational entities ────────────────────────────────────
+# ── Controls: runtime-adjustable entities (no entity_category → Controls) ────
 
 text_sensor:
   - platform: roode
     roode_id: ${roode_id}
     entry_exit_event:
       name: $friendly_name Last Direction
-      entity_category: ""          # Main section
+      # No entity_category → Controls section
 
-    # Prefixed "Cal" so it sorts into the calibration group in HA Configuration.
+    # Status goes to Configuration so it's visible next to calibration buttons.
     sensor_status:
-      name: $friendly_name Cal Status
+      name: $friendly_name Status
       entity_category: config
 
     version:
-      name: $friendly_name Version  # Diagnostic (default)
+      name: $friendly_name Version       # Diagnostic (default in text_sensor.py)
     enabled_features:
-      name: $friendly_name Features  # Diagnostic (default)
+      name: $friendly_name Features      # Diagnostic (default)
+
+number:
+  - platform: roode
+    roode_id: ${roode_id}
+    # All numbers have no entity_category → appear in Controls
+    auto_calibration_interval:
+      name: $friendly_name Auto Calibration Interval
+    entry_max_threshold:
+      name: $friendly_name Entry Max Threshold
+    entry_min_threshold:
+      name: $friendly_name Entry Min Threshold
+    exit_max_threshold:
+      name: $friendly_name Exit Max Threshold
+    exit_min_threshold:
+      name: $friendly_name Exit Min Threshold
+    filter_window:
+      name: $friendly_name Filter Window
+    sampling:
+      name: $friendly_name Sampling
+    entry_roi_height:
+      name: $friendly_name Entry ROI Height
+    entry_roi_width:
+      name: $friendly_name Entry ROI Width
+    exit_roi_height:
+      name: $friendly_name Exit ROI Height
+    exit_roi_width:
+      name: $friendly_name Exit ROI Width
+
+select:
+  - platform: roode
+    roode_id: ${roode_id}
+    # No entity_category → Controls section
+    filter_mode:
+      name: $friendly_name Filter Mode
+    ranging_mode:
+      name: $friendly_name Ranging Mode
+
+switch:
+  - platform: roode
+    roode_id: ${roode_id}
+    # Runtime controls → no entity_category → Controls section
+    invert_direction:
+      name: $friendly_name Invert Direction
+    calibration_persistence:
+      name: $friendly_name Save Calibration to Flash
+    # Performance Mode goes to Configuration — it's a device setup choice,
+    # not a routine runtime control.
+    performance_mode:
+      name: $friendly_name Performance Mode
+      entity_category: config
+
+# ── Sensors: passive readouts (no entity_category → Sensors) ─────────────────
 
 binary_sensor:
   - platform: roode
     roode_id: ${roode_id}
     presence:
-      name: $friendly_name Presence  # Main section (no entity_category)
+      name: $friendly_name Presence
 
-# ── Configuration — Calibration ──────────────────────────────────────────────
-# Entity names prefixed with "Cal" so HA sorts them before "Ctrl" items.
+# ── Configuration: calibration controls + device settings ────────────────────
 
 button:
   - platform: template
-    name: $friendly_name Cal Empty Room
+    name: $friendly_name Calibrate Empty Room
     icon: mdi:ruler-square-compass
     entity_category: config
     on_press:
       - lambda: "id(${roode_id})->recalibration();"
 
   - platform: template
-    name: $friendly_name Cal With Person
+    name: $friendly_name Calibrate With Person
     icon: mdi:human-greeting
     entity_category: config
     on_press:
       - lambda: "id(${roode_id})->person_calibration();"
 
   - platform: template
-    name: $friendly_name Cal Low Obstacle
+    name: $friendly_name Calibrate Low Obstacle
     icon: mdi:dog
     entity_category: config
     on_press:
       - lambda: "id(${roode_id})->calibrate_low_obstacle();"
 
   - platform: template
-    name: $friendly_name Cal High Obstacle
+    name: $friendly_name Calibrate High Obstacle
     icon: mdi:door-open
     entity_category: config
     on_press:
       - lambda: "id(${roode_id})->calibrate_high_obstacle();"
 
   - platform: restart
-    name: $friendly_name Ctrl Restart
+    name: $friendly_name Restart
     entity_category: config
 
-number:
-  - platform: roode
-    roode_id: ${roode_id}
-    # ── Calibration numbers (Cal prefix) ──────────────────────────────────────
-    auto_calibration_interval:
-      name: $friendly_name Cal Auto Interval
-      entity_category: config
-    entry_max_threshold:
-      name: $friendly_name Cal Entry Max
-      entity_category: config
-    entry_min_threshold:
-      name: $friendly_name Cal Entry Min
-      entity_category: config
-    exit_max_threshold:
-      name: $friendly_name Cal Exit Max
-      entity_category: config
-    exit_min_threshold:
-      name: $friendly_name Cal Exit Min
-      entity_category: config
-    # ── Configuration/control numbers (Ctrl prefix) ───────────────────────────
-    filter_window:
-      name: $friendly_name Ctrl Filter Window
-      entity_category: config
-    sampling:
-      name: $friendly_name Ctrl Sampling
-      entity_category: config
-    entry_roi_height:
-      name: $friendly_name Ctrl ROI Entry Height
-      entity_category: config
-    entry_roi_width:
-      name: $friendly_name Ctrl ROI Entry Width
-      entity_category: config
-    exit_roi_height:
-      name: $friendly_name Ctrl ROI Exit Height
-      entity_category: config
-    exit_roi_width:
-      name: $friendly_name Ctrl ROI Exit Width
-      entity_category: config
-
-select:
-  - platform: roode
-    roode_id: ${roode_id}
-    filter_mode:
-      name: $friendly_name Ctrl Filter Mode
-      entity_category: config
-    ranging_mode:
-      name: $friendly_name Ctrl Ranging Mode
-      entity_category: config
-
-switch:
-  - platform: roode
-    roode_id: ${roode_id}
-    calibration_persistence:
-      name: $friendly_name Cal Save to Flash
-      entity_category: config
-    invert_direction:
-      name: $friendly_name Ctrl Invert Direction
-      entity_category: config
-    performance_mode:
-      name: $friendly_name Ctrl Performance Mode
-      entity_category: config
-
-# ── Diagnostic: sensors shown when troubleshooting or setting up ──────────────
-# Distance Zone sensors are Main (entity_category: ""). All others are Diagnostic
-# (default set in sensor.py). Disable in HA entity registry if not needed.
+# ── Diagnostic: raw sensor data for setup and troubleshooting ────────────────
+# All sensor entities default to entity_category: diagnostic (set in sensor.py).
 
 sensor:
   - platform: roode
@@ -176,12 +168,12 @@ sensor:
     roode_id: ${roode_id}
     distance_entry:
       name: $friendly_name Distance Zone 0
-      entity_category: ""          # Main section
+      entity_category: ""          # Sensors section (override diagnostic default)
       filters:
         - delta: 100
     distance_exit:
       name: $friendly_name Distance Zone 1
-      entity_category: ""          # Main section
+      entity_category: ""          # Sensors section (override diagnostic default)
       filters:
         - delta: 100
     max_threshold_entry:

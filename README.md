@@ -211,7 +211,20 @@ If the directions are reversed, flip the **Invert Direction** switch in HA (Conf
 
 ### Step 4 — Tune
 
-Once counting looks correct, enable **Performance Mode** (Configuration → Device) for daily use. This suppresses the diagnostic sensor updates and reduces publishing overhead. Flip it back off when you need to inspect Distance Zone or threshold readouts.
+Once counting looks correct, enable **Performance Mode** (HA → Configuration section) for daily use. This suppresses the diagnostic sensor updates and reduces publishing overhead. Flip it back off when you need to inspect Distance Zone or threshold readouts.
+
+### Optional: using the ESP-IDF framework
+
+By default ESPHome builds for ESP32 using the Arduino 3.x framework. Roode also compiles cleanly under the native ESP-IDF framework, which can give slightly better memory usage and avoids the Arduino abstraction layer. To use it, add `framework:` to your `esp32:` block:
+
+```yaml
+esp32:
+  board: wemos_d1_mini32
+  framework:
+    type: esp-idf
+```
+
+Everything else in the YAML stays the same. If you have no reason to switch, the default Arduino 3.x framework is fine.
 
 For further tuning see [Configuration Reference](#configuration-reference) and [Sampling and Filtering](#sampling-and-filtering).
 
@@ -282,33 +295,37 @@ The package uses two substitutions you can override in your main YAML:
 
 ### Entities by HA section
 
-> **Note:** HA's device page has three fixed section labels: Main, Configuration, and Diagnostic. It is not possible to add custom section names like "Calibration" via ESPHome. Within Configuration, HA sorts entities alphabetically — entity names are prefixed `Cal …` (calibration) and `Ctrl …` (controls/settings) so the two groups naturally sort apart.
+HA's device page automatically creates four sections based on entity domain and `entity_category`:
 
-| Entity name | Type | HA section | Description |
-|-------------|------|-----------|-------------|
-| Distance Zone 0 / 1 | sensor | Main | Measured distance per zone (mm) — live readout |
-| Last Direction | text_sensor | Main | Most recent entry or exit event |
-| Presence | binary_sensor | Main | True while a crossing zone is active |
-| **— Calibration (sorted first by "Cal" prefix) —** | | Configuration | |
-| Cal Status | text_sensor | Configuration | `ok` / `timeout` / `reinitializing` / `error` / `offline` |
-| Cal Empty Room | button | Configuration | Re-measure idle distance |
-| Cal With Person | button | Configuration | Person-present calibration |
-| Cal Low Obstacle | button | Configuration | Calibrate ignoring low objects (e.g. pets) |
-| Cal High Obstacle | button | Configuration | Calibrate for door-open scenario |
-| Cal Auto Interval | number | Configuration | Hours between auto-calibrations (0 = off) |
-| Cal Save to Flash | switch | Configuration | Persist calibration thresholds across reboots |
-| Cal Entry Max / Min | number | Configuration | Upper/lower detection limit, entry zone (live, saved) |
-| Cal Exit Max / Min | number | Configuration | Upper/lower detection limit, exit zone (live, saved) |
-| **— Controls (sorted after by "Ctrl" prefix) —** | | Configuration | |
-| Ctrl Filter Mode | select | Configuration | `min` / `median` / `percentile10` (live, saved) |
-| Ctrl Filter Window | number | Configuration | Samples in filter buffer (live, saved) |
-| Ctrl Invert Direction | switch | Configuration | Flip entry/exit direction (live, saved) |
-| Ctrl Performance Mode | switch | Configuration | Suppress diagnostic publishing to reduce overhead |
-| Ctrl Ranging Mode | select | Configuration | `auto` / `short` / `medium` / `long` (live, saved) |
-| Ctrl Restart | button | Configuration | Reboot the device |
-| Ctrl ROI Entry / Exit Height & Width | number | Configuration | ROI dimensions per zone (live, saved) |
-| Ctrl Sampling | number | Configuration | Raw readings averaged per update (live, saved) |
-| **— Diagnostic (collapsed by default) —** | | Diagnostic | |
+| HA section | What appears there |
+|------------|-------------------|
+| **Controls** | Actionable entities with no `entity_category` — numbers, switches, selects, text sensors |
+| **Sensors** | Passive entities with no `entity_category` — sensors, binary sensors |
+| **Configuration** | Any entity with `entity_category: config` |
+| **Diagnostic** | Any entity with `entity_category: diagnostic` |
+
+| Entity | Type | HA section | Description |
+|--------|------|-----------|-------------|
+| Last Direction | text_sensor | Controls | Most recent entry or exit event |
+| Auto Calibration Interval | number | Controls | Hours between auto-calibrations (0 = off) |
+| Entry / Exit Max Threshold | number | Controls | Upper detection limit per zone (live, saved) |
+| Entry / Exit Min Threshold | number | Controls | Lower detection limit per zone (live, saved) |
+| Filter Mode | select | Controls | `min` / `median` / `percentile10` (live, saved) |
+| Filter Window | number | Controls | Samples in filter buffer (live, saved) |
+| Invert Direction | switch | Controls | Flip entry/exit direction (live, saved) |
+| Ranging Mode | select | Controls | `auto` / `short` / `medium` / `long` (live, saved) |
+| Entry / Exit ROI Height & Width | number | Controls | ROI dimensions per zone (live, saved) |
+| Sampling | number | Controls | Raw readings averaged per update (live, saved) |
+| Save Calibration to Flash | switch | Controls | Persist calibration thresholds across reboots |
+| Distance Zone 0 / 1 | sensor | Sensors | Measured distance per zone (mm) — live readout |
+| Presence | binary_sensor | Sensors | True while a crossing zone is active |
+| Status | text_sensor | Configuration | `ok` / `timeout` / `reinitializing` / `error` / `offline` |
+| Calibrate Empty Room | button | Configuration | Re-measure idle distance |
+| Calibrate With Person | button | Configuration | Person-present calibration |
+| Calibrate Low Obstacle | button | Configuration | Calibrate ignoring low objects (e.g. pets) |
+| Calibrate High Obstacle | button | Configuration | Calibrate for door-open scenario |
+| Performance Mode | switch | Configuration | Suppress diagnostic publishing during daily use |
+| Restart | button | Configuration | Reboot the device |
 | Max / Min Zone 0 / 1 | sensor | Diagnostic | Active threshold values per zone (mm) |
 | ROI Height / Width Zone 0 / 1 | sensor | Diagnostic | Active ROI dimensions |
 | Sensor Status Code | sensor | Diagnostic | Numeric VL53L1X status (0 = ok) |
@@ -329,21 +346,20 @@ number:
       name: "$friendly_name People Count"
 ```
 
-### About "Cal Save to Flash"
+### About "Save Calibration to Flash"
 
 This switch controls whether **calibration threshold data** (idle distance, min/max thresholds) survives reboots. All other settings (filter mode, ROI, ranging mode, etc.) are always saved to flash automatically via ESPHome preferences.
 
-Turn it **off** if you want to test threshold changes in HA without committing them permanently — they will reset on the next reboot. Turn it **on** (or set `calibration_persistence: true` in your YAML) for normal long-term use.
+Turn it **off** to test threshold changes in HA without committing them permanently — they reset on the next reboot. Turn it **on** (or set `calibration_persistence: true` in your YAML) for normal long-term use.
 
-### About "Ctrl Performance Mode"
+### About "Performance Mode"
 
 When **on**, the following are suppressed to reduce overhead during normal operation:
-- CPU Usage, RAM Free, Loop Time sensor publishing
-- Distance Zone 0/1 sensor publishing
+- CPU Usage, RAM Free, Loop Time sensor publishing (and the heap query that feeds them)
 - Features text sensor publishing
 - Manual Adjustments counter publishing
 
-Counting, presence, calibration, and Status continue working normally. Turn it **off** when setting up or troubleshooting to see the diagnostic readouts.
+Distance Zone sensors remain active (they are in the Sensors section and always publish). Counting, presence, calibration, and Status continue working normally. Turn it **off** when setting up or troubleshooting to see the full diagnostic readouts.
 
 ---
 
@@ -439,7 +455,7 @@ Enable `calibration_persistence: true`. Roode auto-recalibrates when zones are c
 Fixed in 1.8.0 — was a dual-core race condition where `expected_counter_` was written before the HA number update completed.
 
 **Diagnostic sensors stopped updating.**
-Performance Mode is probably on. Go to the device in HA → Configuration → **Ctrl Performance Mode** and turn it off. The diagnostic sensors (CPU, RAM, etc.) resume publishing immediately. Distance Zone sensors are in the Main section and are unaffected by Performance Mode.
+Performance Mode is probably on. Go to the device in HA → Configuration → **Performance Mode** and turn it off. CPU, RAM, Loop Time, and Features resume publishing immediately. Distance Zone sensors are in the Sensors section and are never suppressed.
 
 ---
 

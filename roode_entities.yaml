@@ -8,12 +8,28 @@
 # Substitutions below are defaults — override them in your main YAML if needed:
 #   friendly_name — prefix used for all entity names (default: "Roode")
 #   roode_id      — must match the `id:` of your `roode:` block (default: roode_platform)
+#
+# ── Home Assistant dashboard tip ─────────────────────────────────────────────
+# To see calibration status alongside the buttons, create an Entities card in
+# HA with these entities grouped together:
+#
+#   type: entities
+#   title: Roode Calibration
+#   entities:
+#     - button.roode_calibrate_empty_room
+#     - button.roode_calibrate_with_person
+#     - button.roode_calibrate_low_obstacle
+#     - button.roode_calibrate_high_obstacle
+#     - text_sensor.roode_calibration_status      # ← live status during cal
+#     - text_sensor.roode_status                  # ← general sensor status
 # ─────────────────────────────────────────────────────────────────────────────
 substitutions:
   friendly_name: Roode
   roode_id: roode_platform
 
-# ── Calibration buttons ───────────────────────────────────────────────────────
+# ── Calibration controls ──────────────────────────────────────────────────────
+# All buttons are entity_category: config so they appear together in the HA
+# device page "Configuration" section alongside the Calibration Status sensor.
 button:
   - platform: restart
     name: $friendly_name Restart
@@ -46,6 +62,25 @@ button:
     entity_category: config
     on_press:
       - lambda: "id(${roode_id})->calibrate_high_obstacle();"
+
+# ── Text sensors ──────────────────────────────────────────────────────────────
+# sensor_status is entity_category: diagnostic so it appears in the HA device
+# "Diagnostic" section — easy to spot next to the config controls above.
+text_sensor:
+  - platform: roode
+    roode_id: ${roode_id}
+    sensor_status:
+      name: $friendly_name Status
+      entity_category: diagnostic
+      icon: mdi:information-outline
+    version:
+      name: $friendly_name Version
+      entity_category: diagnostic
+    entry_exit_event:
+      name: $friendly_name Last Direction
+    enabled_features:
+      name: $friendly_name Features
+      entity_category: diagnostic
 
 # ── Runtime number entities (all changes saved to flash automatically) ────────
 number:
@@ -92,19 +127,6 @@ switch:
     calibration_persistence:
       name: $friendly_name Save Settings to Flash
 
-# ── Text sensors ──────────────────────────────────────────────────────────────
-text_sensor:
-  - platform: roode
-    roode_id: ${roode_id}
-    sensor_status:
-      name: $friendly_name Status
-    version:
-      name: $friendly_name Version
-    entry_exit_event:
-      name: $friendly_name Last Direction
-    enabled_features:
-      name: $friendly_name Features
-
 # ── Diagnostic sensors (shown in HA; disable in entity registry if not needed) ─
 sensor:
   - platform: roode
@@ -136,14 +158,19 @@ sensor:
       name: $friendly_name ROI Width Zone 1
     sensor_status:
       name: $friendly_name Sensor Status Code
+      entity_category: diagnostic
     manual_adjustment_count:
       name: $friendly_name Manual Adjustments
+      entity_category: diagnostic
     loop_time:
       name: $friendly_name Loop Time
+      entity_category: diagnostic
     cpu_usage:
       name: $friendly_name CPU Usage
+      entity_category: diagnostic
     ram_free:
       name: $friendly_name RAM Free
+      entity_category: diagnostic
 
 # ── Presence binary sensors ───────────────────────────────────────────────────
 binary_sensor:

@@ -370,7 +370,7 @@ class Roode : public PollingComponent {
   // proceeding so it never interrupts an in-flight sensor read.
   volatile bool calibration_in_progress_{false};
   volatile bool sensor_task_reading_{false};
-  void suspend_sensor_task_for_calibration(uint32_t timeout_ms = 500);
+  void suspend_sensor_task_for_calibration(uint32_t timeout_ms = 3000);
   void resume_sensor_task_after_calibration();
 };
 

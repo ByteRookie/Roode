@@ -214,6 +214,10 @@ void Roode::setup() {
       distanceSensor->set_ranging_mode(mode);
       publish_sensor_configuration(entry, exit, true);
       publish_sensor_configuration(entry, exit, false);
+      // Validation reads above used the pre-ROI wide aperture — clear those samples
+      // so the first detections use fresh readings with the calibrated ROI.
+      entry->reset_samples();
+      exit->reset_samples();
     } else {
       calibrate_zones();
     }
@@ -699,12 +703,15 @@ void Roode::suspend_sensor_task_for_calibration(uint32_t timeout_ms) {
   // sleep (vTaskDelay).  sensor_task_reading_ covers the entire loop body so
   // this guarantees no concurrent sensor access — readDistance(), path_tracking,
   // run_zone_calibration(), and auto-calibrate_zones() are all included.
+  // Timeout is 3 s to accommodate auto-cal aborting mid-calibrateThreshold
+  // (worst case ~1.5 s per 50-sample pass) without racing.
   uint32_t deadline = millis() + timeout_ms;
   while (sensor_task_reading_ && millis() < deadline) {
     delay(1);
+    App.feed_wdt();  // keep Core 0 WDT alive while we spin-wait
   }
   if (sensor_task_reading_) {
-    ESP_LOGW(CALIBRATION, "sensor_task_reading timed out — proceeding anyway");
+    ESP_LOGW(CALIBRATION, "sensor_task_reading timed out after %ums — proceeding anyway", timeout_ms);
   }
 }
 
@@ -716,6 +723,15 @@ void Roode::resume_sensor_task_after_calibration() {
 void Roode::recalibration() {
   suspend_sensor_task_for_calibration();
   calibrate_zones();
+  // Reset PathTrack FSM state so any in-flight partial crossing sequence from
+  // before calibration cannot combine with post-calibration readings to fire a
+  // phantom count.
+  state_ = STATE_IDLE;
+  zone_debounced_active_[0] = false;
+  zone_debounced_active_[1] = false;
+  zone_dwell_first_active_[0] = zone_dwell_first_active_[1] = 0;
+  zone_dwell_first_clear_[0] = zone_dwell_first_clear_[1] = 0;
+  path_track_first_event_ts_ = 0;
   resume_sensor_task_after_calibration();
 }
 
@@ -723,14 +739,32 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;
   z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
-  // First pass: measure with reset ROI to get idle distance for ROI sizing
-  z->calibrateThreshold(distanceSensor, 50);
-  // Recalculate ROI sizes based on the measured idle distance
+
+  // First pass: measure with reset ROI to get idle distance for ROI sizing.
+  // 25 samples — enough for a reliable average while keeping WDT budget safe.
+  App.feed_wdt();
+#ifdef USE_ESP32
+  esp_task_wdt_reset();
+#endif
+  z->calibrateThreshold(distanceSensor, 25);
+
+  // Recalculate ROI for both zones based on the measured idle distance.
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
   exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-  // Second pass: re-measure threshold with the calibrated ROI so thresholds match
-  // the actual ROI that will be used for detection (same as calibrate_zones() does)
-  z->calibrateThreshold(distanceSensor, 20);
+
+  // Second pass: re-measure with the calibrated ROI so thresholds match the ROI
+  // that will actually be used during detection.
+  App.feed_wdt();
+#ifdef USE_ESP32
+  esp_task_wdt_reset();
+#endif
+  z->calibrateThreshold(distanceSensor, 15);
+
+  App.feed_wdt();
+#ifdef USE_ESP32
+  esp_task_wdt_reset();
+#endif
+
   auto *mode = determine_ranging_mode(entry->threshold->idle, exit->threshold->idle);
   distanceSensor->set_ranging_mode(mode);
 
@@ -742,16 +776,19 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
     calibration_prefs_[zone_id].save(&calibration_data_[zone_id]);
   }
 
-  // Publish the updated calibration data so Home Assistant sees the new
-  // thresholds and ROI values immediately after a fail-safe recalibration
+  // Clear sample buffers so stale distances don't bleed into post-calibration detection.
+  z->reset_samples();
+
+  // Publish updated calibration so HA sees new thresholds and ROI immediately.
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
+  publish_setting_entities();
   last_calibration_ts_ =
       std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
   char cal_msg[64];
-  snprintf(cal_msg, sizeof(cal_msg), "calibrated: idle=%dmm thresh=%d-%d%%",
-           z->threshold->idle,
+  snprintf(cal_msg, sizeof(cal_msg), "zone %d cal: idle=%dmm thresh=%d-%d%%",
+           zone_id, z->threshold->idle,
            z->threshold->min_percentage.value_or(15),
            z->threshold->max_percentage.value_or(80));
   update_status_text(std::string(cal_msg));
@@ -866,37 +903,88 @@ void Roode::calibrate_zones() {
   entry->reset_roi(orientation_ == Parallel ? 167 : 195);
   exit->reset_roi(orientation_ == Parallel ? 231 : 60);
 
+  // Phase 1: baseline measurement with wide default ROI.
+  // Uses 30 samples per zone — statistically solid, stays within the 5 s task WDT.
   update_status_text("cal: measuring baseline...");
+  App.feed_wdt();
+#ifdef USE_ESP32
+  esp_task_wdt_reset();
+#endif
   calibrateDistance();
 
+  // If Core 0 requested manual calibration while we were measuring baseline,
+  // abort so Core 0 can take over without a concurrent sensor access race.
+  if (calibration_in_progress_) {
+    ESP_LOGW(CALIBRATION, "auto-cal aborted after baseline (manual cal requested)");
+    return;
+  }
+
+  // Phase 2: entry zone — compute optimal ROI then re-measure with it.
+  // 20 samples is enough for a reliable threshold on the narrower ROI.
+  App.feed_wdt();
+#ifdef USE_ESP32
+  esp_task_wdt_reset();
+#endif
   update_status_text("cal: calibrating entry zone...");
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-  entry->calibrateThreshold(distanceSensor, 50);
+  entry->calibrateThreshold(distanceSensor, 20);
 
+  if (calibration_in_progress_) {
+    ESP_LOGW(CALIBRATION, "auto-cal aborted after entry zone (manual cal requested)");
+    return;
+  }
+
+  // Phase 3: exit zone.
+  App.feed_wdt();
+#ifdef USE_ESP32
+  esp_task_wdt_reset();
+#endif
   update_status_text("cal: calibrating exit zone...");
   exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-  exit->calibrateThreshold(distanceSensor, 50);
+  exit->calibrateThreshold(distanceSensor, 20);
+
+  App.feed_wdt();
+#ifdef USE_ESP32
+  esp_task_wdt_reset();
+#endif
+
+  // Recalculate ranging mode after the final calibrated measurements — idle distances
+  // can shift slightly once the optimised ROI is applied.
+  auto *mode = determine_ranging_mode(entry->threshold->idle, exit->threshold->idle);
+  distanceSensor->set_ranging_mode(mode);
 
   publish_sensor_configuration(entry, exit, true);
-  App.feed_wdt();
   publish_sensor_configuration(entry, exit, false);
+  // Sync HA number entities (ROI h/w, threshold %, etc.) with the new values
+  // so the dashboard reflects what was actually calibrated without a reboot.
+  publish_setting_entities();
 
-  calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max,
-                          static_cast<uint32_t>(time(nullptr))};
-  calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max,
-                          static_cast<uint32_t>(time(nullptr))};
+  uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
+  calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max, now_epoch};
+  calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max, now_epoch};
 
   if (calibration_persistence_) {
     calibration_prefs_[0].save(&calibration_data_[0]);
     calibration_prefs_[1].save(&calibration_data_[1]);
   }
-  ESP_LOGI(SETUP, "Finished calibrating sensor zones");
+  // Clear sample buffers so stale pre-calibration distances don't pollute the
+  // first readings after the new thresholds are applied.
+  entry->reset_samples();
+  exit->reset_samples();
+
+  ESP_LOGI(SETUP, "Finished calibrating: entry idle=%dmm %d-%d%% | exit idle=%dmm %d-%d%%",
+           entry->threshold->idle,
+           entry->threshold->min_percentage.value_or(15),
+           entry->threshold->max_percentage.value_or(80),
+           exit->threshold->idle,
+           exit->threshold->min_percentage.value_or(15),
+           exit->threshold->max_percentage.value_or(80));
   last_calibration_ts_ =
       std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   publish_feature_list();
-  char cal_msg[64];
-  snprintf(cal_msg, sizeof(cal_msg), "cal done: idle=%dmm thresh=%d-%d%%",
-           entry->threshold->idle,
+  char cal_msg[80];
+  snprintf(cal_msg, sizeof(cal_msg), "cal done: e=%dmm x=%dmm thresh=%d-%d%%",
+           entry->threshold->idle, exit->threshold->idle,
            entry->threshold->min_percentage.value_or(15),
            entry->threshold->max_percentage.value_or(80));
   update_status_text(std::string(cal_msg));
@@ -907,8 +995,17 @@ void Roode::calibrateDistance() {
   auto *const initial = distanceSensor->get_ranging_mode_override().value_or(Ranging::Longest);
   distanceSensor->set_ranging_mode(initial);
 
-  entry->calibrateThreshold(distanceSensor, 50);
-  exit->calibrateThreshold(distanceSensor, 50);
+  // 30 samples each: statistically sound, fast enough to stay within WDT budget.
+  entry->calibrateThreshold(distanceSensor, 30);
+  App.feed_wdt();
+#ifdef USE_ESP32
+  esp_task_wdt_reset();
+#endif
+  exit->calibrateThreshold(distanceSensor, 30);
+  App.feed_wdt();
+#ifdef USE_ESP32
+  esp_task_wdt_reset();
+#endif
 
   if (distanceSensor->get_ranging_mode_override().has_value()) {
     return;
@@ -1235,10 +1332,15 @@ void Roode::apply_entry_roi(uint8_t h, uint8_t w) {
     entry_roi_height_pref_.save(&h);
     entry_roi_width_pref_.save(&w);
   }
-  update_status_text("calibrating...");
+  update_status_text("calibrating entry ROI...");
+  // Suspend the sensor task before touching the hardware — run_zone_calibration
+  // drives the sensor bus from Core 0 and must not race with Core 1's sensor_task.
+  suspend_sensor_task_for_calibration();
   run_zone_calibration(0);
-  publish_sensor_configuration(entry, exit, true);
-  publish_sensor_configuration(entry, exit, false);
+  resume_sensor_task_after_calibration();
+  // run_zone_calibration already calls publish_sensor_configuration + publish_setting_entities.
+  // Re-publish the actual calibrated ROI so the number entities reflect the true values
+  // (the override may differ from what roi_calibration() chose if it was partially constrained).
   if (entry_roi_height_number_ != nullptr)
     entry_roi_height_number_->publish_state(entry->roi->height);
   if (entry_roi_width_number_ != nullptr)
@@ -1254,10 +1356,10 @@ void Roode::apply_exit_roi(uint8_t h, uint8_t w) {
     exit_roi_height_pref_.save(&h);
     exit_roi_width_pref_.save(&w);
   }
-  update_status_text("calibrating...");
+  update_status_text("calibrating exit ROI...");
+  suspend_sensor_task_for_calibration();
   run_zone_calibration(1);
-  publish_sensor_configuration(entry, exit, true);
-  publish_sensor_configuration(entry, exit, false);
+  resume_sensor_task_after_calibration();
   if (exit_roi_height_number_ != nullptr)
     exit_roi_height_number_->publish_state(exit->roi->height);
   if (exit_roi_width_number_ != nullptr)
@@ -1670,15 +1772,21 @@ void Roode::sensor_task(void *param) {
     // mode, so calibration must be triggered here to actually execute on ESP32).
     // Guard: epoch > 100000 ensures NTP is synced (time(nullptr) returns 0 until then, which would
     // cause uint32_t underflow and fire calibration spuriously on every boot before NTP sync).
+    // Guard: skip entirely if Core 0 has already claimed the bus for a manual calibration.
     uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
-    if (self->auto_calibration_interval_sec_ > 0 && now_epoch > 100000 &&
+    if (!self->calibration_in_progress_ &&
+        self->auto_calibration_interval_sec_ > 0 && now_epoch > 100000 &&
         now_epoch - self->last_calibration_ts_ >= self->auto_calibration_interval_sec_) {
-      // Only calibrate when both zones are clear — calibrating with someone present corrupts the baseline
+      // Only calibrate when both zones are clear — calibrating with someone present corrupts the baseline.
       // Use debounced state — a momentary raw reading above threshold->max does not
       // mean the zone is truly empty (noise can produce false clearances).
       bool zones_clear = !self->zone_debounced_active_[0] && !self->zone_debounced_active_[1];
       if (zones_clear) {
         ESP_LOGI(TAG, "auto_calibration_running");
+        // sensor_task_reading_ remains true during auto-cal so that Core 0's
+        // suspend_sensor_task_for_calibration() correctly waits rather than proceeding
+        // concurrently.  calibrate_zones() checks calibration_in_progress_ after each
+        // slow phase and returns early if Core 0 claims the bus mid-calibration.
         self->calibrate_zones();
       } else {
         ESP_LOGD(TAG, "auto_calibration_deferred: zones occupied");

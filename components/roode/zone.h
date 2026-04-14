@@ -61,6 +61,16 @@ class Zone {
       sample_idx_ = 0;
   }
   void set_max_samples(uint8_t max) { set_filter_window(max); };
+  // Clear the sample ring-buffer so stale pre-calibration distances don't bleed
+  // into the first detections after a recalibration.  Call this after any
+  // calibrateThreshold() sequence completes.
+  void reset_samples() {
+    samples.fill(0);
+    sample_idx_ = 0;
+    sample_count_ = 0;
+    min_distance = 0;
+    last_distance = 0;
+  }
 
  protected:
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;

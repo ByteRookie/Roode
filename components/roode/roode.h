@@ -26,6 +26,7 @@ class RangingModeSelect;    // forward declaration — full type in select.h
 class RoodeSettingNumber;   // forward declaration — full type in setting_number.h
 class InvertDirectionSwitch;         // forward declaration — full type in switch.h
 class CalibrationPersistenceSwitch;  // forward declaration — full type in switch.h
+class PerformanceModeSwitch;         // forward declaration — full type in switch.h
 }
 }
 
@@ -152,6 +153,7 @@ class Roode : public PollingComponent {
   void set_ranging_mode_select(RangingModeSelect *sel) { ranging_mode_select_ = sel; }
   void set_invert_direction_switch(InvertDirectionSwitch *sw) { invert_direction_switch_ = sw; }
   void set_calibration_persistence_switch(CalibrationPersistenceSwitch *sw) { cal_persistence_switch_ = sw; }
+  void set_performance_mode_switch(PerformanceModeSwitch *sw) { performance_mode_switch_ = sw; }
 
   // Setting number entity setters
   void set_filter_window_number(RoodeSettingNumber *n) { filter_window_number_ = n; }
@@ -199,6 +201,7 @@ class Roode : public PollingComponent {
   void apply_exit_roi(uint8_t h, uint8_t w);
   void apply_invert_direction(bool inv);
   void apply_calibration_persistence(bool val);
+  void apply_performance_mode(bool val);
   void apply_ranging_mode(const std::string &mode);
 
  protected:
@@ -208,6 +211,7 @@ class Roode : public PollingComponent {
   RangingModeSelect *ranging_mode_select_{nullptr};
   InvertDirectionSwitch *invert_direction_switch_{nullptr};
   CalibrationPersistenceSwitch *cal_persistence_switch_{nullptr};
+  PerformanceModeSwitch *performance_mode_switch_{nullptr};
 
   // Setting number entity pointers
   RoodeSettingNumber *filter_window_number_{nullptr};
@@ -276,6 +280,7 @@ class Roode : public PollingComponent {
   ESPPreferenceObject invert_direction_pref_;
 
   bool calibration_persistence_{true};
+  bool performance_mode_{false};
   bool fail_safe_triggered_{false};
   uint32_t last_calibration_ts_{0};
   uint32_t auto_calibration_interval_sec_{4 * 60 * 60};

@@ -1,5 +1,6 @@
 #include "vl53l1x.h"
 #include "../roode/roode.h"
+#include "esphome/core/hal.h"  // delay(), millis(), delayMicroseconds()
 #include <cstdio>
 
 namespace esphome {

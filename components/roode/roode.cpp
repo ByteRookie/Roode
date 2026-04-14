@@ -2,9 +2,14 @@
 #include "select.h"
 #include "setting_number.h"
 #include "switch.h"
-#include "Arduino.h"
-#ifdef CONFIG_IDF_TARGET_ESP32
-#include "esp_task_wdt.h"  // Access to the ESP32 task watchdog
+#include "esphome/core/hal.h"     // delay(), millis(), delayMicroseconds()
+#include "esp_system.h"           // esp_restart()
+#include "esp_heap_caps.h"        // heap_caps_get_*
+#include "esp_flash.h"            // esp_flash_get_size()
+#include "esp_ota_ops.h"          // esp_ota_get_running_partition()
+#include "esp_chip_info.h"        // esp_chip_info()
+#ifdef USE_ESP32
+#include "esp_task_wdt.h"         // ESP32 task watchdog
 #endif
 #include <string>
 #include <optional>
@@ -217,7 +222,7 @@ void Roode::setup() {
   }
   last_calibration_ts_ =
       std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
-#ifdef CONFIG_IDF_TARGET_ESP32
+#ifdef USE_ESP32
   if (!force_single_core_) {
     log_event("use_dual_core");
     vTaskDelay(pdMS_TO_TICKS(200));
@@ -801,19 +806,21 @@ void Roode::update_metrics() {
       cpu_usage_sensor->publish_state(cpu);
   }
   if (ram_free_sensor != nullptr) {
-    uint32_t total_heap = ESP.getHeapSize();
+    uint32_t total_heap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
     float used_percent = 0;
     if (total_heap > 0) {
-      uint32_t used = total_heap - ESP.getFreeHeap();
+      uint32_t used = total_heap - heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
       used_percent = ((float) used / (float) total_heap) * 100.0f;
     }
     ram_free_sensor->publish_state(used_percent);
   }
   if (flash_free_sensor != nullptr) {
-    uint32_t total_flash = ESP.getFlashChipSize();
+    uint32_t total_flash = 0;
+    esp_flash_get_size(nullptr, &total_flash);
     float used_percent = 0;
     if (total_flash > 0) {
-      uint32_t used = total_flash - ESP.getFreeSketchSpace();
+      const esp_partition_t *running = esp_ota_get_running_partition();
+      uint32_t used = running ? running->size : 0;
       used_percent = ((float) used / (float) total_flash) * 100.0f;
     }
     flash_free_sensor->publish_state(used_percent);
@@ -973,10 +980,12 @@ void Roode::publish_feature_list() {
   };
 
   std::vector<std::pair<std::string, std::string>> features;
-#ifdef CONFIG_IDF_TARGET_ESP32
+#ifdef USE_ESP32
+  esp_chip_info_t chip_info;
+  esp_chip_info(&chip_info);
   features.push_back({"cpu_mode", use_sensor_task_ ? "dual" : "single"});
-  features.push_back({"cpu", ESP.getChipModel()});
-  features.push_back({"cpu_cores", std::to_string(ESP.getChipCores())});
+  features.push_back({"cpu", CONFIG_IDF_TARGET});
+  features.push_back({"cpu_cores", std::to_string(chip_info.cores)});
 #else
   features.push_back({"cpu_mode", "single"});
   features.push_back({"cpu", "ESP8266"});
@@ -984,8 +993,9 @@ void Roode::publish_feature_list() {
 #endif
   features.push_back({"xshut", distanceSensor->get_xshut_state().has_value() ? "enabled" : "disabled"});
   features.push_back({"refresh", distanceSensor->is_interrupt_enabled() ? "interrupt" : "polling"});
-  features.push_back({"ram", fmt_bytes(ESP.getHeapSize())});
-  features.push_back({"flash", fmt_bytes(ESP.getFlashChipSize())});
+  features.push_back({"ram", fmt_bytes(heap_caps_get_total_size(MALLOC_CAP_DEFAULT))});
+  uint32_t flash_size = 0; esp_flash_get_size(nullptr, &flash_size);
+  features.push_back({"flash", fmt_bytes(flash_size)});
   features.push_back({"calibration_value", std::to_string(entry->threshold->idle)});
   uint32_t last_cal_epoch = std::max(calibration_data_[0].last_calibrated_ts, calibration_data_[1].last_calibrated_ts);
   features.push_back({"calibration", fmt_time(last_cal_epoch)});
@@ -1592,18 +1602,18 @@ void Roode::restart_sensor() {
   if (restart_attempt_count_ >= max_restart_attempts_) {
     ESP_LOGE(TAG, "sensor_restart_escalating_reset");
     log_event("sensor_restart_escalating_reset");
-    ESP.restart();
+    esp_restart();
   }
 }
 
 void Roode::sensor_task(void *param) {
   auto *self = static_cast<Roode *>(param);
   // Register this task with the watchdog when running on ESP32
-#ifdef CONFIG_IDF_TARGET_ESP32
+#ifdef USE_ESP32
   esp_task_wdt_add(nullptr);
 #endif
   for (;;) {
-#ifdef CONFIG_IDF_TARGET_ESP32
+#ifdef USE_ESP32
     // Feed the watchdog to prevent unwanted resets
     esp_task_wdt_reset();
 #endif

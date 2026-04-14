@@ -9,7 +9,7 @@
 #include "vl53l1_types.h"
 #include "../core/vl53l1_error_codes.h"
 #include "../core/VL53L1X_api.h"
-#include "Arduino.h"
+#include "esphome/core/hal.h"
 
 #ifdef __cplusplus
 extern "C"

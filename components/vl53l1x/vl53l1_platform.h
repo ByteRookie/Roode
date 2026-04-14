@@ -10,6 +10,13 @@
 #include "vl53l1_error_codes.h"
 #include "VL53L1X_api.h"
 #include "esphome/core/hal.h"
+// Bring ESPHome HAL functions into global scope so third-party VL53L1X
+// library files (which use bare millis/delay) compile without Arduino.h.
+#ifdef __cplusplus
+using esphome::millis;
+using esphome::delay;
+using esphome::delayMicroseconds;
+#endif
 
 #ifdef __cplusplus
 extern "C"

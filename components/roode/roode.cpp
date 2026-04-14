@@ -687,10 +687,13 @@ void Roode::updateCounter(int delta) {
   expected_counter_ = next;
 }
 void Roode::suspend_sensor_task_for_calibration(uint32_t timeout_ms) {
-#ifdef CONFIG_IDF_TARGET_ESP32
+  // use_sensor_task_ is false on single-core / ESP8266 — no sync needed there.
   if (!use_sensor_task_) return;
   calibration_in_progress_ = true;
-  // Spin-wait until any in-flight readDistance() call on Core 1 has returned.
+  // Spin-wait until sensor_task has finished its current iteration and gone to
+  // sleep (vTaskDelay).  sensor_task_reading_ covers the entire loop body so
+  // this guarantees no concurrent sensor access — readDistance(), path_tracking,
+  // run_zone_calibration(), and auto-calibrate_zones() are all included.
   uint32_t deadline = millis() + timeout_ms;
   while (sensor_task_reading_ && millis() < deadline) {
     delay(1);
@@ -698,14 +701,11 @@ void Roode::suspend_sensor_task_for_calibration(uint32_t timeout_ms) {
   if (sensor_task_reading_) {
     ESP_LOGW(CALIBRATION, "sensor_task_reading timed out — proceeding anyway");
   }
-#endif
 }
 
 void Roode::resume_sensor_task_after_calibration() {
-#ifdef CONFIG_IDF_TARGET_ESP32
   if (!use_sensor_task_) return;
   calibration_in_progress_ = false;
-#endif
 }
 
 void Roode::recalibration() {
@@ -1614,6 +1614,11 @@ void Roode::sensor_task(void *param) {
       vTaskDelay(pdMS_TO_TICKS(10));
       continue;
     }
+    // Mark the entire iteration as busy — this covers readDistance(), path_tracking()
+    // (which can call run_zone_calibration()), and the auto-calibrate_zones() block.
+    // Core 0 spin-waits on this flag before starting any calibration so that all
+    // sensor access paths on Core 1 are included, not just the readDistance() call.
+    self->sensor_task_reading_ = true;
     uint32_t now = millis();
     if (self->last_loop_update_ts_ != 0 && (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
         (now - self->last_sensor_restart_ts_ > self->restart_backoff_ms_)) {
@@ -1621,9 +1626,7 @@ void Roode::sensor_task(void *param) {
       self->restart_sensor();
     }
     unsigned long start = micros();
-    self->sensor_task_reading_ = true;
     VL53L1_Error status = self->current_zone->readDistance(self->distanceSensor);
-    self->sensor_task_reading_ = false;
     if (status == VL53L1_ERROR_NONE) {
       self->last_loop_update_ts_ = millis();
       self->restart_backoff_ms_ = self->restart_timeout_ms_;  // reset backoff on successful read
@@ -1671,6 +1674,8 @@ void Roode::sensor_task(void *param) {
         ESP_LOGD(TAG, "auto_calibration_deferred: zones occupied");
       }
     }
+    // Release the sensor bus — Core 0 may now start calibration on next check.
+    self->sensor_task_reading_ = false;
     vTaskDelay(pdMS_TO_TICKS(self->polling_interval_ms_));
   }
 }

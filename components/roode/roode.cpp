@@ -1219,6 +1219,8 @@ void Roode::publish_setting_entities() {
     invert_direction_switch_->publish_state(invert_direction_);
   if (cal_persistence_switch_ != nullptr)
     cal_persistence_switch_->publish_state(calibration_persistence_);
+  if (performance_mode_switch_ != nullptr)
+    performance_mode_switch_->publish_state(performance_mode_);
   if (filter_window_number_ != nullptr)
     filter_window_number_->publish_state(filter_window_);
   if (sampling_number_ != nullptr)

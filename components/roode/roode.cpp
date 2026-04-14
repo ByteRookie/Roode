@@ -1487,11 +1487,7 @@ void Roode::person_calibration() {
 
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
-  // Publish updated threshold number entities
-  if (entry_max_threshold_number_ != nullptr)
-    entry_max_threshold_number_->publish_state(entry->threshold->max_percentage.value_or(80));
-  if (exit_max_threshold_number_ != nullptr)
-    exit_max_threshold_number_->publish_state(exit->threshold->max_percentage.value_or(80));
+  publish_setting_entities();
 
   if (!any_adjusted) {
     update_status_text("person cal: thresholds already ok");
@@ -1571,10 +1567,7 @@ void Roode::calibrate_low_obstacle() {
 
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
-  if (entry_max_threshold_number_ != nullptr)
-    entry_max_threshold_number_->publish_state(entry->threshold->max_percentage.value_or(80));
-  if (exit_max_threshold_number_ != nullptr)
-    exit_max_threshold_number_->publish_state(exit->threshold->max_percentage.value_or(80));
+  publish_setting_entities();
 
   update_status_text("low obs cal: done");
   calibration_status_reset_ts_ = millis();
@@ -1646,11 +1639,9 @@ void Roode::calibrate_high_obstacle() {
     ESP_LOGI(CALIBRATION, "zone %d high obs: avg=%dmm new_min=%dmm (%u%%)", z, obs_avg, new_min_mm, new_min_pct);
   }
 
+  publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
-  if (entry_min_threshold_number_ != nullptr)
-    entry_min_threshold_number_->publish_state(entry->threshold->min_percentage.value_or(15));
-  if (exit_min_threshold_number_ != nullptr)
-    exit_min_threshold_number_->publish_state(exit->threshold->min_percentage.value_or(15));
+  publish_setting_entities();
 
   update_status_text("high obs cal: done");
   calibration_status_reset_ts_ = millis();

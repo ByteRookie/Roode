@@ -126,8 +126,8 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
 void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Orientation orientation) {
   // the value of the average distance is used for computing the optimal size of the ROI and consequently also the
   // center of the two zones
-  int function_of_the_distance = 16 * (1 - (0.15 * 2) / (0.34 * (min(entry_threshold, exit_threshold) / 1000)));
-  int ROI_size = min(8, max(4, function_of_the_distance));
+  int function_of_the_distance = 16 * (1 - (0.15 * 2) / (0.34 * (std::min(entry_threshold, exit_threshold) / 1000)));
+  int ROI_size = std::min(8, std::max(4, function_of_the_distance));
   // Use the calculated ROI size unless an override has been specified
   this->roi->width = this->roi_override->width ? this->roi_override->width : ROI_size;
   this->roi->height = this->roi_override->height ? this->roi_override->height : ROI_size * 2;

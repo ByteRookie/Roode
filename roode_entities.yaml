@@ -13,6 +13,7 @@
 #
 #   Main (device card)
 #     • Last Direction    • Presence
+#     • Distance Zone 0   • Distance Zone 1
 #     (People Count and Occupancy live in your main YAML)
 #
 #   Configuration → Calibration
@@ -180,10 +181,12 @@ sensor:
     roode_id: ${roode_id}
     distance_entry:
       name: $friendly_name Distance Zone 0
+      entity_category: ""          # Main section — useful for daily monitoring
       filters:
         - delta: 100
     distance_exit:
       name: $friendly_name Distance Zone 1
+      entity_category: ""          # Main section — useful for daily monitoring
       filters:
         - delta: 100
     max_threshold_entry:

@@ -241,6 +241,7 @@ For further tuning see [Configuration Reference](#configuration-reference) and [
 | `detection_thresholds.min` | `15%` | Min distance (% of idle or absolute mm) |
 | `detection_thresholds.max` | `85%` | Max distance (% of idle or absolute mm) |
 | `calibration_persistence` | `false` | Save calibration to flash across reboots |
+| `performance_mode` | `false` | Boot into Performance Mode — suppresses diagnostic publishing (CPU, RAM, loop time, distance zones, features). Toggle off in HA to re-enable diagnostics. |
 | `filter_mode` | `min` | `min`, `median`, or `percentile10` |
 | `filter_window` | `5` | Samples in the filter buffer |
 | `zones.invert` | `false` | Swap entry/exit zones |

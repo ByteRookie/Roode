@@ -137,6 +137,9 @@ class Roode : public PollingComponent {
   void set_log_fallback_events(bool val) { log_fallback_events_ = val; }
   void set_force_single_core(bool val) { force_single_core_ = val; }
   void set_calibration_persistence(bool val) { calibration_persistence_ = val; }
+  // Sets initial boot state from YAML. apply_performance_mode() is the runtime
+  // path that also syncs the HA switch entity.
+  void set_performance_mode(bool val) { performance_mode_ = val; }
   void set_filter_mode(FilterMode mode) {
     filter_mode_ = mode;
     default_filter_mode_ = mode;

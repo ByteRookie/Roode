@@ -40,6 +40,7 @@ CONF_RESTART_TIMEOUT = "restart_timeout"
 CONF_CPU_OPTIMIZATION = "cpu_optimization"
 CONF_ACTIVATE = "activate"
 CONF_DEACTIVATE = "deactivate"
+CONF_PERFORMANCE_MODE = "performance_mode"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -92,6 +93,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ROI, default={}): ROI_SCHEMA,
         cv.Optional(CONF_DETECTION_THRESHOLDS, default={}): THRESHOLDS_SCHEMA,
         cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=True): cv.boolean,
+        cv.Optional(CONF_PERFORMANCE_MODE, default=False): cv.boolean,
         cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(FILTER_MODES, upper=False),
         cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_LOG_FALLBACK, default=False): cv.boolean,
@@ -125,6 +127,7 @@ async def to_code(config: Dict):
     cg.add(roode.set_orientation(config[CONF_ORIENTATION]))
     cg.add(roode.set_sampling_size(config[CONF_SAMPLING]))
     cg.add(roode.set_calibration_persistence(config[CONF_CALIBRATION_PERSISTENCE]))
+    cg.add(roode.set_performance_mode(config[CONF_PERFORMANCE_MODE]))
     cg.add(roode.set_filter_mode(config[CONF_FILTER_MODE]))
     cg.add(roode.set_filter_window(config[CONF_FILTER_WINDOW]))
     cg.add(roode.set_log_fallback_events(config[CONF_LOG_FALLBACK]))

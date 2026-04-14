@@ -12,9 +12,11 @@ AUTO_LOAD = ["switch"]
 
 InvertDirectionSwitch = roode_ns.class_("InvertDirectionSwitch", switch.Switch)
 CalibrationPersistenceSwitch = roode_ns.class_("CalibrationPersistenceSwitch", switch.Switch)
+PerformanceModeSwitch = roode_ns.class_("PerformanceModeSwitch", switch.Switch)
 
 CONF_INVERT_DIRECTION = "invert_direction"
 CONF_CALIBRATION_PERSISTENCE = "calibration_persistence"
+CONF_PERFORMANCE_MODE = "performance_mode"
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -26,6 +28,10 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_CALIBRATION_PERSISTENCE): switch.switch_schema(
             CalibrationPersistenceSwitch,
             icon="mdi:content-save",
+        ),
+        cv.Optional(CONF_PERFORMANCE_MODE): switch.switch_schema(
+            PerformanceModeSwitch,
+            icon="mdi:speedometer",
         ),
     }
 )
@@ -45,3 +51,9 @@ async def to_code(config: OrderedDict):
         sw = await switch.new_switch(conf)
         cg.add(sw.set_roode_hub(hub))
         cg.add(hub.set_calibration_persistence_switch(sw))
+
+    if CONF_PERFORMANCE_MODE in config:
+        conf = config[CONF_PERFORMANCE_MODE]
+        sw = await switch.new_switch(conf)
+        cg.add(sw.set_roode_hub(hub))
+        cg.add(hub.set_performance_mode_switch(sw))

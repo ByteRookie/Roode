@@ -294,21 +294,21 @@ void Roode::setup() {
 }
 
 void Roode::update() {
-  if (distance_entry != nullptr) {
-    distance_entry->publish_state(entry->getDistance());
-  }
-  if (distance_exit != nullptr) {
-    distance_exit->publish_state(exit->getDistance());
-  }
-  if (xshut_state_binary_sensor != nullptr) {
-    auto val = distanceSensor->get_xshut_state();
-    if (val.has_value())
-      xshut_state_binary_sensor->publish_state(*val);
-  }
-  if (interrupt_status_sensor != nullptr) {
-    auto val = distanceSensor->get_interrupt_state();
-    if (val.has_value())
-      interrupt_status_sensor->publish_state(*val ? 1 : 0);
+  if (!performance_mode_) {
+    if (distance_entry != nullptr)
+      distance_entry->publish_state(entry->getDistance());
+    if (distance_exit != nullptr)
+      distance_exit->publish_state(exit->getDistance());
+    if (xshut_state_binary_sensor != nullptr) {
+      auto val = distanceSensor->get_xshut_state();
+      if (val.has_value())
+        xshut_state_binary_sensor->publish_state(*val);
+    }
+    if (interrupt_status_sensor != nullptr) {
+      auto val = distanceSensor->get_interrupt_state();
+      if (val.has_value())
+        interrupt_status_sensor->publish_state(*val ? 1 : 0);
+    }
   }
   if (people_counter != nullptr && fabs(people_counter->state - expected_counter_) > 0.001f) {
     // Suppress detection for 300 ms after an automatic counter update.
@@ -322,7 +322,7 @@ void Roode::update() {
       int diff = (int) roundf(people_counter->state - expected_counter_);
       manual_adjustment_count_ += abs(diff);
       expected_counter_ = people_counter->state;
-      if (manual_adjustment_sensor != nullptr)
+      if (!performance_mode_ && manual_adjustment_sensor != nullptr)
         manual_adjustment_sensor->publish_state(manual_adjustment_count_);
       if (diff != 0) {
         std::string sign = diff > 0 ? "+" : "";
@@ -835,32 +835,36 @@ void Roode::update_metrics() {
     return;
   float cpu = 0.0f;
   if (loop_count_ > 0) {
-    float avg_ms = (float) loop_time_sum_ / loop_count_ / 1000.0f;
-    if (loop_time_sensor != nullptr)
-      loop_time_sensor->publish_state(avg_ms);
     cpu = ((float) loop_time_sum_ / ((now - loop_window_start_) * 1000.0f)) * 100.0f;
-    if (cpu_usage_sensor != nullptr)
-      cpu_usage_sensor->publish_state(cpu);
-  }
-  if (ram_free_sensor != nullptr) {
-    uint32_t total_heap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
-    float used_percent = 0;
-    if (total_heap > 0) {
-      uint32_t used = total_heap - heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-      used_percent = ((float) used / (float) total_heap) * 100.0f;
+    if (!performance_mode_) {
+      float avg_ms = (float) loop_time_sum_ / loop_count_ / 1000.0f;
+      if (loop_time_sensor != nullptr)
+        loop_time_sensor->publish_state(avg_ms);
+      if (cpu_usage_sensor != nullptr)
+        cpu_usage_sensor->publish_state(cpu);
     }
-    ram_free_sensor->publish_state(used_percent);
   }
-  if (flash_free_sensor != nullptr) {
-    uint32_t total_flash = 0;
-    esp_flash_get_size(nullptr, &total_flash);
-    float used_percent = 0;
-    if (total_flash > 0) {
-      const esp_partition_t *running = esp_ota_get_running_partition();
-      uint32_t used = running ? running->size : 0;
-      used_percent = ((float) used / (float) total_flash) * 100.0f;
+  if (!performance_mode_) {
+    if (ram_free_sensor != nullptr) {
+      uint32_t total_heap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+      float used_percent = 0;
+      if (total_heap > 0) {
+        uint32_t used = total_heap - heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        used_percent = ((float) used / (float) total_heap) * 100.0f;
+      }
+      ram_free_sensor->publish_state(used_percent);
     }
-    flash_free_sensor->publish_state(used_percent);
+    if (flash_free_sensor != nullptr) {
+      uint32_t total_flash = 0;
+      esp_flash_get_size(nullptr, &total_flash);
+      float used_percent = 0;
+      if (total_flash > 0) {
+        const esp_partition_t *running = esp_ota_get_running_partition();
+        uint32_t used = running ? running->size : 0;
+        used_percent = ((float) used / (float) total_flash) * 100.0f;
+      }
+      flash_free_sensor->publish_state(used_percent);
+    }
   }
   apply_cpu_optimizations(cpu);
   reset_cpu_optimizations(cpu);
@@ -1103,7 +1107,7 @@ void Roode::publish_feature_list() {
     if (i + 1 < features.size())
       feature_list += "\n";
   }
-  if (enabled_features_sensor != nullptr)
+  if (!performance_mode_ && enabled_features_sensor != nullptr)
     enabled_features_sensor->publish_state(feature_list);
   log_event(std::string("features_enabled: ") + feature_list);
 }
@@ -1382,6 +1386,13 @@ void Roode::apply_calibration_persistence(bool val) {
   if (cal_persistence_switch_ != nullptr)
     cal_persistence_switch_->publish_state(val);
   ESP_LOGI(TAG, "calibration_persistence changed: %s", val ? "true" : "false");
+}
+
+void Roode::apply_performance_mode(bool val) {
+  performance_mode_ = val;
+  if (performance_mode_switch_ != nullptr)
+    performance_mode_switch_->publish_state(val);
+  ESP_LOGI(TAG, "performance_mode changed: %s", val ? "on (diagnostics suppressed)" : "off (diagnostics active)");
 }
 
 void Roode::apply_ranging_mode(const std::string &mode) {
@@ -1683,6 +1694,11 @@ void InvertDirectionSwitch::write_state(bool state) {
 
 void CalibrationPersistenceSwitch::write_state(bool state) {
   hub_->apply_calibration_persistence(state);
+  publish_state(state);
+}
+
+void PerformanceModeSwitch::write_state(bool state) {
+  hub_->apply_performance_mode(state);
   publish_state(state);
 }
 

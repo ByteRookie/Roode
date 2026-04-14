@@ -36,5 +36,23 @@ class CalibrationPersistenceSwitch : public esphome::switch_::Switch {
   Roode *hub_{nullptr};
 };
 
+/**
+ * ESPHome switch that enables Performance Mode.
+ * When ON, suppresses publishing of diagnostic sensors (CPU, RAM, loop time,
+ * distance zones, features) to reduce overhead during daily operation.
+ * Counting, calibration, presence, and status continue unaffected.
+ * Flip OFF to re-enable diagnostics for setup or troubleshooting.
+ */
+class PerformanceModeSwitch : public esphome::switch_::Switch {
+ public:
+  void set_roode_hub(Roode *hub) { hub_ = hub; }
+
+ protected:
+  void write_state(bool state) override;
+
+ private:
+  Roode *hub_{nullptr};
+};
+
 }  // namespace roode
 }  // namespace esphome

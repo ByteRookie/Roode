@@ -9,32 +9,67 @@
 #   friendly_name — prefix used for all entity names (default: "Roode")
 #   roode_id      — must match the `id:` of your `roode:` block (default: roode_platform)
 #
-# ── Home Assistant dashboard tip ─────────────────────────────────────────────
-# To see calibration status alongside the buttons, create an Entities card in
-# HA with these entities grouped together:
+# ── Entity layout in Home Assistant ──────────────────────────────────────────
 #
-#   type: entities
-#   title: Roode Calibration
-#   entities:
-#     - button.roode_calibrate_empty_room
-#     - button.roode_calibrate_with_person
-#     - button.roode_calibrate_low_obstacle
-#     - button.roode_calibrate_high_obstacle
-#     - text_sensor.roode_calibration_status      # ← live status during cal
-#     - text_sensor.roode_status                  # ← general sensor status
+#   Main (device card)
+#     • Last Direction    • Presence
+#     (People Count and Occupancy live in your main YAML)
+#
+#   Configuration → Calibration
+#     • Status            • Calibrate Empty Room   • Calibrate With Person
+#     • Calibrate Low Obstacle                     • Calibrate High Obstacle
+#     • Auto Calibration Interval                  • Save Calibration to Flash
+#     • Entry / Exit Min & Max Threshold
+#
+#   Configuration → Sensor Tuning
+#     • Filter Window     • Sampling       • Filter Mode     • Ranging Mode
+#     • Entry / Exit ROI Height & Width    • Invert Direction
+#
+#   Configuration → Device
+#     • Restart           • Performance Mode
+#
+#   Diagnostic (collapsed by default — for setup and troubleshooting)
+#     • Distance Zone 0/1  • Threshold sensors  • ROI sensors
+#     • Sensor Status Code • Manual Adjustments • Loop Time
+#     • CPU Usage          • RAM Free            • Version  • Features
+#
 # ─────────────────────────────────────────────────────────────────────────────
 substitutions:
   friendly_name: Roode
   roode_id: roode_platform
 
-# ── Calibration controls ──────────────────────────────────────────────────────
-# All buttons are entity_category: config so they appear together in the HA
-# device page "Configuration" section alongside the Calibration Status sensor.
-button:
-  - platform: restart
-    name: $friendly_name Restart
-    entity_category: config
+# ── Main: day-to-day operational entities ────────────────────────────────────
 
+text_sensor:
+  - platform: roode
+    roode_id: ${roode_id}
+    entry_exit_event:
+      name: $friendly_name Last Direction
+      entity_category: ""        # Main section — visible on device card
+
+    # Status appears in the Calibration config group so you can see the result
+    # right next to the calibration buttons without leaving the section.
+    sensor_status:
+      name: $friendly_name Status
+      entity_category: config
+
+    # Diagnostic text sensors (shown in Diagnostic section by default)
+    version:
+      name: $friendly_name Version
+    enabled_features:
+      name: $friendly_name Features
+
+binary_sensor:
+  - platform: roode
+    roode_id: ${roode_id}
+    presence:
+      name: $friendly_name Presence
+      # No entity_category → Main section
+
+# ── Configuration: Calibration ───────────────────────────────────────────────
+
+button:
+  # — Calibration buttons —
   - platform: template
     name: $friendly_name Calibrate Empty Room
     icon: mdi:ruler-square-compass
@@ -63,71 +98,82 @@ button:
     on_press:
       - lambda: "id(${roode_id})->calibrate_high_obstacle();"
 
-# ── Text sensors ──────────────────────────────────────────────────────────────
-# sensor_status is entity_category: diagnostic so it appears in the HA device
-# "Diagnostic" section — easy to spot next to the config controls above.
-text_sensor:
-  - platform: roode
-    roode_id: ${roode_id}
-    sensor_status:
-      name: $friendly_name Status
-      entity_category: diagnostic
-      icon: mdi:information-outline
-    version:
-      name: $friendly_name Version
-      entity_category: diagnostic
-    entry_exit_event:
-      name: $friendly_name Last Direction
-    enabled_features:
-      name: $friendly_name Features
-      entity_category: diagnostic
+  # — Device controls —
+  - platform: restart
+    name: $friendly_name Restart
+    entity_category: config
 
-# ── Runtime number entities (all changes saved to flash automatically) ────────
+# ── Configuration: Sensor Tuning & Calibration Settings ──────────────────────
+
 number:
   - platform: roode
     roode_id: ${roode_id}
-    filter_window:
-      name: $friendly_name Filter Window
-    sampling:
-      name: $friendly_name Sampling
-    entry_max_threshold:
-      name: $friendly_name Entry Max Threshold
-    entry_min_threshold:
-      name: $friendly_name Entry Min Threshold
-    exit_max_threshold:
-      name: $friendly_name Exit Max Threshold
-    exit_min_threshold:
-      name: $friendly_name Exit Min Threshold
+    # Calibration group
     auto_calibration_interval:
       name: $friendly_name Auto Calibration Interval
+      entity_category: config
+    entry_max_threshold:
+      name: $friendly_name Entry Max Threshold
+      entity_category: config
+    entry_min_threshold:
+      name: $friendly_name Entry Min Threshold
+      entity_category: config
+    exit_max_threshold:
+      name: $friendly_name Exit Max Threshold
+      entity_category: config
+    exit_min_threshold:
+      name: $friendly_name Exit Min Threshold
+      entity_category: config
+    # Sensor tuning group
+    filter_window:
+      name: $friendly_name Filter Window
+      entity_category: config
+    sampling:
+      name: $friendly_name Sampling
+      entity_category: config
     entry_roi_height:
       name: $friendly_name Entry ROI Height
+      entity_category: config
     entry_roi_width:
       name: $friendly_name Entry ROI Width
+      entity_category: config
     exit_roi_height:
       name: $friendly_name Exit ROI Height
+      entity_category: config
     exit_roi_width:
       name: $friendly_name Exit ROI Width
+      entity_category: config
 
-# ── Runtime select entities ───────────────────────────────────────────────────
 select:
   - platform: roode
     roode_id: ${roode_id}
     filter_mode:
       name: $friendly_name Filter Mode
+      entity_category: config
     ranging_mode:
       name: $friendly_name Ranging Mode
+      entity_category: config
 
-# ── Runtime switch entities ───────────────────────────────────────────────────
 switch:
   - platform: roode
     roode_id: ${roode_id}
+    # Calibration group
+    calibration_persistence:
+      name: $friendly_name Save Calibration to Flash
+      entity_category: config
+    # Sensor tuning group
     invert_direction:
       name: $friendly_name Invert Direction
-    calibration_persistence:
-      name: $friendly_name Save Settings to Flash
+      entity_category: config
+    # Device group — suppresses diagnostic publishing to reduce overhead
+    performance_mode:
+      name: $friendly_name Performance Mode
+      entity_category: config
 
-# ── Diagnostic sensors (shown in HA; disable in entity registry if not needed) ─
+# ── Diagnostic: sensors shown when troubleshooting or setting up ──────────────
+# All sensor entities below default to entity_category: diagnostic (set in
+# sensor.py). Disable individual entities in HA's entity registry if not needed.
+
 sensor:
   - platform: roode
     id: roode_sensors
@@ -158,23 +204,11 @@ sensor:
       name: $friendly_name ROI Width Zone 1
     sensor_status:
       name: $friendly_name Sensor Status Code
-      entity_category: diagnostic
     manual_adjustment_count:
       name: $friendly_name Manual Adjustments
-      entity_category: diagnostic
     loop_time:
       name: $friendly_name Loop Time
-      entity_category: diagnostic
     cpu_usage:
       name: $friendly_name CPU Usage
-      entity_category: diagnostic
     ram_free:
       name: $friendly_name RAM Free
-      entity_category: diagnostic
-
-# ── Presence binary sensors ───────────────────────────────────────────────────
-binary_sensor:
-  - platform: roode
-    roode_id: ${roode_id}
-    presence:
-      name: $friendly_name Presence

@@ -54,7 +54,7 @@ text_sensor:
     roode_id: ${roode_id}
     entry_exit_event:
       name: $friendly_name Last Direction
-      # No entity_category → Controls section
+      entity_category: ""   # Override DIAGNOSTIC Python default → Controls section
 
     # Status goes to Configuration so it's visible next to calibration buttons.
     sensor_status:

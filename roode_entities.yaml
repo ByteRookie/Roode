@@ -11,32 +11,31 @@
 #
 # ── Entity layout in Home Assistant ──────────────────────────────────────────
 #
-# HA splits entities with no entity_category by domain automatically:
-#   Controls   — numbers, switches, selects, text_sensors (no entity_category)
-#   Sensors    — sensors, binary_sensors (no entity_category)
+# HA splits entities into four fixed sections (in this order):
+#   Controls   — non-sensor entities with no entity_category
+#   Sensors    — sensor/binary_sensor entities with no entity_category
 #   Configuration — entity_category: config
 #   Diagnostic — entity_category: diagnostic
 #
-#   Controls
+#   Controls  (main — always visible)
 #     • People Count (in your main YAML)
 #     • Last Direction
+#
+#   Sensors  (live sensor data)
+#     • Distance Zone 0  • Distance Zone 1  • Presence
+#
+#   Configuration  (calibration + all tuning controls)
+#     • Status
+#     • Calibrate Empty Room   • Calibrate With Person
+#     • Calibrate Low Obstacle • Calibrate High Obstacle
+#     • Restart                • Performance Mode
 #     • Filter Window  • Sampling       • Filter Mode    • Ranging Mode
 #     • Entry / Exit Max & Min Threshold
 #     • Entry / Exit ROI Height & Width
 #     • Invert Direction  • Save Calibration to Flash
 #     • Auto Calibration Interval
 #
-#   Sensors
-#     • Distance Zone 0  • Distance Zone 1  • Presence
-#
-#   Configuration  (calibration controls + device settings)
-#     • Status
-#     • Calibrate Empty Room   • Calibrate With Person
-#     • Calibrate Low Obstacle • Calibrate High Obstacle
-#     • Performance Mode
-#     • Restart
-#
-#   Diagnostic  (collapsed by default — setup and troubleshooting)
+#   Diagnostic  (collapsed by default — raw readbacks)
 #     • Threshold sensors  • ROI sensors
 #     • Sensor Status Code • Manual Adjustments
 #     • Loop Time  • CPU Usage  • RAM Free
@@ -47,7 +46,7 @@ substitutions:
   friendly_name: Roode
   roode_id: roode_platform
 
-# ── Controls: runtime-adjustable entities (no entity_category → Controls) ────
+# ── Controls: primary entities (no entity_category → Controls) ───────────────
 
 text_sensor:
   - platform: roode
@@ -69,49 +68,62 @@ text_sensor:
 number:
   - platform: roode
     roode_id: ${roode_id}
-    # All numbers have no entity_category → appear in Controls
+    # entity_category: config → Configuration section (grouped with calibration)
     auto_calibration_interval:
       name: $friendly_name Auto Calibration Interval
+      entity_category: config
     entry_max_threshold:
       name: $friendly_name Entry Max Threshold
+      entity_category: config
     entry_min_threshold:
       name: $friendly_name Entry Min Threshold
+      entity_category: config
     exit_max_threshold:
       name: $friendly_name Exit Max Threshold
+      entity_category: config
     exit_min_threshold:
       name: $friendly_name Exit Min Threshold
+      entity_category: config
     filter_window:
       name: $friendly_name Filter Window
+      entity_category: config
     sampling:
       name: $friendly_name Sampling
+      entity_category: config
     entry_roi_height:
       name: $friendly_name Entry ROI Height
+      entity_category: config
     entry_roi_width:
       name: $friendly_name Entry ROI Width
+      entity_category: config
     exit_roi_height:
       name: $friendly_name Exit ROI Height
+      entity_category: config
     exit_roi_width:
       name: $friendly_name Exit ROI Width
+      entity_category: config
 
 select:
   - platform: roode
     roode_id: ${roode_id}
-    # No entity_category → Controls section
+    # entity_category: config → Configuration section
     filter_mode:
       name: $friendly_name Filter Mode
+      entity_category: config
     ranging_mode:
       name: $friendly_name Ranging Mode
+      entity_category: config
 
 switch:
   - platform: roode
     roode_id: ${roode_id}
-    # Runtime controls → no entity_category → Controls section
+    # entity_category: config → Configuration section (grouped with calibration)
     invert_direction:
       name: $friendly_name Invert Direction
+      entity_category: config
     calibration_persistence:
       name: $friendly_name Save Calibration to Flash
-    # Performance Mode goes to Configuration — it's a device setup choice,
-    # not a routine runtime control.
+      entity_category: config
     performance_mode:
       name: $friendly_name Performance Mode
       entity_category: config
@@ -124,7 +136,7 @@ binary_sensor:
     presence:
       name: $friendly_name Presence
 
-# ── Configuration: calibration controls + device settings ────────────────────
+# ── Configuration: calibration controls + all tuning knobs ──────────────────
 
 button:
   - platform: template

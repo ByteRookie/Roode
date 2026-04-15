@@ -390,7 +390,7 @@ void Roode::loop() {
     bool zones_clear = !zone_debounced_active_[0] && !zone_debounced_active_[1];
     if (zones_clear) {
       ESP_LOGI(TAG, "auto_calibration_running");
-      calibrate_zones();
+      calibrate_zones(true);
     } else {
       ESP_LOGD(TAG, "auto_calibration_deferred: zones occupied");
     }
@@ -874,6 +874,13 @@ void Roode::update_metrics() {
     last_status_text_ = "";  // Force re-publish even if previous text was also "ok"
     update_status_text("ok");
   }
+  // Heartbeat: re-publish the current status every 60 s so HA never marks the
+  // entity Unavailable after a reconnect during a long steady-"ok" period.
+  if (status_text_sensor != nullptr && !last_status_text_.empty() &&
+      (last_status_heartbeat_ts_ == 0 || now - last_status_heartbeat_ts_ >= 60000)) {
+    status_text_sensor->publish_state(last_status_text_);
+    last_status_heartbeat_ts_ = now;
+  }
   loop_time_sum_ = 0;
   loop_count_ = 0;
   loop_window_start_ = now;
@@ -900,7 +907,7 @@ const RangingMode *Roode::determine_ranging_mode(uint16_t average_entry_zone_dis
   return Ranging::Longest;
 }
 
-void Roode::calibrate_zones() {
+void Roode::calibrate_zones(bool auto_cal) {
   ESP_LOGI(SETUP, "Calibrating sensor zones");
   update_status_text("cal: keep room empty...");
 
@@ -918,7 +925,9 @@ void Roode::calibrate_zones() {
 
   // If Core 0 requested manual calibration while we were measuring baseline,
   // abort so Core 0 can take over without a concurrent sensor access race.
-  if (calibration_in_progress_) {
+  // Only relevant for the auto-cal path (sensor_task); manual cal sets the flag
+  // before calling us and must not abort itself.
+  if (auto_cal && calibration_in_progress_) {
     ESP_LOGW(CALIBRATION, "auto-cal aborted after baseline (manual cal requested)");
     return;
   }
@@ -933,7 +942,7 @@ void Roode::calibrate_zones() {
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
   entry->calibrateThreshold(distanceSensor, 20);
 
-  if (calibration_in_progress_) {
+  if (auto_cal && calibration_in_progress_) {
     ESP_LOGW(CALIBRATION, "auto-cal aborted after entry zone (manual cal requested)");
     return;
   }
@@ -1116,6 +1125,7 @@ void Roode::update_status_text(const std::string &status) {
   if (status_text_sensor != nullptr && status != last_status_text_) {
     status_text_sensor->publish_state(status);
     last_status_text_ = status;
+    last_status_heartbeat_ts_ = millis();  // Restart the 60-s heartbeat window
   }
 }
 
@@ -1796,7 +1806,7 @@ void Roode::sensor_task(void *param) {
         // suspend_sensor_task_for_calibration() correctly waits rather than proceeding
         // concurrently.  calibrate_zones() checks calibration_in_progress_ after each
         // slow phase and returns early if Core 0 claims the bus mid-calibration.
-        self->calibrate_zones();
+        self->calibrate_zones(true);
       } else {
         ESP_LOGD(TAG, "auto_calibration_deferred: zones occupied");
       }

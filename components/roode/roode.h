@@ -341,7 +341,7 @@ class Roode : public PollingComponent {
   bool handle_sensor_status();
   void update_status_text(const std::string &status);
   void calibrateDistance();
-  void calibrate_zones();
+  void calibrate_zones(bool auto_cal = false);
   void publish_feature_list();
   void restore_settings_from_flash();
   void publish_setting_entities();
@@ -377,6 +377,7 @@ class Roode : public PollingComponent {
   // clears it immediately after; Core 0 spin-waits until false before
   // proceeding so it never interrupts an in-flight sensor read.
   volatile bool calibration_in_progress_{false};
+  uint32_t last_status_heartbeat_ts_{0};
   volatile bool sensor_task_reading_{false};
   void suspend_sensor_task_for_calibration(uint32_t timeout_ms = 3000);
   void resume_sensor_task_after_calibration();

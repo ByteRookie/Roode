@@ -155,6 +155,12 @@ void Roode::setup() {
     return;
   }
 
+  // Publish "ok" immediately so the Status entity has a valid state in HA from
+  // the very start of setup.  calibrate_zones() will publish more specific
+  // status strings as it runs; this just ensures the entity is never stuck as
+  // "Unavailable" while the API is establishing its first connection.
+  update_status_text("ok");
+
   // Initialize filtering options before calibrating so threshold sampling uses
   // the configured window and mode
   entry->set_filter_window(filter_window_);
@@ -793,6 +799,14 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
            z->threshold->max_percentage.value_or(80));
   update_status_text(std::string(cal_msg));
   calibration_status_reset_ts_ = millis();
+  // Reset PathTrack FSM so stale occupancy state from the stuck zone cannot
+  // prevent new detections after the fail-safe calibration completes.
+  state_ = STATE_IDLE;
+  zone_debounced_active_[0] = false;
+  zone_debounced_active_[1] = false;
+  zone_dwell_first_active_[0] = zone_dwell_first_active_[1] = 0;
+  zone_dwell_first_clear_[0] = zone_dwell_first_clear_[1] = 0;
+  path_track_first_event_ts_ = 0;
 }
 
 void Roode::apply_cpu_optimizations(float cpu) {

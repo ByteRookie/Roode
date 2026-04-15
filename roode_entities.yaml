@@ -22,10 +22,10 @@
 #     • Last Direction
 #
 #   Sensors  (live sensor data)
+#     • Status
 #     • Distance Zone 0  • Distance Zone 1  • Presence
 #
 #   Configuration  (calibration + all tuning controls)
-#     • Status
 #     • Calibrate Empty Room   • Calibrate With Person
 #     • Calibrate Low Obstacle • Calibrate High Obstacle
 #     • Restart                • Performance Mode
@@ -55,10 +55,9 @@ text_sensor:
       name: $friendly_name Last Direction
       entity_category: ""   # Override DIAGNOSTIC Python default → Controls section
 
-    # Status goes to Configuration so it's visible next to calibration buttons.
     sensor_status:
       name: $friendly_name Status
-      entity_category: config
+      entity_category: ""   # Sensors section — entity_category: config hides text sensors in HA
 
     version:
       name: $friendly_name Version       # Diagnostic (default in text_sensor.py)

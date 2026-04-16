@@ -1,6 +1,7 @@
 #include "vl53l1x.h"
 #include "../roode/roode.h"
 #include "esphome/core/hal.h"  // delay(), millis(), delayMicroseconds()
+#include <algorithm>
 #include <cstdio>
 
 namespace esphome {
@@ -31,6 +32,13 @@ int8_t VL53L1X::uld_read_register(uint8_t address, uint16_t register_address, ui
 }
 
 VL53L1X::~VL53L1X() {
+  auto it = std::remove(sensors.begin(), sensors.end(), this);
+  if (it != sensors.end()) {
+    sensors.erase(it, sensors.end());
+  }
+  if (active_sensor_ == this) {
+    active_sensor_ = nullptr;
+  }
   if (this->xshut_pin.has_value()) {
     this->xshut_pin.value()->digital_write(false);
     ESP_LOGD(TAG, "XShut pin set LOW - powering down sensor");
@@ -61,7 +69,9 @@ void VL53L1X::setup() {
   ESP_LOGD(TAG, "Beginning setup");
   set_active_sensor(this);
 
-  sensors.push_back(this);
+  if (std::find(sensors.begin(), sensors.end(), this) == sensors.end()) {
+    sensors.push_back(this);
+  }
   for (auto *s : sensors) {
     if (s != this && s->xshut_pin.has_value()) {
       s->xshut_pin.value()->digital_write(false);
@@ -522,14 +532,22 @@ void VL53L1X::restart() {
     roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
     roode::Roode::log_event("xshut_reinitialize");
     ESP_LOGD(TAG, "XShut pin set HIGH - restart complete");
-    this->wait_for_boot();
+    if (this->wait_for_boot() != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Sensor failed to boot after XSHUT restart");
+      this->mark_failed();
+      return;
+    }
     this->reinitialize_after_reset();
     roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
     roode::Roode::log_event("sensor.recovered_via_xshut");
     recovery_count_++;
   } else {
     ESP_LOGW(TAG, "Restarting sensor without XSHUT pin");
-    this->init();
+    if (this->init() != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Sensor restart without XSHUT failed");
+      this->mark_failed();
+      return;
+    }
     if (this->ranging_mode != nullptr) {
       this->sensor.SetDistanceMode(this->ranging_mode->mode);
       this->sensor.SetTimingBudgetInMs(this->ranging_mode->timing_budget);
@@ -551,14 +569,22 @@ void VL53L1X::soft_reset() {
     roode::Roode::log_event("xshut_reinitialize_sensor_" + std::to_string(sensor_id_));
     roode::Roode::log_event("xshut_reinitialize");
     ESP_LOGD(TAG, "XShut pin set HIGH - reset complete");
-    this->wait_for_boot();
+    if (this->wait_for_boot() != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Sensor failed to boot after XSHUT reset");
+      this->mark_failed();
+      return;
+    }
     this->reinitialize_after_reset();
     roode::Roode::log_event("sensor_" + std::to_string(sensor_id_) + ".recovered_via_xshut");
     roode::Roode::log_event("sensor.recovered_via_xshut");
     recovery_count_++;
   } else {
     ESP_LOGW(TAG, "Restarting sensor without XSHUT pin");
-    this->init();
+    if (this->init() != VL53L1_ERROR_NONE) {
+      ESP_LOGE(TAG, "Sensor soft reset without XSHUT failed");
+      this->mark_failed();
+      return;
+    }
     if (this->ranging_mode != nullptr) {
       this->sensor.SetDistanceMode(this->ranging_mode->mode);
       this->sensor.SetTimingBudgetInMs(this->ranging_mode->timing_budget);

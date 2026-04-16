@@ -1,7 +1,6 @@
 #pragma once
 #include <math.h>
 #include <array>
-#include <vector>
 
 #include "esphome/core/application.h"
 #include "esphome/core/log.h"

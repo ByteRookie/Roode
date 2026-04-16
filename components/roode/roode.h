@@ -1,5 +1,6 @@
 #pragma once
 #include <math.h>
+#include <atomic>
 #include <string>
 #include "esphome/core/hal.h"
 #include "freertos/FreeRTOS.h"  // BaseType_t, TickType_t
@@ -302,7 +303,7 @@ class Roode : public PollingComponent {
   static bool log_fallback_events_;
   static Roode *instance_;
   int manual_adjustment_count_{0};
-  float expected_counter_{0};
+  std::atomic<int32_t> expected_counter_{0};
   bool force_single_core_{false};
   TaskHandle_t sensor_task_handle_{nullptr};
   uint8_t multicore_retry_count_{0};
@@ -331,7 +332,7 @@ class Roode : public PollingComponent {
   // Used to suppress false "manual_adjust" detections caused by the race window
   // between updateCounter() setting expected_counter_ and call.perform() updating
   // people_counter->state on the dual-core sensor task.
-  uint32_t last_auto_update_ts_{0};
+  std::atomic<uint32_t> last_auto_update_ts_{0};
 
   std::string last_status_text_{};
 
@@ -376,10 +377,10 @@ class Roode : public PollingComponent {
   // sensor_task_reading_: Core 1 sets true while inside readDistance() and
   // clears it immediately after; Core 0 spin-waits until false before
   // proceeding so it never interrupts an in-flight sensor read.
-  volatile bool calibration_in_progress_{false};
+  std::atomic<bool> calibration_in_progress_{false};
   uint32_t last_status_heartbeat_ts_{0};
-  volatile bool sensor_task_reading_{false};
-  void suspend_sensor_task_for_calibration(uint32_t timeout_ms = 3000);
+  std::atomic<bool> sensor_task_reading_{false};
+  bool suspend_sensor_task_for_calibration(uint32_t timeout_ms = 10000);
   void resume_sensor_task_after_calibration();
 };
 

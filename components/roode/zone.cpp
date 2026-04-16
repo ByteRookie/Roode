@@ -75,8 +75,9 @@ void Zone::reset_roi(uint8_t default_center) {
 
 void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   ESP_LOGD(CALIBRATION, "Beginning. zoneId: %d", id);
-  std::vector<uint16_t> zone_distances;
-  zone_distances.reserve(number_attempts);
+  static constexpr size_t kMaxCalibrationSamples = 64;
+  std::array<uint16_t, kMaxCalibrationSamples> zone_distances{};
+  size_t zone_count = 0;
 
   for (int i = 0; i < number_attempts; i++) {
     // Feed the watchdog every 10 samples — calibrateThreshold can run for several
@@ -93,10 +94,12 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
     uint16_t d = this->getMinDistance();
     if (d == 0 || d > 4000)
       continue;  // skip invalid readings during calibration
-    zone_distances.push_back(d);
+    if (zone_count < zone_distances.size()) {
+      zone_distances[zone_count++] = d;
+    }
   }
 
-  if (zone_distances.empty()) {
+  if (zone_count == 0) {
     threshold->idle = 0;
     ESP_LOGW(CALIBRATION, "Calibration failed: no valid distances recorded for zone %d", id);
     return;
@@ -104,14 +107,15 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
 
   // Outlier rejection: compute the median and discard readings outside ±25% of it.
   // Protects the baseline when someone walks through the field of view mid-calibration.
-  std::vector<uint16_t> sorted = zone_distances;
-  std::sort(sorted.begin(), sorted.end());
-  uint16_t median = sorted[sorted.size() / 2];
+  std::array<uint16_t, kMaxCalibrationSamples> sorted = zone_distances;
+  std::sort(sorted.begin(), sorted.begin() + zone_count);
+  uint16_t median = sorted[zone_count / 2];
   uint16_t lo = static_cast<uint16_t>(median * 75 / 100);
   uint16_t hi = static_cast<uint16_t>(median * 125 / 100);
   int64_t sum = 0;
   int count = 0;
-  for (uint16_t d : zone_distances) {
+  for (size_t i = 0; i < zone_count; i++) {
+    uint16_t d = zone_distances[i];
     if (d >= lo && d <= hi) {
       sum += d;
       count++;
@@ -149,7 +153,7 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
            threshold->min_percentage.value_or((threshold->min * 100) / threshold->idle),
            threshold->max,
            threshold->max_percentage.value_or((threshold->max * 100) / threshold->idle),
-           count, (int)zone_distances.size());
+           count, (int) zone_count);
 }
 
 void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Orientation orientation) {

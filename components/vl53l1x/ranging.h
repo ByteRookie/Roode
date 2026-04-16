@@ -15,14 +15,19 @@ struct RangingMode {
 };
 
 namespace Ranging {
-// NOLINTBEGIN(cert-err58-cpp)
-__attribute__((unused)) static const RangingMode *Shortest = new RangingMode("Shortest", 15, Short);
-__attribute__((unused)) static const RangingMode *Short = new RangingMode("Short", 20);
-__attribute__((unused)) static const RangingMode *Medium = new RangingMode("Medium", 33);
-__attribute__((unused)) static const RangingMode *Long = new RangingMode("Long", 50);
-__attribute__((unused)) static const RangingMode *Longer = new RangingMode("Longer", 100);
-__attribute__((unused)) static const RangingMode *Longest = new RangingMode("Longest", 200);
-// NOLINTEND(cert-err58-cpp)
+inline const RangingMode kShortest{"Shortest", 15, Short};
+inline const RangingMode kShort{"Short", 20};
+inline const RangingMode kMedium{"Medium", 33};
+inline const RangingMode kLong{"Long", 50};
+inline const RangingMode kLonger{"Longer", 100};
+inline const RangingMode kLongest{"Longest", 200};
+
+__attribute__((unused)) inline const RangingMode *Shortest = &kShortest;
+__attribute__((unused)) inline const RangingMode *Short = &kShort;
+__attribute__((unused)) inline const RangingMode *Medium = &kMedium;
+__attribute__((unused)) inline const RangingMode *Long = &kLong;
+__attribute__((unused)) inline const RangingMode *Longer = &kLonger;
+__attribute__((unused)) inline const RangingMode *Longest = &kLongest;
 }  // namespace Ranging
 
 }  // namespace vl53l1x

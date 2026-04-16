@@ -49,6 +49,7 @@ class VL53L1X : public i2c::I2CDevice, public Component {
   void set_interrupt_pin(InternalGPIOPin *pin) { this->interrupt_pin = pin; }
   optional<const RangingMode *> get_ranging_mode_override() { return this->ranging_mode_override; }
   void set_ranging_mode_override(const RangingMode *mode) { this->ranging_mode_override = {mode}; }
+  void clear_ranging_mode_override() { this->ranging_mode_override.reset(); }
   void set_offset(int16_t val) { this->offset = val; }
   void set_xtalk(uint16_t val) { this->xtalk = val; }
   void set_timeout(uint16_t val) { this->timeout = val; }
@@ -102,4 +103,3 @@ class VL53L1X : public i2c::I2CDevice, public Component {
 
 }  // namespace vl53l1x
 }  // namespace esphome
-

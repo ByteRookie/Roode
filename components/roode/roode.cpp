@@ -130,6 +130,12 @@ void Roode::log_event(const std::string &msg) {
 }
 
 Roode::~Roode() {
+#ifdef USE_ESP32
+  if (sensor_task_handle_ != nullptr) {
+    vTaskDelete(sensor_task_handle_);
+    sensor_task_handle_ = nullptr;
+  }
+#endif
   delete entry;
   delete exit;
 }
@@ -287,7 +293,7 @@ void Roode::setup() {
       interrupt_status_sensor->publish_state(*val ? 1 : 0);
   }
   if (people_counter != nullptr)
-    expected_counter_ = people_counter->state;
+    expected_counter_.store((int32_t) lroundf(people_counter->state), std::memory_order_release);
 
   // Seed crossing timestamp so fail-safe calibration doesn't fire in the first 2 minutes of operation.
   last_valid_crossing_ts_ = millis();
@@ -316,18 +322,23 @@ void Roode::update() {
         interrupt_status_sensor->publish_state(*val ? 1 : 0);
     }
   }
-  if (people_counter != nullptr && fabs(people_counter->state - expected_counter_) > 0.001f) {
+  if (people_counter != nullptr) {
+    int32_t current_counter = (int32_t) lroundf(people_counter->state);
+    int32_t expected_counter = expected_counter_.load(std::memory_order_acquire);
+    if (current_counter == expected_counter)
+      return;
     // Suppress detection for 300 ms after an automatic counter update.
     // On dual-core ESP32 the sensor task calls updateCounter() on core 1 while
     // update() runs on core 0; the brief window between call.perform() and
     // expected_counter_ being written caused legitimate automatic count changes
     // to be logged as phantom "manual_adjust" events.
-    if (millis() - last_auto_update_ts_ < 300) {
-      expected_counter_ = people_counter->state;
+    uint32_t last_auto_update = last_auto_update_ts_.load(std::memory_order_acquire);
+    if (millis() - last_auto_update < 300) {
+      expected_counter_.store(current_counter, std::memory_order_release);
     } else {
-      int diff = (int) roundf(people_counter->state - expected_counter_);
+      int diff = current_counter - expected_counter;
       manual_adjustment_count_ += abs(diff);
-      expected_counter_ = people_counter->state;
+      expected_counter_.store(current_counter, std::memory_order_release);
       if (!performance_mode_ && manual_adjustment_sensor != nullptr)
         manual_adjustment_sensor->publish_state(manual_adjustment_count_);
       if (diff != 0) {
@@ -691,7 +702,7 @@ void Roode::updateCounter(int delta) {
   // narrow race window where people_counter->state has not yet reflected the
   // new value, which previously caused the automatic count change to be logged
   // as a phantom "manual_adjust".
-  last_auto_update_ts_ = millis();
+  last_auto_update_ts_.store(millis(), std::memory_order_release);
   auto call = this->people_counter->make_call();
   call.set_value(next);
   call.perform();
@@ -699,35 +710,43 @@ void Roode::updateCounter(int delta) {
   // between these two lines, it sees state==next and expected==old (diff=+delta)
   // rather than state==old and expected==next (diff=-delta).  The suppression
   // window in update() handles any remaining transient in either direction.
-  expected_counter_ = next;
+  expected_counter_.store((int32_t) lroundf(next), std::memory_order_release);
 }
-void Roode::suspend_sensor_task_for_calibration(uint32_t timeout_ms) {
+bool Roode::suspend_sensor_task_for_calibration(uint32_t timeout_ms) {
   // use_sensor_task_ is false on single-core / ESP8266 — no sync needed there.
-  if (!use_sensor_task_) return;
-  calibration_in_progress_ = true;
+  if (!use_sensor_task_)
+    return true;
+  calibration_in_progress_.store(true, std::memory_order_release);
   // Spin-wait until sensor_task has finished its current iteration and gone to
   // sleep (vTaskDelay).  sensor_task_reading_ covers the entire loop body so
   // this guarantees no concurrent sensor access — readDistance(), path_tracking,
   // run_zone_calibration(), and auto-calibrate_zones() are all included.
-  // Timeout is 3 s to accommodate auto-cal aborting mid-calibrateThreshold
-  // (worst case ~1.5 s per 50-sample pass) without racing.
-  uint32_t deadline = millis() + timeout_ms;
-  while (sensor_task_reading_ && millis() < deadline) {
+  // Manual calibration must never proceed if the sensor task is still active;
+  // racing two cores on the same I2C bus is a direct path to random crashes.
+  uint32_t start = millis();
+  while (sensor_task_reading_.load(std::memory_order_acquire) && (millis() - start) < timeout_ms) {
     delay(1);
     App.feed_wdt();  // keep Core 0 WDT alive while we spin-wait
   }
-  if (sensor_task_reading_) {
-    ESP_LOGW(CALIBRATION, "sensor_task_reading timed out after %ums — proceeding anyway", timeout_ms);
+  if (sensor_task_reading_.load(std::memory_order_acquire)) {
+    calibration_in_progress_.store(false, std::memory_order_release);
+    ESP_LOGW(CALIBRATION, "sensor task still busy after %ums — aborting calibration to avoid a bus race", timeout_ms);
+    update_status_text("sensor busy - retry");
+    calibration_status_reset_ts_ = millis();
+    return false;
   }
+  return true;
 }
 
 void Roode::resume_sensor_task_after_calibration() {
-  if (!use_sensor_task_) return;
-  calibration_in_progress_ = false;
+  if (!use_sensor_task_)
+    return;
+  calibration_in_progress_.store(false, std::memory_order_release);
 }
 
 void Roode::recalibration() {
-  suspend_sensor_task_for_calibration();
+  if (!suspend_sensor_task_for_calibration())
+    return;
   calibrate_zones();
   // Reset PathTrack FSM state so any in-flight partial crossing sequence from
   // before calibration cannot combine with post-calibration readings to fire a
@@ -941,7 +960,7 @@ void Roode::calibrate_zones(bool auto_cal) {
   // abort so Core 0 can take over without a concurrent sensor access race.
   // Only relevant for the auto-cal path (sensor_task); manual cal sets the flag
   // before calling us and must not abort itself.
-  if (auto_cal && calibration_in_progress_) {
+  if (auto_cal && calibration_in_progress_.load(std::memory_order_acquire)) {
     ESP_LOGW(CALIBRATION, "auto-cal aborted after baseline (manual cal requested)");
     return;
   }
@@ -956,7 +975,7 @@ void Roode::calibrate_zones(bool auto_cal) {
   entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
   entry->calibrateThreshold(distanceSensor, 20);
 
-  if (auto_cal && calibration_in_progress_) {
+  if (auto_cal && calibration_in_progress_.load(std::memory_order_acquire)) {
     ESP_LOGW(CALIBRATION, "auto-cal aborted after entry zone (manual cal requested)");
     return;
   }
@@ -1193,15 +1212,15 @@ void Roode::restore_settings_from_flash() {
     entry->set_filter_window(val); exit->set_filter_window(val);
   }
   // Reject extreme percentages that produce degenerate thresholds.
-  // max_pct=100% makes threshold->max == idle, so any sub-idle noise triggers
+  // max_pct near idle makes threshold->max so permissive that sub-idle noise triggers
   // zone active (768 false detections/21 min observed in the field).
   // min_pct=1% makes threshold->min ≈ 22 mm, matching virtually every reading.
   // Out-of-range values are silently discarded; the defaults (15%/80%) apply.
-  if (entry_max_pct_pref_.load(&val) && val >= 51 && val <= 97)
+  if (entry_max_pct_pref_.load(&val) && val >= 51 && val <= 95)
     entry->set_threshold_percentages(entry->threshold->min_percentage.value_or(15), val);
   if (entry_min_pct_pref_.load(&val) && val >= 2 && val <= 49)
     entry->set_threshold_percentages(val, entry->threshold->max_percentage.value_or(80));
-  if (exit_max_pct_pref_.load(&val) && val >= 51 && val <= 97)
+  if (exit_max_pct_pref_.load(&val) && val >= 51 && val <= 95)
     exit->set_threshold_percentages(exit->threshold->min_percentage.value_or(15), val);
   if (exit_min_pct_pref_.load(&val) && val >= 2 && val <= 49)
     exit->set_threshold_percentages(val, exit->threshold->max_percentage.value_or(80));
@@ -1298,8 +1317,9 @@ void Roode::apply_filter_window(uint8_t val) {
 
 void Roode::apply_entry_max_threshold_pct(uint8_t pct) {
   if (pct < 51) pct = 51;
-  if (pct > 97) pct = 97;  // never let max reach idle (100% = instant false detection)
+  if (pct > 95) pct = 95;  // keep headroom below idle to avoid noise-triggered occupancy
   entry->set_threshold_percentages(entry->threshold->min_percentage.value_or(15), pct);
+  entry->reset_samples();
   if (calibration_persistence_)
     entry_max_pct_pref_.save(&pct);
   publish_sensor_configuration(entry, exit, true);
@@ -1311,6 +1331,7 @@ void Roode::apply_entry_min_threshold_pct(uint8_t pct) {
   if (pct < 2) pct = 2;
   if (pct > 49) pct = 49;
   entry->set_threshold_percentages(pct, entry->threshold->max_percentage.value_or(80));
+  entry->reset_samples();
   if (calibration_persistence_)
     entry_min_pct_pref_.save(&pct);
   publish_sensor_configuration(entry, exit, false);
@@ -1320,8 +1341,9 @@ void Roode::apply_entry_min_threshold_pct(uint8_t pct) {
 
 void Roode::apply_exit_max_threshold_pct(uint8_t pct) {
   if (pct < 51) pct = 51;
-  if (pct > 97) pct = 97;  // never let max reach idle (100% = instant false detection)
+  if (pct > 95) pct = 95;  // keep headroom below idle to avoid noise-triggered occupancy
   exit->set_threshold_percentages(exit->threshold->min_percentage.value_or(15), pct);
+  exit->reset_samples();
   if (calibration_persistence_)
     exit_max_pct_pref_.save(&pct);
   publish_sensor_configuration(entry, exit, true);
@@ -1333,6 +1355,7 @@ void Roode::apply_exit_min_threshold_pct(uint8_t pct) {
   if (pct < 2) pct = 2;
   if (pct > 49) pct = 49;
   exit->set_threshold_percentages(pct, exit->threshold->max_percentage.value_or(80));
+  exit->reset_samples();
   if (calibration_persistence_)
     exit_min_pct_pref_.save(&pct);
   publish_sensor_configuration(entry, exit, false);
@@ -1365,7 +1388,8 @@ void Roode::apply_entry_roi(uint8_t h, uint8_t w) {
   update_status_text("calibrating entry ROI...");
   // Suspend the sensor task before touching the hardware — run_zone_calibration
   // drives the sensor bus from Core 0 and must not race with Core 1's sensor_task.
-  suspend_sensor_task_for_calibration();
+  if (!suspend_sensor_task_for_calibration())
+    return;
   run_zone_calibration(0);
   resume_sensor_task_after_calibration();
   // run_zone_calibration already calls publish_sensor_configuration + publish_setting_entities.
@@ -1387,7 +1411,8 @@ void Roode::apply_exit_roi(uint8_t h, uint8_t w) {
     exit_roi_width_pref_.save(&w);
   }
   update_status_text("calibrating exit ROI...");
-  suspend_sensor_task_for_calibration();
+  if (!suspend_sensor_task_for_calibration())
+    return;
   run_zone_calibration(1);
   resume_sensor_task_after_calibration();
   if (exit_roi_height_number_ != nullptr)
@@ -1440,6 +1465,7 @@ void Roode::apply_ranging_mode(const std::string &mode) {
     distanceSensor->set_ranging_mode(Ranging::Longest);
   } else {
     // "auto" — no override; ranging mode will be auto-selected on next full recalibration
+    distanceSensor->clear_ranging_mode_override();
     mode_idx = 0;
   }
   if (calibration_persistence_) {
@@ -1451,13 +1477,15 @@ void Roode::apply_ranging_mode(const std::string &mode) {
 }
 
 void Roode::person_calibration() {
-  suspend_sensor_task_for_calibration();
+  if (!suspend_sensor_task_for_calibration())
+    return;
   ESP_LOGI(CALIBRATION, "person_calibration: starting");
   update_status_text("person cal: stand in doorway...");
   calibration_status_reset_ts_ = 0;
 
   const int num_samples = 30;
   bool any_adjusted = false;
+  bool adjustment_failed = false;
 
   for (int z = 0; z < 2; z++) {
     Zone *zone = z == 0 ? entry : exit;
@@ -1491,11 +1519,16 @@ void Roode::person_calibration() {
     uint8_t cur_max = zone->threshold->max_percentage.value_or(80);
     uint8_t cur_min = zone->threshold->min_percentage.value_or(15);
 
-    if (person_pct > cur_max || person_pct < cur_min) {
-      // Person is outside the detection window — adjust max upward with 5% margin
-      uint8_t new_max = static_cast<uint8_t>(std::min(static_cast<int>(person_pct) + 5, 100));
+    if (person_pct > cur_max) {
+      // Person is farther than the current max threshold — widen the upper bound
+      // but keep a safety margin below idle to avoid false occupancy at rest.
+      uint8_t new_max = static_cast<uint8_t>(std::min(static_cast<int>(person_pct) + 5, 95));
+      if (new_max <= cur_min + 2) {
+        adjustment_failed = true;
+        continue;
+      }
       zone->set_threshold_percentages(cur_min, new_max);
-      // Save to flash
+      zone->reset_samples();
       if (calibration_persistence_) {
         if (z == 0) {
           entry_max_pct_pref_.save(&new_max);
@@ -1508,14 +1541,43 @@ void Roode::person_calibration() {
       update_status_text(std::string(msg));
       ESP_LOGI(CALIBRATION, "zone %d: person_pct=%u adjusted max to %u%%", z, person_pct, new_max);
       any_adjusted = true;
+    } else if (person_pct < cur_min) {
+      // Person is closer than the current min threshold — lower the lower bound.
+      uint8_t new_min = person_pct > 5 ? person_pct - 5 : 2;
+      new_min = std::max<uint8_t>(2, std::min<uint8_t>(49, new_min));
+      uint8_t floor_min = static_cast<uint8_t>(std::min<int>(49, ((100 * 100) / idle) + 1));
+      if (new_min < floor_min)
+        new_min = floor_min;
+      if (new_min + 2 >= cur_max) {
+        adjustment_failed = true;
+        continue;
+      }
+      zone->set_threshold_percentages(new_min, cur_max);
+      zone->reset_samples();
+      if (calibration_persistence_) {
+        if (z == 0) {
+          entry_min_pct_pref_.save(&new_min);
+        } else {
+          exit_min_pct_pref_.save(&new_min);
+        }
+      }
+      char msg[56];
+      snprintf(msg, sizeof(msg), "person cal: zone %d min -> %u%%", z, new_min);
+      update_status_text(std::string(msg));
+      ESP_LOGI(CALIBRATION, "zone %d: person_pct=%u adjusted min to %u%%", z, person_pct, new_min);
+      any_adjusted = true;
     }
   }
 
+  entry->reset_samples();
+  exit->reset_samples();
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
   publish_setting_entities();
 
-  if (!any_adjusted) {
+  if (adjustment_failed && !any_adjusted) {
+    update_status_text("person cal: no safe threshold window");
+  } else if (!any_adjusted) {
     update_status_text("person cal: thresholds already ok");
   } else {
     update_status_text("person cal: done");
@@ -1527,7 +1589,8 @@ void Roode::person_calibration() {
 void Roode::calibrate_low_obstacle() {
   // Low obstacle (e.g. pet, plant) — reads at a FAR distance, ~70-90% of idle.
   // Lower the max threshold so the obstacle distance falls outside the detection window.
-  suspend_sensor_task_for_calibration();
+  if (!suspend_sensor_task_for_calibration())
+    return;
   ESP_LOGI(CALIBRATION, "calibrate_low_obstacle: starting");
   update_status_text("low obs cal: keep obstacle in place...");
   calibration_status_reset_ts_ = 0;
@@ -1581,6 +1644,7 @@ void Roode::calibrate_low_obstacle() {
     }
 
     zone->set_threshold_percentages(cur_min, new_max_pct);
+    zone->reset_samples();
     if (calibration_persistence_) {
       if (z == 0) entry_max_pct_pref_.save(&new_max_pct);
       else         exit_max_pct_pref_.save(&new_max_pct);
@@ -1591,6 +1655,8 @@ void Roode::calibrate_low_obstacle() {
     ESP_LOGI(CALIBRATION, "zone %d low obs: avg=%dmm new_max=%dmm (%u%%)", z, obs_avg, new_max_mm, new_max_pct);
   }
 
+  entry->reset_samples();
+  exit->reset_samples();
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
   publish_setting_entities();
@@ -1603,7 +1669,8 @@ void Roode::calibrate_low_obstacle() {
 void Roode::calibrate_high_obstacle() {
   // High obstacle (e.g. open door, cabinet) — reads at a CLOSE distance, ~20-50% of idle.
   // Raise the min threshold so the obstacle distance falls outside the detection window.
-  suspend_sensor_task_for_calibration();
+  if (!suspend_sensor_task_for_calibration())
+    return;
   ESP_LOGI(CALIBRATION, "calibrate_high_obstacle: starting");
   update_status_text("high obs cal: keep obstacle in place...");
   calibration_status_reset_ts_ = 0;
@@ -1655,6 +1722,7 @@ void Roode::calibrate_high_obstacle() {
     }
 
     zone->set_threshold_percentages(new_min_pct, cur_max);
+    zone->reset_samples();
     if (calibration_persistence_) {
       if (z == 0) entry_min_pct_pref_.save(&new_min_pct);
       else         exit_min_pct_pref_.save(&new_min_pct);
@@ -1665,6 +1733,8 @@ void Roode::calibrate_high_obstacle() {
     ESP_LOGI(CALIBRATION, "zone %d high obs: avg=%dmm new_min=%dmm (%u%%)", z, obs_avg, new_min_mm, new_min_pct);
   }
 
+  entry->reset_samples();
+  exit->reset_samples();
   publish_sensor_configuration(entry, exit, true);
   publish_sensor_configuration(entry, exit, false);
   publish_setting_entities();
@@ -1755,7 +1825,7 @@ void Roode::sensor_task(void *param) {
     self->use_sensor_task_ = true;
     // Yield the sensor bus to Core 0 whenever a calibration is in progress.
     // vTaskDelay keeps the watchdog fed via esp_task_wdt_reset() on the next iteration.
-    if (self->calibration_in_progress_) {
+    if (self->calibration_in_progress_.load(std::memory_order_acquire)) {
       vTaskDelay(pdMS_TO_TICKS(10));
       continue;
     }
@@ -1763,7 +1833,7 @@ void Roode::sensor_task(void *param) {
     // (which can call run_zone_calibration()), and the auto-calibrate_zones() block.
     // Core 0 spin-waits on this flag before starting any calibration so that all
     // sensor access paths on Core 1 are included, not just the readDistance() call.
-    self->sensor_task_reading_ = true;
+    self->sensor_task_reading_.store(true, std::memory_order_release);
     uint32_t now = millis();
     if (self->last_loop_update_ts_ != 0 && (now - self->last_loop_update_ts_ > self->restart_timeout_ms_) &&
         (now - self->last_sensor_restart_ts_ > self->restart_backoff_ms_)) {
@@ -1807,7 +1877,7 @@ void Roode::sensor_task(void *param) {
     // cause uint32_t underflow and fire calibration spuriously on every boot before NTP sync).
     // Guard: skip entirely if Core 0 has already claimed the bus for a manual calibration.
     uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
-    if (!self->calibration_in_progress_ &&
+    if (!self->calibration_in_progress_.load(std::memory_order_acquire) &&
         self->auto_calibration_interval_sec_ > 0 && now_epoch > 100000 &&
         now_epoch - self->last_calibration_ts_ >= self->auto_calibration_interval_sec_) {
       // Only calibrate when both zones are clear — calibrating with someone present corrupts the baseline.
@@ -1826,7 +1896,7 @@ void Roode::sensor_task(void *param) {
       }
     }
     // Release the sensor bus — Core 0 may now start calibration on next check.
-    self->sensor_task_reading_ = false;
+    self->sensor_task_reading_.store(false, std::memory_order_release);
     vTaskDelay(pdMS_TO_TICKS(self->polling_interval_ms_));
   }
 }

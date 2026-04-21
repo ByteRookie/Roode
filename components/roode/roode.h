@@ -174,6 +174,7 @@ class Roode : public PollingComponent {
 
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
+  void set_allow_device_restart(bool allow) { allow_device_restart_ = allow; }
   void set_cpu_optimization_thresholds(float activate, float deactivate) {
     cpu_opt_activate_threshold_ = activate;
     cpu_opt_deactivate_threshold_ = deactivate;
@@ -328,6 +329,15 @@ class Roode : public PollingComponent {
   // Used to enforce a minimum sequence duration and reject rapid noise sequences.
   uint32_t path_track_first_event_ts_{0};
 
+  // PathTrack FSM crossing-sequence buffer — previously function-scoped statics.
+  // Moving them to member variables lets recalibration() and restart_sensor()
+  // reset them, preventing stale partial sequences from combining with
+  // post-restart readings and generating phantom counts.
+  int path_track_buf_[4]{0, 0, 0, 0};
+  int path_track_filling_size_{1};
+  int left_prev_status_{NOBODY};
+  int right_prev_status_{NOBODY};
+
   // Timestamp of the last automatic counter update (from path_tracking).
   // Used to suppress false "manual_adjust" detections caused by the race window
   // between updateCounter() setting expected_counter_ and call.perform() updating
@@ -339,7 +349,7 @@ class Roode : public PollingComponent {
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
   void path_tracking(Zone *zone);
-  bool handle_sensor_status();
+  void handle_sensor_status();
   void update_status_text(const std::string &status);
   void calibrateDistance();
   void calibrate_zones(bool auto_cal = false);
@@ -368,6 +378,7 @@ class Roode : public PollingComponent {
   uint8_t invalid_read_count_{0};
   uint8_t restart_attempt_count_{0};
   uint8_t max_restart_attempts_{3};
+  bool allow_device_restart_{true};
   static void sensor_task(void *param);
   bool use_sensor_task_{false};
   void restart_sensor();

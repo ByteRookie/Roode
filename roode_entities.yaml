@@ -194,7 +194,6 @@ button:
 
 sensor:
   - platform: roode
-    id: roode_sensors   # Required: sensor.sensor_schema() base needs id or name
     roode_id: ${roode_id}
     distance_entry:
       name: $friendly_name Distance Zone 0  # (*) suppressed in Performance Mode

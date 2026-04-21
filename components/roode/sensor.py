@@ -31,7 +31,7 @@ CONF_FLASH_FREE = "flash_free"
 CONF_MANUAL_ADJUST = "manual_adjustment_count"
 CONF_INTERRUPT_STATUS = "interrupt_status"
 
-CONFIG_SCHEMA = sensor.sensor_schema().extend(
+CONFIG_SCHEMA = cv.Schema(
     {
         cv.Optional(CONF_DISTANCE_ENTRY): sensor.sensor_schema(
             icon=ICON_RULER,

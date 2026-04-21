@@ -270,17 +270,22 @@ void Roode::setup() {
   if (status_sensor != nullptr)
     status_sensor->publish_state(sensor_status);
 
-  if (loop_time_sensor != nullptr)
-    loop_time_sensor->publish_state(0);
-  if (cpu_usage_sensor != nullptr)
-    cpu_usage_sensor->publish_state(0);
-  if (ram_free_sensor != nullptr)
-    ram_free_sensor->publish_state(0);
-  if (flash_free_sensor != nullptr)
-    flash_free_sensor->publish_state(0);
+  // Publish NAN for sensors suppressed by performance mode so HA shows
+  // "unavailable" rather than a stale "0" from boot.
+  float perf_init = performance_mode_ ? NAN : 0.0f;
+  if (loop_time_sensor != nullptr) loop_time_sensor->publish_state(perf_init);
+  if (cpu_usage_sensor != nullptr) cpu_usage_sensor->publish_state(perf_init);
+  if (ram_free_sensor != nullptr) ram_free_sensor->publish_state(perf_init);
+  if (flash_free_sensor != nullptr) flash_free_sensor->publish_state(perf_init);
   manual_adjustment_count_ = 0;
   if (manual_adjustment_sensor != nullptr)
     manual_adjustment_sensor->publish_state(0);
+  if (performance_mode_) {
+    if (distance_entry != nullptr) distance_entry->publish_state(NAN);
+    if (distance_exit != nullptr) distance_exit->publish_state(NAN);
+    if (interrupt_status_sensor != nullptr) interrupt_status_sensor->publish_state(NAN);
+    if (enabled_features_sensor != nullptr) enabled_features_sensor->publish_state("");
+  }
   if (xshut_state_binary_sensor != nullptr) {
     auto val = distanceSensor->get_xshut_state();
     if (val.has_value())
@@ -1435,6 +1440,20 @@ void Roode::apply_performance_mode(bool val) {
   performance_mode_ = val;
   if (performance_mode_switch_ != nullptr)
     performance_mode_switch_->publish_state(val);
+  if (val) {
+    // When enabling performance mode, push NAN to every sensor that will now be
+    // suppressed so HA shows "unavailable" rather than displaying a stale reading.
+    // This makes it visually obvious that diagnostics are off, and prevents old
+    // values from being mistaken for live data during long-term operation.
+    if (distance_entry != nullptr) distance_entry->publish_state(NAN);
+    if (distance_exit != nullptr) distance_exit->publish_state(NAN);
+    if (loop_time_sensor != nullptr) loop_time_sensor->publish_state(NAN);
+    if (cpu_usage_sensor != nullptr) cpu_usage_sensor->publish_state(NAN);
+    if (ram_free_sensor != nullptr) ram_free_sensor->publish_state(NAN);
+    if (flash_free_sensor != nullptr) flash_free_sensor->publish_state(NAN);
+    if (interrupt_status_sensor != nullptr) interrupt_status_sensor->publish_state(NAN);
+    if (enabled_features_sensor != nullptr) enabled_features_sensor->publish_state("");
+  }
   ESP_LOGI(TAG, "performance_mode changed: %s", val ? "on (diagnostics suppressed)" : "off (diagnostics active)");
 }
 

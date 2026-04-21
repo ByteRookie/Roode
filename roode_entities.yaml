@@ -22,8 +22,8 @@
 #     • Last Direction
 #
 #   Sensors  (live sensor data)
-#     • Status
-#     • Distance Zone 0  • Distance Zone 1  • Presence
+#     • Status  • Presence
+#     • Distance Zone 0  • Distance Zone 1  (hidden when Performance Mode ON)
 #
 #   Configuration  (calibration + all tuning controls)
 #     • Calibrate Empty Room   • Calibrate With Person
@@ -35,11 +35,13 @@
 #     • Invert Direction  • Save Calibration to Flash
 #     • Auto Calibration Interval
 #
-#   Diagnostic  (collapsed by default — raw readbacks)
+#   Diagnostic  (collapsed by default — raw readbacks, hidden when Performance Mode ON)
 #     • Threshold sensors  • ROI sensors
 #     • Sensor Status Code • Manual Adjustments
-#     • Loop Time  • CPU Usage  • RAM Free
+#     • Loop Time  • CPU Usage  • RAM Free  • Flash Used
 #     • Version    • Features
+#     • (optional) Interrupt Status • XSHUT State
+#     • (optional) Entry Presence   • Exit Presence
 #
 # ─────────────────────────────────────────────────────────────────────────────
 substitutions:
@@ -57,7 +59,7 @@ text_sensor:
 
     sensor_status:
       name: $friendly_name Status
-      entity_category: ""   # Sensors section — entity_category: config hides text sensors in HA
+      entity_category: ""   # Sensors section
 
     version:
       name: $friendly_name Version       # Diagnostic (default in text_sensor.py)
@@ -105,7 +107,6 @@ number:
 select:
   - platform: roode
     roode_id: ${roode_id}
-    # entity_category: config → Configuration section
     filter_mode:
       name: $friendly_name Filter Mode
       entity_category: config
@@ -116,7 +117,6 @@ select:
 switch:
   - platform: roode
     roode_id: ${roode_id}
-    # entity_category: config → Configuration section (grouped with calibration)
     invert_direction:
       name: $friendly_name Invert Direction
       entity_category: config
@@ -134,6 +134,23 @@ binary_sensor:
     roode_id: ${roode_id}
     presence:
       name: $friendly_name Presence
+      device_class: occupancy
+
+    # Optional: uncomment to expose XSHUT pin state (diagnostic)
+    # sensor_xshut_state:
+    #   name: $friendly_name XSHUT State
+    #   entity_category: diagnostic
+
+    # Optional: uncomment to expose per-zone presence sensors
+    # zones:
+    #   entry:
+    #     presence:
+    #       name: $friendly_name Entry Zone Presence
+    #       device_class: occupancy
+    #   exit:
+    #     presence:
+    #       name: $friendly_name Exit Zone Presence
+    #       device_class: occupancy
 
 # ── Configuration: calibration controls + all tuning knobs ──────────────────
 
@@ -172,19 +189,20 @@ button:
 
 # ── Diagnostic: raw sensor data for setup and troubleshooting ────────────────
 # All sensor entities default to entity_category: diagnostic (set in sensor.py).
+# Sensors marked with (*) are suppressed (show "unavailable") when Performance
+# Mode is ON — they are only useful during setup/troubleshooting.
 
 sensor:
   - platform: roode
-    id: roode_sensors
     roode_id: ${roode_id}
     distance_entry:
-      name: $friendly_name Distance Zone 0
-      entity_category: ""          # Sensors section (override diagnostic default)
+      name: $friendly_name Distance Zone 0  # (*) suppressed in Performance Mode
+      entity_category: ""                   # Sensors section (override diagnostic default)
       filters:
         - delta: 100
     distance_exit:
-      name: $friendly_name Distance Zone 1
-      entity_category: ""          # Sensors section (override diagnostic default)
+      name: $friendly_name Distance Zone 1  # (*) suppressed in Performance Mode
+      entity_category: ""                   # Sensors section (override diagnostic default)
       filters:
         - delta: 100
     max_threshold_entry:
@@ -208,8 +226,14 @@ sensor:
     manual_adjustment_count:
       name: $friendly_name Manual Adjustments
     loop_time:
-      name: $friendly_name Loop Time
+      name: $friendly_name Loop Time         # (*) suppressed in Performance Mode
     cpu_usage:
-      name: $friendly_name CPU Usage
+      name: $friendly_name CPU Usage         # (*) suppressed in Performance Mode
     ram_free:
-      name: $friendly_name RAM Free
+      name: $friendly_name RAM Free          # (*) suppressed in Performance Mode
+    flash_free:
+      name: $friendly_name Flash Used        # (*) suppressed in Performance Mode
+
+    # Optional: uncomment to expose interrupt status (diagnostic, advanced)
+    # interrupt_status:
+    #   name: $friendly_name Interrupt Status

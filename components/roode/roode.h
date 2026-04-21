@@ -285,7 +285,7 @@ class Roode : public PollingComponent {
   ESPPreferenceObject invert_direction_pref_;
 
   bool calibration_persistence_{true};
-  bool performance_mode_{false};
+  bool performance_mode_{true};
   bool fail_safe_triggered_{false};
   uint32_t last_calibration_ts_{0};
   uint32_t auto_calibration_interval_sec_{4 * 60 * 60};

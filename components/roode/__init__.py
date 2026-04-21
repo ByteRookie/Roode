@@ -94,7 +94,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ROI, default={}): ROI_SCHEMA,
         cv.Optional(CONF_DETECTION_THRESHOLDS, default={}): THRESHOLDS_SCHEMA,
         cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=True): cv.boolean,
-        cv.Optional(CONF_PERFORMANCE_MODE, default=False): cv.boolean,
+        cv.Optional(CONF_PERFORMANCE_MODE, default=True): cv.boolean,
         cv.Optional(CONF_ALLOW_DEVICE_RESTART, default=True): cv.boolean,
         cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(FILTER_MODES, upper=False),
         cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),

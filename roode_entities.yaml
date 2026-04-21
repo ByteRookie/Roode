@@ -26,9 +26,8 @@
 #     • Distance Zone 0  • Distance Zone 1  (hidden when Performance Mode ON)
 #
 #   Configuration  (calibration + all tuning controls)
-#     • Calibrate Empty Room   • Calibrate With Person
-#     • Calibrate Low Obstacle • Calibrate High Obstacle
-#     • Restart                • Performance Mode
+#     • Calibration Mode (select)  • Run Calibration (button)
+#     • Restart                    • Performance Mode  (disabled by default)
 #     • Filter Window  • Sampling       • Filter Mode    • Ranging Mode
 #     • Entry / Exit Max & Min Threshold
 #     • Entry / Exit ROI Height & Width
@@ -36,9 +35,9 @@
 #     • Auto Calibration Interval
 #
 #   Diagnostic  (collapsed by default — raw readbacks, hidden when Performance Mode ON)
-#     • Threshold sensors  • ROI sensors
-#     • Sensor Status Code • Manual Adjustments
-#     • Loop Time  • CPU Usage  • RAM Free  • Flash Used
+#     • Threshold sensors  • ROI sensors           (disabled by default)
+#     • Sensor Status Code • Manual Adjustments     (disabled by default)
+#     • Loop Time  • CPU Usage  • RAM Free  • Flash Used  (disabled by default)
 #     • Version    • Features
 #     • (optional) Interrupt Status • XSHUT State
 #     • (optional) Entry Presence   • Exit Presence
@@ -114,6 +113,21 @@ select:
       name: $friendly_name Ranging Mode
       entity_category: config
 
+  - platform: template
+    name: $friendly_name Calibration Mode
+    id: calibration_mode_select
+    entity_category: config
+    icon: mdi:tune
+    options:
+      - "Empty Room"
+      - "With Person"
+      - "Low Obstacle"
+      - "High Obstacle"
+    initial_option: "Empty Room"
+    optimistic: true
+    set_action:
+      - lambda: ""
+
 switch:
   - platform: roode
     roode_id: ${roode_id}
@@ -126,6 +140,7 @@ switch:
     performance_mode:
       name: $friendly_name Performance Mode
       entity_category: config
+      disabled_by_default: true
 
 # ── Sensors: passive readouts (no entity_category → Sensors) ─────────────────
 
@@ -156,32 +171,16 @@ binary_sensor:
 
 button:
   - platform: template
-    name: $friendly_name Calibrate Empty Room
-    icon: mdi:ruler-square-compass
+    name: $friendly_name Run Calibration
+    icon: mdi:play-circle
     entity_category: config
     on_press:
-      - lambda: "id(${roode_id})->recalibration();"
-
-  - platform: template
-    name: $friendly_name Calibrate With Person
-    icon: mdi:human-greeting
-    entity_category: config
-    on_press:
-      - lambda: "id(${roode_id})->person_calibration();"
-
-  - platform: template
-    name: $friendly_name Calibrate Low Obstacle
-    icon: mdi:dog
-    entity_category: config
-    on_press:
-      - lambda: "id(${roode_id})->calibrate_low_obstacle();"
-
-  - platform: template
-    name: $friendly_name Calibrate High Obstacle
-    icon: mdi:door-open
-    entity_category: config
-    on_press:
-      - lambda: "id(${roode_id})->calibrate_high_obstacle();"
+      - lambda: |-
+          auto sel = id(calibration_mode_select).state;
+          if (sel == "Empty Room")         id(${roode_id})->recalibration();
+          else if (sel == "With Person")   id(${roode_id})->person_calibration();
+          else if (sel == "Low Obstacle")  id(${roode_id})->calibrate_low_obstacle();
+          else if (sel == "High Obstacle") id(${roode_id})->calibrate_high_obstacle();
 
   - platform: restart
     name: $friendly_name Restart
@@ -207,32 +206,46 @@ sensor:
         - delta: 100
     max_threshold_entry:
       name: $friendly_name Max Zone 0
+      disabled_by_default: true
     max_threshold_exit:
       name: $friendly_name Max Zone 1
+      disabled_by_default: true
     min_threshold_entry:
       name: $friendly_name Min Zone 0
+      disabled_by_default: true
     min_threshold_exit:
       name: $friendly_name Min Zone 1
+      disabled_by_default: true
     roi_height_entry:
       name: $friendly_name ROI Height Zone 0
+      disabled_by_default: true
     roi_width_entry:
       name: $friendly_name ROI Width Zone 0
+      disabled_by_default: true
     roi_height_exit:
       name: $friendly_name ROI Height Zone 1
+      disabled_by_default: true
     roi_width_exit:
       name: $friendly_name ROI Width Zone 1
+      disabled_by_default: true
     sensor_status:
       name: $friendly_name Sensor Status Code
+      disabled_by_default: true
     manual_adjustment_count:
       name: $friendly_name Manual Adjustments
+      disabled_by_default: true
     loop_time:
       name: $friendly_name Loop Time         # (*) suppressed in Performance Mode
+      disabled_by_default: true
     cpu_usage:
       name: $friendly_name CPU Usage         # (*) suppressed in Performance Mode
+      disabled_by_default: true
     ram_free:
       name: $friendly_name RAM Free          # (*) suppressed in Performance Mode
+      disabled_by_default: true
     flash_free:
       name: $friendly_name Flash Used        # (*) suppressed in Performance Mode
+      disabled_by_default: true
 
     # Optional: uncomment to expose interrupt status (diagnostic, advanced)
     # interrupt_status:

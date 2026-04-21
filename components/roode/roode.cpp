@@ -490,8 +490,8 @@ void Roode::path_tracking(Zone *zone) {
   // registers as NOBODY.  Single sensor frames of noise (< 150 ms) cannot
   // advance the FSM, eliminating the primary source of phantom crossings.
   {
-    static constexpr uint32_t kZoneDwellMs = 150;
-    static constexpr uint32_t kZoneClearMs = 80;
+    const uint32_t kZoneDwellMs = std::max(50U, zone_dwell_ms_);
+    const uint32_t kZoneClearMs = std::max(20U, zone_clear_ms_);
     uint32_t now_deb = millis();
     uint8_t zid = zone->id;
     bool raw_active = zone->getMinDistance() < zone->threshold->max &&
@@ -632,8 +632,9 @@ void Roode::path_tracking(Zone *zone) {
 
         // Reject sequences that completed faster than a real person could walk
         // through two zones.  300 ms is conservative — actual people take 700 ms+.
+        const uint32_t kMinSeqMs = std::max(100U, min_sequence_ms_);
         bool timing_ok = (path_track_first_event_ts_ == 0) ||
-                         ((millis() - path_track_first_event_ts_) >= 300);
+                         ((millis() - path_track_first_event_ts_) >= kMinSeqMs);
 
         if ((path_track_buf_[1] == 1) && (path_track_buf_[2] == 3) && (path_track_buf_[3] == 2)) {
           // This an exit
@@ -757,7 +758,7 @@ void Roode::recalibration() {
   resume_sensor_task_after_calibration();
 }
 
-void Roode::run_zone_calibration(uint8_t zone_id) {
+void Roode::run_zone_calibration(uint8_t zone_id, bool apply_drift_guard) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;
   z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
@@ -789,6 +790,24 @@ void Roode::run_zone_calibration(uint8_t zone_id) {
 
   auto *mode = determine_ranging_mode(entry->threshold->idle, exit->threshold->idle);
   distanceSensor->set_ranging_mode(mode);
+
+  if (apply_drift_guard && max_baseline_drift_pct_ > 0 &&
+      calibration_data_[zone_id].last_calibrated_ts > 0 &&
+      calibration_data_[zone_id].baseline_mm > 0) {
+    int delta = abs(static_cast<int>(z->threshold->idle) - static_cast<int>(calibration_data_[zone_id].baseline_mm));
+    int limit = (static_cast<int>(calibration_data_[zone_id].baseline_mm) * max_baseline_drift_pct_) / 100;
+    if (delta > limit) {
+      ESP_LOGW(CALIBRATION,
+               "Zone %d: baseline drift %dmm exceeds %d%% limit (%dmm). Rejecting cal.",
+               zone_id, delta, max_baseline_drift_pct_, limit);
+      update_status_text("cal rejected: drift too large");
+      calibration_status_reset_ts_ = millis();
+      z->threshold->idle = calibration_data_[zone_id].baseline_mm;
+      z->threshold->min  = calibration_data_[zone_id].threshold_min_mm;
+      z->threshold->max  = calibration_data_[zone_id].threshold_max_mm;
+      return;
+    }
+  }
 
   calibration_data_[zone_id].baseline_mm = z->threshold->idle;
   calibration_data_[zone_id].threshold_min_mm = z->threshold->min;
@@ -1003,6 +1022,34 @@ void Roode::calibrate_zones(bool auto_cal) {
   publish_setting_entities();
 
   uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
+
+  if (auto_cal && max_baseline_drift_pct_ > 0) {
+    Zone *zones[2] = {entry, exit};
+    bool any_rejected = false;
+    for (int i = 0; i < 2; i++) {
+      if (calibration_data_[i].last_calibrated_ts > 0 && calibration_data_[i].baseline_mm > 0) {
+        int delta = abs(static_cast<int>(zones[i]->threshold->idle) - static_cast<int>(calibration_data_[i].baseline_mm));
+        int limit = (static_cast<int>(calibration_data_[i].baseline_mm) * max_baseline_drift_pct_) / 100;
+        if (delta > limit) {
+          ESP_LOGW(CALIBRATION,
+                   "Zone %d: baseline drift %dmm exceeds %d%% limit (%dmm). Rejecting auto-cal.",
+                   i, delta, max_baseline_drift_pct_, limit);
+          zones[i]->threshold->idle = calibration_data_[i].baseline_mm;
+          zones[i]->threshold->min  = calibration_data_[i].threshold_min_mm;
+          zones[i]->threshold->max  = calibration_data_[i].threshold_max_mm;
+          any_rejected = true;
+        }
+      }
+    }
+    if (any_rejected) {
+      update_status_text("auto-cal rejected: drift too large");
+      calibration_status_reset_ts_ = millis();
+      entry->reset_samples();
+      exit->reset_samples();
+      return;
+    }
+  }
+
   calibration_data_[0] = {entry->threshold->idle, entry->threshold->min, entry->threshold->max, now_epoch};
   calibration_data_[1] = {exit->threshold->idle, exit->threshold->min, exit->threshold->max, now_epoch};
 
@@ -1387,7 +1434,7 @@ void Roode::apply_entry_roi(uint8_t h, uint8_t w) {
   // drives the sensor bus from Core 0 and must not race with Core 1's sensor_task.
   if (!suspend_sensor_task_for_calibration())
     return;
-  run_zone_calibration(0);
+  run_zone_calibration(0, false);
   resume_sensor_task_after_calibration();
   // run_zone_calibration already calls publish_sensor_configuration + publish_setting_entities.
   // Re-publish the actual calibrated ROI so the number entities reflect the true values
@@ -1410,7 +1457,7 @@ void Roode::apply_exit_roi(uint8_t h, uint8_t w) {
   update_status_text("calibrating exit ROI...");
   if (!suspend_sensor_task_for_calibration())
     return;
-  run_zone_calibration(1);
+  run_zone_calibration(1, false);
   resume_sensor_task_after_calibration();
   if (exit_roi_height_number_ != nullptr)
     exit_roi_height_number_->publish_state(exit->roi->height);
@@ -1636,8 +1683,8 @@ void Roode::calibrate_low_obstacle() {
     uint16_t idle = zone->threshold->idle;
     if (idle == 0) continue;
 
-    // Set max 40mm below the obstacle so it falls outside the detection window
-    int new_max_mm = static_cast<int>(obs_avg) - 40;
+    // Set max obstacle_buffer_mm_ below the obstacle so it falls outside the detection window
+    int new_max_mm = static_cast<int>(obs_avg) - static_cast<int>(obstacle_buffer_mm_);
     if (new_max_mm < 100) {
       update_status_text("low obs cal: obstacle too close to sensor");
       calibration_status_reset_ts_ = millis();
@@ -1716,8 +1763,8 @@ void Roode::calibrate_high_obstacle() {
     uint16_t idle = zone->threshold->idle;
     if (idle == 0) continue;
 
-    // Set min 40mm above the obstacle so it falls outside the detection window
-    int new_min_mm = static_cast<int>(obs_avg) + 40;
+    // Set min obstacle_buffer_mm_ above the obstacle so it falls outside the detection window
+    int new_min_mm = static_cast<int>(obs_avg) + static_cast<int>(obstacle_buffer_mm_);
     uint8_t new_min_pct = static_cast<uint8_t>((static_cast<uint32_t>(new_min_mm) * 100) / idle);
     new_min_pct = std::max<uint8_t>(2, std::min<uint8_t>(49, new_min_pct));
     // Enforce 100mm absolute floor

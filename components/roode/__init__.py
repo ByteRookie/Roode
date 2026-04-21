@@ -42,6 +42,11 @@ CONF_ACTIVATE = "activate"
 CONF_DEACTIVATE = "deactivate"
 CONF_PERFORMANCE_MODE = "performance_mode"
 CONF_ALLOW_DEVICE_RESTART = "allow_device_restart"
+CONF_ZONE_DWELL_MS = "zone_dwell_ms"
+CONF_ZONE_CLEAR_MS = "zone_clear_ms"
+CONF_MIN_SEQUENCE_MS = "min_sequence_ms"
+CONF_OBSTACLE_BUFFER_MM = "obstacle_buffer_mm"
+CONF_MAX_BASELINE_DRIFT_PCT = "max_baseline_drift_pct"
 
 FilterMode = roode_ns.enum("FilterMode")
 FILTER_MODES = {
@@ -96,6 +101,11 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=True): cv.boolean,
         cv.Optional(CONF_PERFORMANCE_MODE, default=True): cv.boolean,
         cv.Optional(CONF_ALLOW_DEVICE_RESTART, default=True): cv.boolean,
+        cv.Optional(CONF_ZONE_DWELL_MS, default=150): cv.All(cv.positive_int, cv.Range(min=50, max=1000)),
+        cv.Optional(CONF_ZONE_CLEAR_MS, default=80): cv.All(cv.positive_int, cv.Range(min=20, max=500)),
+        cv.Optional(CONF_MIN_SEQUENCE_MS, default=300): cv.All(cv.positive_int, cv.Range(min=100, max=2000)),
+        cv.Optional(CONF_OBSTACLE_BUFFER_MM, default=40): cv.All(cv.uint16_t, cv.Range(min=10, max=200)),
+        cv.Optional(CONF_MAX_BASELINE_DRIFT_PCT, default=15): cv.All(cv.uint8_t, cv.Range(min=0, max=50)),
         cv.Optional(CONF_FILTER_MODE, default="min"): cv.enum(FILTER_MODES, upper=False),
         cv.Optional(CONF_FILTER_WINDOW, default=5): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_LOG_FALLBACK, default=False): cv.boolean,
@@ -137,6 +147,11 @@ async def to_code(config: Dict):
     cg.add(roode.set_invalid_distance_limit(config[CONF_INVALID_DISTANCE_LIMIT]))
     cg.add(roode.set_restart_timeout(config[CONF_RESTART_TIMEOUT]))
     cg.add(roode.set_allow_device_restart(config[CONF_ALLOW_DEVICE_RESTART]))
+    cg.add(roode.set_zone_dwell_ms(config[CONF_ZONE_DWELL_MS]))
+    cg.add(roode.set_zone_clear_ms(config[CONF_ZONE_CLEAR_MS]))
+    cg.add(roode.set_min_sequence_ms(config[CONF_MIN_SEQUENCE_MS]))
+    cg.add(roode.set_obstacle_buffer_mm(config[CONF_OBSTACLE_BUFFER_MM]))
+    cg.add(roode.set_max_baseline_drift_pct(config[CONF_MAX_BASELINE_DRIFT_PCT]))
     cpu_conf = config.get(CONF_CPU_OPTIMIZATION, {})
     cg.add(
         roode.set_cpu_optimization_thresholds(

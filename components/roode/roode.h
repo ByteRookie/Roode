@@ -175,11 +175,16 @@ class Roode : public PollingComponent {
   void set_invalid_distance_limit(uint8_t limit) { invalid_distance_limit_ = limit; }
   void set_restart_timeout(uint32_t ms) { restart_timeout_ms_ = ms; }
   void set_allow_device_restart(bool allow) { allow_device_restart_ = allow; }
+  void set_zone_dwell_ms(uint32_t ms) { zone_dwell_ms_ = ms; }
+  void set_zone_clear_ms(uint32_t ms) { zone_clear_ms_ = ms; }
+  void set_min_sequence_ms(uint32_t ms) { min_sequence_ms_ = ms; }
+  void set_obstacle_buffer_mm(uint16_t mm) { obstacle_buffer_mm_ = mm; }
+  void set_max_baseline_drift_pct(uint8_t pct) { max_baseline_drift_pct_ = pct; }
   void set_cpu_optimization_thresholds(float activate, float deactivate) {
     cpu_opt_activate_threshold_ = activate;
     cpu_opt_deactivate_threshold_ = deactivate;
   }
-  void run_zone_calibration(uint8_t zone_id);
+  void run_zone_calibration(uint8_t zone_id, bool apply_drift_guard = true);
   void recalibration();
   void person_calibration();
   void calibrate_low_obstacle();
@@ -286,6 +291,8 @@ class Roode : public PollingComponent {
 
   bool calibration_persistence_{true};
   bool performance_mode_{true};
+  uint16_t obstacle_buffer_mm_{40};
+  uint8_t max_baseline_drift_pct_{15};
   bool fail_safe_triggered_{false};
   uint32_t last_calibration_ts_{0};
   uint32_t auto_calibration_interval_sec_{4 * 60 * 60};
@@ -316,6 +323,11 @@ class Roode : public PollingComponent {
   unsigned long last_valid_crossing_ts_{0};
   unsigned long zone_triggered_start_[2]{0, 0};
   bool zone_active_prev_[2]{false, false};  // tracks previous zone state for cpu-opt clearing events
+
+  // Configurable FSM timing thresholds (exposed to YAML)
+  uint32_t zone_dwell_ms_{150};
+  uint32_t zone_clear_ms_{80};
+  uint32_t min_sequence_ms_{300};
 
   // Dwell-time debounce: a zone must be continuously within threshold for
   // kZoneDwellMs before it registers as SOMEONE, and continuously outside for

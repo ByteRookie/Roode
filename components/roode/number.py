@@ -3,7 +3,7 @@ from typing import OrderedDict
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import number
-from esphome.const import CONF_ICON, CONF_MAX_VALUE
+from esphome.const import CONF_ICON, CONF_MAX_VALUE, NUMBER_MODE_BOX
 
 from ..persisted_number import PERSISTED_NUMBER_SCHEMA, new_persisted_number
 from . import Roode, roode_ns, CONF_ROODE_ID
@@ -43,7 +43,7 @@ SETTING_NUMBER_DEFS = [
 
 # Build schema entry for each setting number using the newer number_schema() API
 def _setting_schema(icon: str):
-    return number.number_schema(RoodeSettingNumber).extend(
+    return number.number_schema(RoodeSettingNumber, mode=NUMBER_MODE_BOX).extend(
         {cv.Optional(CONF_ICON, default=icon): cv.icon}
     )
 

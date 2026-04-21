@@ -262,6 +262,11 @@ For further tuning see [Configuration Reference](#configuration-reference) and [
 | `invalid_distance_limit` | `10` | Consecutive bad readings before restart |
 | `restart_timeout` | `30s` | Cooldown between sensor restarts |
 | `log_fallback_events` | `false` | Log INT fallbacks and XSHUT recoveries |
+| `zone_dwell_ms` | `150` | Ms a zone must stay active before registering as occupied. Lower = catches faster crossings but more noise-sensitive |
+| `zone_clear_ms` | `80` | Ms a zone must stay inactive before registering as clear |
+| `min_sequence_ms` | `300` | Min ms a full crossing sequence must take to be counted. Rejects rapid noise sequences |
+| `obstacle_buffer_mm` | `40` | Safety margin (mm) added/subtracted from the obstacle distance during low/high obstacle calibration |
+| `max_baseline_drift_pct` | `15` | Max % shift auto-calibration may apply to the idle baseline. `0` disables the guard. Manual calibration always applies without limit |
 
 ### Per-zone overrides
 

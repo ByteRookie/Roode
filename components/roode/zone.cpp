@@ -107,6 +107,8 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
 
   // Outlier rejection: compute the median and discard readings outside ±25% of it.
   // Protects the baseline when someone walks through the field of view mid-calibration.
+  // If the tight band rejects more than half the samples (noisy environment),
+  // fall back to a wider ±40% band before giving up to the raw median.
   std::array<uint16_t, kMaxCalibrationSamples> sorted = zone_distances;
   std::sort(sorted.begin(), sorted.begin() + zone_count);
   uint16_t median = sorted[zone_count / 2];
@@ -119,6 +121,22 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
     if (d >= lo && d <= hi) {
       sum += d;
       count++;
+    }
+  }
+  if (count > 0 && static_cast<size_t>(count) < zone_count / 2) {
+    // Tight band rejected >50% of samples — retry with ±40% to handle noisy environments.
+    ESP_LOGW(CALIBRATION, "Zone %d: tight outlier band kept only %d/%zu samples, retrying with ±40%%",
+             id, count, zone_count);
+    lo = static_cast<uint16_t>(median * 60 / 100);
+    hi = static_cast<uint16_t>(median * 140 / 100);
+    sum = 0;
+    count = 0;
+    for (size_t i = 0; i < zone_count; i++) {
+      uint16_t d = zone_distances[i];
+      if (d >= lo && d <= hi) {
+        sum += d;
+        count++;
+      }
     }
   }
   if (count == 0) {

@@ -148,6 +148,11 @@ void Roode::dump_config() {
 }
 
 void Roode::setup() {
+  // Publish a valid initial state before any hardware init that could fail.
+  // Without this, if is_failed() returns true below, the Status entity never
+  // receives publish_state() and HA shows it as "Unavailable" indefinitely.
+  update_status_text("ok");
+
   ESP_LOGI(SETUP, "Booting Roode %s", VERSION);
   if (version_sensor != nullptr) {
     version_sensor->publish_state(VERSION);
@@ -160,12 +165,6 @@ void Roode::setup() {
     ESP_LOGE(TAG, "Roode cannot be setup without a valid VL53L1X sensor");
     return;
   }
-
-  // Publish "ok" immediately so the Status entity has a valid state in HA from
-  // the very start of setup.  calibrate_zones() will publish more specific
-  // status strings as it runs; this just ensures the entity is never stuck as
-  // "Unavailable" while the API is establishing its first connection.
-  update_status_text("ok");
 
   // Initialize filtering options before calibrating so threshold sampling uses
   // the configured window and mode
@@ -370,7 +369,9 @@ void Roode::loop() {
   uint16_t dist = this->current_zone->getDistance();
   if (status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
     invalid_read_count_++;
-  } else {
+  } else if (status == VL53L1_ERROR_NONE) {
+    // Only reset on a genuinely valid read (status OK AND distance in range).
+    // A sensor error alone should not clear the consecutive-invalid counter.
     invalid_read_count_ = 0;
   }
   // Attempt to recover the sensor when repeated invalid distance values are observed
@@ -400,23 +401,28 @@ void Roode::loop() {
   // Guard: epoch must be valid (NTP synced), interval must be non-zero,
   // and both zones must be clear so we never calibrate over a live reading.
   uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
-  if (auto_calibration_interval_sec_ > 0 && now_epoch > 100000 &&
-      now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
-    // Use debounced state — a momentary raw reading above threshold->max does not
-    // mean the zone is truly empty (noise can produce false clearances).
-    bool zones_clear = !zone_debounced_active_[0] && !zone_debounced_active_[1];
-    if (zones_clear) {
-      ESP_LOGI(TAG, "auto_calibration_running");
-      calibrate_zones(true);
-    } else {
-      ESP_LOGD(TAG, "auto_calibration_deferred: zones occupied");
+  if (auto_calibration_interval_sec_ > 0 && now_epoch > 100000) {
+    // Seed last_calibration_ts_ on first valid NTP sync so the auto-cal interval
+    // is measured from that point rather than from Unix epoch 0, which would cause
+    // calibration to fire immediately on every first NTP sync.
+    if (last_calibration_ts_ == 0)
+      last_calibration_ts_ = now_epoch;
+    if (now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
+      // Use debounced state — a momentary raw reading above threshold->max does not
+      // mean the zone is truly empty (noise can produce false clearances).
+      bool zones_clear = !zone_debounced_active_[0] && !zone_debounced_active_[1];
+      if (zones_clear) {
+        ESP_LOGI(TAG, "auto_calibration_running");
+        calibrate_zones(true);
+      } else {
+        ESP_LOGD(TAG, "auto_calibration_deferred: zones occupied");
+      }
     }
   }
   delay(polling_interval_ms_);
 }
 
-bool Roode::handle_sensor_status() {
-  bool check_status = false;
+void Roode::handle_sensor_status() {
   std::string text_state;
   if (distanceSensor->is_failed()) {
     text_state = "offline";
@@ -425,7 +431,6 @@ bool Roode::handle_sensor_status() {
     if (last_sensor_status != sensor_status) {
       if (status_sensor != nullptr)
         status_sensor->publish_state(sensor_status);
-      check_status = true;
     }
   } else if (sensor_status == VL53L1_ERROR_TIME_OUT) {
     text_state = "timeout";
@@ -442,20 +447,14 @@ bool Roode::handle_sensor_status() {
   if (text_state == "ok" && calibration_status_reset_ts_ != 0) {
     last_sensor_status = sensor_status;
     sensor_status = VL53L1_ERROR_NONE;
-    return check_status;
+    return;
   }
   update_status_text(text_state);
   last_sensor_status = sensor_status;
   sensor_status = VL53L1_ERROR_NONE;
-  return check_status;
 }
 
 void Roode::path_tracking(Zone *zone) {
-  static int PathTrack[] = {0, 0, 0, 0};
-  static int PathTrackFillingSize = 1;  // init this to 1 as we start from state
-                                        // where nobody is any of the zones
-  static int LeftPreviousStatus = NOBODY;
-  static int RightPreviousStatus = NOBODY;
   int CurrentZoneStatus = NOBODY;
   int AllZonesCurrentStatus = 0;
   int AnEventHasOccured = 0;
@@ -463,23 +462,17 @@ void Roode::path_tracking(Zone *zone) {
   uint32_t timeout = state_ == STATE_ENTRY_ACTIVE ? 2500 : 3500;
   if (state_ != STATE_IDLE && millis() - state_started_ts > timeout) {
     state_ = STATE_IDLE;
-    // Clear the PathTrack array and filling size so stale partial sequence data
-    // cannot combine with the NEXT crossing to fire a spurious count.
-    // Do NOT reset LeftPreviousStatus / RightPreviousStatus here — those reflect
-    // real zone occupancy. Resetting them while a zone is still occupied would
-    // immediately re-fire events on the next call, creating rapid state cycling
-    // that produces endless counts.
-    PathTrackFillingSize = 1;
-    PathTrack[0] = PathTrack[1] = PathTrack[2] = PathTrack[3] = 0;
+    // Clear the entire PathTrack sequence buffer and both previous-status values.
+    // Clearing left_prev_status_ / right_prev_status_ unconditionally is safe
+    // because the debounce layer (kZoneDwellMs=150ms) below already filters
+    // rapid re-entry events — the prior concern about "rapid state cycling" no
+    // longer applies.  Leaving stale SOMEONE values was the primary source of
+    // phantom counts when a person stood in the doorway during a timeout.
+    path_track_filling_size_ = 1;
+    path_track_buf_[0] = path_track_buf_[1] = path_track_buf_[2] = path_track_buf_[3] = 0;
     path_track_first_event_ts_ = 0;
-    // If both zones are genuinely idle (debounced), also clear the static
-    // previous-status variables.  Without this, a stale SOMEONE value can
-    // survive the timeout and combine with the very next zone event to fire
-    // a phantom count — the primary cause of counts drifting up over time.
-    if (!zone_debounced_active_[0] && !zone_debounced_active_[1]) {
-      LeftPreviousStatus = NOBODY;
-      RightPreviousStatus = NOBODY;
-    }
+    left_prev_status_ = NOBODY;
+    right_prev_status_ = NOBODY;
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
 
@@ -565,7 +558,7 @@ void Roode::path_tracking(Zone *zone) {
 
   // left zone
   if (zone == (this->invert_direction_ ? this->exit : this->entry)) {
-    if (CurrentZoneStatus != LeftPreviousStatus) {
+    if (CurrentZoneStatus != left_prev_status_) {
       // event in left zone has occured
       AnEventHasOccured = 1;
 
@@ -578,17 +571,17 @@ void Roode::path_tracking(Zone *zone) {
         AllZonesCurrentStatus += 1;
       }
       // need to check right zone as well ...
-      if (RightPreviousStatus == SOMEONE) {
+      if (right_prev_status_ == SOMEONE) {
         // event in right zone has occured
         AllZonesCurrentStatus += 2;
       }
       // remember for next time
-      LeftPreviousStatus = CurrentZoneStatus;
+      left_prev_status_ = CurrentZoneStatus;
     }
   }
   // right zone
   else {
-    if (CurrentZoneStatus != RightPreviousStatus) {
+    if (CurrentZoneStatus != right_prev_status_) {
       // event in right zone has occured
       AnEventHasOccured = 1;
       if (CurrentZoneStatus == SOMEONE) {
@@ -599,37 +592,37 @@ void Roode::path_tracking(Zone *zone) {
         }
       }
       // need to check left zone as well ...
-      if (LeftPreviousStatus == SOMEONE) {
+      if (left_prev_status_ == SOMEONE) {
         // event in left zone has occured
         AllZonesCurrentStatus += 1;
       }
       // remember for next time
-      RightPreviousStatus = CurrentZoneStatus;
+      right_prev_status_ = CurrentZoneStatus;
     }
   }
 
   // if an event has occured
   if (AnEventHasOccured) {
     ESP_LOGD(TAG, "Event has occured, AllZonesCurrentStatus: %d", AllZonesCurrentStatus);
-    if (PathTrackFillingSize < 4) {
-      PathTrackFillingSize++;
+    if (path_track_filling_size_ < 4) {
+      path_track_filling_size_++;
     }
     // Record when the first event in a crossing sequence occurs.
     // We use this below to enforce a minimum crossing duration and reject
     // sequences that complete too quickly to be a real person traversal.
     // (The 150 ms zone dwell debounce already enforces ~460 ms naturally;
     // this 300 ms gate is a second independent layer of defence.)
-    if (PathTrackFillingSize == 2 && path_track_first_event_ts_ == 0) {
+    if (path_track_filling_size_ == 2 && path_track_first_event_ts_ == 0) {
       path_track_first_event_ts_ = millis();
     }
 
     // if nobody anywhere lets check if an exit or entry has happened
-    if ((LeftPreviousStatus == NOBODY) && (RightPreviousStatus == NOBODY)) {
+    if ((left_prev_status_ == NOBODY) && (right_prev_status_ == NOBODY)) {
       ESP_LOGD(TAG, "Nobody anywhere, AllZonesCurrentStatus: %d", AllZonesCurrentStatus);
-      // check exit or entry only if PathTrackFillingSize is 4 (for example 0 1
+      // check exit or entry only if path_track_filling_size_ is 4 (for example 0 1
       // 3 2) and last event is 0 (nobobdy anywhere)
-      if (PathTrackFillingSize == 4) {
-        // check exit or entry. no need to check PathTrack[0] == 0 , it is
+      if (path_track_filling_size_ == 4) {
+        // check exit or entry. no need to check path_track_buf_[0] == 0 , it is
         // always the case
 
         // Reject sequences that completed faster than a real person could walk
@@ -637,7 +630,7 @@ void Roode::path_tracking(Zone *zone) {
         bool timing_ok = (path_track_first_event_ts_ == 0) ||
                          ((millis() - path_track_first_event_ts_) >= 300);
 
-        if ((PathTrack[1] == 1) && (PathTrack[2] == 3) && (PathTrack[3] == 2)) {
+        if ((path_track_buf_[1] == 1) && (path_track_buf_[2] == 3) && (path_track_buf_[3] == 2)) {
           // This an exit
           if (timing_ok) {
             ESP_LOGI("Roode pathTracking", "Exit detected.");
@@ -650,7 +643,7 @@ void Roode::path_tracking(Zone *zone) {
             ESP_LOGD(TAG, "crossing_rejected: exit sequence too fast (%ums)",
                      (unsigned) (millis() - path_track_first_event_ts_));
           }
-        } else if ((PathTrack[1] == 2) && (PathTrack[2] == 3) && (PathTrack[3] == 1)) {
+        } else if ((path_track_buf_[1] == 2) && (path_track_buf_[2] == 3) && (path_track_buf_[3] == 1)) {
           // This an entry
           if (timing_ok) {
             ESP_LOGI("Roode pathTracking", "Entry detected.");
@@ -666,27 +659,23 @@ void Roode::path_tracking(Zone *zone) {
         }
       }
 
-      PathTrackFillingSize = 1;
-      PathTrack[0] = PathTrack[1] = PathTrack[2] = PathTrack[3] = 0;
+      path_track_filling_size_ = 1;
+      path_track_buf_[0] = path_track_buf_[1] = path_track_buf_[2] = path_track_buf_[3] = 0;
       path_track_first_event_ts_ = 0;
       state_ = STATE_IDLE;
     } else {
-      // update PathTrack
-      // example of PathTrack update
+      // update path_track_buf_
+      // example of update:
       // 0
       // 0 1
       // 0 1 3
       // 0 1 3 1
       // 0 1 3 3
       // 0 1 3 2 ==> if next is 0 : check if exit
-      PathTrack[PathTrackFillingSize - 1] = AllZonesCurrentStatus;
+      path_track_buf_[path_track_filling_size_ - 1] = AllZonesCurrentStatus;
     }
   }
   if (presence_sensor != nullptr) {
-    // Use debounced zone state rather than the FSM static variables
-    // (LeftPreviousStatus / RightPreviousStatus).  The statics can carry a
-    // stale SOMEONE value across a timeout or recalibration event, leaving
-    // presence permanently stuck true even when the room is empty.
     if (!zone_debounced_active_[0] && !zone_debounced_active_[1]) {
       presence_sensor->publish_state(false);
     }
@@ -748,15 +737,18 @@ void Roode::recalibration() {
   if (!suspend_sensor_task_for_calibration())
     return;
   calibrate_zones();
-  // Reset PathTrack FSM state so any in-flight partial crossing sequence from
-  // before calibration cannot combine with post-calibration readings to fire a
-  // phantom count.
+  // Reset the full FSM state so stale partial sequences from before calibration
+  // cannot combine with post-calibration readings and fire phantom counts.
   state_ = STATE_IDLE;
   zone_debounced_active_[0] = false;
   zone_debounced_active_[1] = false;
   zone_dwell_first_active_[0] = zone_dwell_first_active_[1] = 0;
   zone_dwell_first_clear_[0] = zone_dwell_first_clear_[1] = 0;
   path_track_first_event_ts_ = 0;
+  path_track_buf_[0] = path_track_buf_[1] = path_track_buf_[2] = path_track_buf_[3] = 0;
+  path_track_filling_size_ = 1;
+  left_prev_status_ = NOBODY;
+  right_prev_status_ = NOBODY;
   resume_sensor_task_after_calibration();
 }
 
@@ -1802,12 +1794,26 @@ void Roode::restart_sensor() {
   distanceSensor->restart();
   last_sensor_restart_ts_ = now;
   invalid_read_count_ = 0;
+  // Reset FSM crossing-sequence state so any partial sequence captured before
+  // the restart cannot combine with post-restart readings and fire phantom counts.
+  state_ = STATE_IDLE;
+  path_track_buf_[0] = path_track_buf_[1] = path_track_buf_[2] = path_track_buf_[3] = 0;
+  path_track_filling_size_ = 1;
+  left_prev_status_ = NOBODY;
+  right_prev_status_ = NOBODY;
+  path_track_first_event_ts_ = 0;
   // Double the backoff for the next attempt, capped at 120s
   restart_backoff_ms_ = std::min(restart_backoff_ms_ * 2, static_cast<uint32_t>(120000));
   if (restart_attempt_count_ >= max_restart_attempts_) {
-    ESP_LOGE(TAG, "sensor_restart_escalating_reset");
     log_event("sensor_restart_escalating_reset");
-    esp_restart();
+    if (allow_device_restart_) {
+      ESP_LOGE(TAG, "sensor_restart_escalating_reset: rebooting device");
+      esp_restart();
+    } else {
+      ESP_LOGE(TAG, "sensor_restart_escalating_reset: allow_device_restart disabled, marking failed");
+      update_status_text("sensor failed");
+      mark_failed();
+    }
   }
 }
 
@@ -1849,7 +1855,9 @@ void Roode::sensor_task(void *param) {
     uint16_t dist = self->current_zone->getDistance();
     if (status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
       self->invalid_read_count_++;
-    } else {
+    } else if (status == VL53L1_ERROR_NONE) {
+      // Only reset on a genuinely valid read (status OK AND distance in range).
+      // A sensor error alone should not clear the consecutive-invalid counter.
       self->invalid_read_count_ = 0;
     }
     // Similar recovery check for the asynchronous sensor task
@@ -1878,21 +1886,27 @@ void Roode::sensor_task(void *param) {
     // Guard: skip entirely if Core 0 has already claimed the bus for a manual calibration.
     uint32_t now_epoch = static_cast<uint32_t>(time(nullptr));
     if (!self->calibration_in_progress_.load(std::memory_order_acquire) &&
-        self->auto_calibration_interval_sec_ > 0 && now_epoch > 100000 &&
-        now_epoch - self->last_calibration_ts_ >= self->auto_calibration_interval_sec_) {
-      // Only calibrate when both zones are clear — calibrating with someone present corrupts the baseline.
-      // Use debounced state — a momentary raw reading above threshold->max does not
-      // mean the zone is truly empty (noise can produce false clearances).
-      bool zones_clear = !self->zone_debounced_active_[0] && !self->zone_debounced_active_[1];
-      if (zones_clear) {
-        ESP_LOGI(TAG, "auto_calibration_running");
-        // sensor_task_reading_ remains true during auto-cal so that Core 0's
-        // suspend_sensor_task_for_calibration() correctly waits rather than proceeding
-        // concurrently.  calibrate_zones() checks calibration_in_progress_ after each
-        // slow phase and returns early if Core 0 claims the bus mid-calibration.
-        self->calibrate_zones(true);
-      } else {
-        ESP_LOGD(TAG, "auto_calibration_deferred: zones occupied");
+        self->auto_calibration_interval_sec_ > 0 && now_epoch > 100000) {
+      // Seed last_calibration_ts_ on first valid NTP sync so the auto-cal interval
+      // is measured from that point rather than from Unix epoch 0, which would cause
+      // calibration to fire immediately on every first NTP sync.
+      if (self->last_calibration_ts_ == 0)
+        self->last_calibration_ts_ = now_epoch;
+      if (now_epoch - self->last_calibration_ts_ >= self->auto_calibration_interval_sec_) {
+        // Only calibrate when both zones are clear — calibrating with someone present corrupts the baseline.
+        // Use debounced state — a momentary raw reading above threshold->max does not
+        // mean the zone is truly empty (noise can produce false clearances).
+        bool zones_clear = !self->zone_debounced_active_[0] && !self->zone_debounced_active_[1];
+        if (zones_clear) {
+          ESP_LOGI(TAG, "auto_calibration_running");
+          // sensor_task_reading_ remains true during auto-cal so that Core 0's
+          // suspend_sensor_task_for_calibration() correctly waits rather than proceeding
+          // concurrently.  calibrate_zones() checks calibration_in_progress_ after each
+          // slow phase and returns early if Core 0 claims the bus mid-calibration.
+          self->calibrate_zones(true);
+        } else {
+          ESP_LOGD(TAG, "auto_calibration_deferred: zones occupied");
+        }
       }
     }
     // Release the sensor bus — Core 0 may now start calibration on next check.

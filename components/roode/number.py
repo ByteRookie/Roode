@@ -5,18 +5,6 @@ import esphome.config_validation as cv
 from esphome.components import number
 from esphome.const import CONF_ICON, CONF_MAX_VALUE
 
-# NUMBER_MODE_BOX was added to esphome.const in a later ESPHome release.
-# Fall back gracefully so the component still loads on older installs;
-# numbers will just render as sliders instead of input boxes.
-try:
-    from esphome.const import NUMBER_MODE_BOX as _NUMBER_MODE_BOX
-except ImportError:
-    try:
-        from esphome.components.number import NumberMode as _NM
-        _NUMBER_MODE_BOX = _NM.NUMBER_MODE_BOX
-    except Exception:
-        _NUMBER_MODE_BOX = None
-
 from ..persisted_number import PERSISTED_NUMBER_SCHEMA, new_persisted_number
 from . import Roode, roode_ns, CONF_ROODE_ID
 
@@ -55,8 +43,7 @@ SETTING_NUMBER_DEFS = [
 
 # Build schema entry for each setting number using the newer number_schema() API
 def _setting_schema(icon: str):
-    kwargs = {} if _NUMBER_MODE_BOX is None else {"mode": _NUMBER_MODE_BOX}
-    return number.number_schema(RoodeSettingNumber, **kwargs).extend(
+    return number.number_schema(RoodeSettingNumber).extend(
         {cv.Optional(CONF_ICON, default=icon): cv.icon}
     )
 

@@ -5,6 +5,16 @@ import esphome.config_validation as cv
 from esphome.components import number
 from esphome.const import CONF_ICON, CONF_MAX_VALUE
 
+# Override the mode default to BOX so HA renders number inputs instead of sliders.
+# NUMBER_MODES lives in esphome.components.number (not esphome.const).
+# Wrapped in try/except so the component loads cleanly on any ESPHome version
+# that doesn't export it — numbers will simply render as sliders on those builds.
+try:
+    from esphome.components.number import NUMBER_MODES as _NUMBER_MODES
+    _MODE_OVERRIDE = {cv.Optional("mode", default="BOX"): cv.enum(_NUMBER_MODES, upper=True)}
+except (ImportError, AttributeError, Exception):
+    _MODE_OVERRIDE = {}
+
 from ..persisted_number import PERSISTED_NUMBER_SCHEMA, new_persisted_number
 from . import Roode, roode_ns, CONF_ROODE_ID
 
@@ -41,10 +51,11 @@ SETTING_NUMBER_DEFS = [
     (CONF_EXIT_ROI_WIDTH,         "EXIT_ROI_WIDTH",         4,   16,  1,   "mdi:arrow-expand-horizontal","set_exit_roi_width_number"),
 ]
 
-# Build schema entry for each setting number using the newer number_schema() API
+# Build schema entry for each setting number using the newer number_schema() API.
+# _MODE_OVERRIDE inserts mode: box as the default when NUMBER_MODES is available.
 def _setting_schema(icon: str):
     return number.number_schema(RoodeSettingNumber).extend(
-        {cv.Optional(CONF_ICON, default=icon): cv.icon}
+        {cv.Optional(CONF_ICON, default=icon): cv.icon, **_MODE_OVERRIDE}
     )
 
 CONFIG_SCHEMA = cv.Schema(

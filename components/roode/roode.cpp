@@ -415,12 +415,17 @@ void Roode::loop() {
     if (now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
       // Use debounced state — a momentary raw reading above threshold->max does not
       // mean the zone is truly empty (noise can produce false clearances).
+      // Also require 10s of no zone activity — the debounced clear state can be true
+      // for ~80ms while a person is transitioning between entry and exit zones.
       bool zones_clear = !zone_debounced_active_[0] && !zone_debounced_active_[1];
-      if (zones_clear) {
+      bool zones_stable = (last_zone_activity_ts_ == 0) ||
+                          (millis() - last_zone_activity_ts_ >= 10000);
+      if (zones_clear && zones_stable) {
         ESP_LOGI(TAG, "auto_calibration_running");
         calibrate_zones(true);
       } else {
-        ESP_LOGD(TAG, "auto_calibration_deferred: zones occupied");
+        ESP_LOGD(TAG, "auto_calibration_deferred: %s",
+                 !zones_clear ? "zones occupied" : "zones not stable (recent activity)");
       }
     }
   }
@@ -501,8 +506,10 @@ void Roode::path_tracking(Zone *zone) {
       if (zone_dwell_first_active_[zid] == 0)
         zone_dwell_first_active_[zid] = now_deb;
       if (!zone_debounced_active_[zid] &&
-          (now_deb - zone_dwell_first_active_[zid]) >= kZoneDwellMs)
+          (now_deb - zone_dwell_first_active_[zid]) >= kZoneDwellMs) {
         zone_debounced_active_[zid] = true;
+        last_zone_activity_ts_ = now_deb;  // track for auto-cal stability window
+      }
     } else {
       zone_dwell_first_active_[zid] = 0;
       if (zone_debounced_active_[zid]) {
@@ -551,6 +558,7 @@ void Roode::path_tracking(Zone *zone) {
     bool zones_clear = !zone_debounced_active_[0] && !zone_debounced_active_[1];
     if (zones_clear) {
       ESP_LOGI(CALIBRATION, "Fail safe calibration triggered for zone %d", zone->id);
+      fail_safe_triggered_ = false;  // clear before cal so it's true only on active fail-safe
       run_zone_calibration(zone->id);
       fail_safe_triggered_ = true;
       zone_triggered_start_[zone->id] = 0;
@@ -740,8 +748,18 @@ void Roode::resume_sensor_task_after_calibration() {
 }
 
 void Roode::recalibration() {
-  if (!suspend_sensor_task_for_calibration())
+  if (!suspend_sensor_task_for_calibration()) {
+    // Calibration aborted (sensor task busy). Reset FSM so any stale partial
+    // crossing sequence is cleared immediately rather than waiting for the
+    // 2500ms FSM timeout to fire.
+    state_ = STATE_IDLE;
+    path_track_filling_size_ = 1;
+    path_track_buf_[0] = path_track_buf_[1] = path_track_buf_[2] = path_track_buf_[3] = 0;
+    path_track_first_event_ts_ = 0;
+    left_prev_status_ = NOBODY;
+    right_prev_status_ = NOBODY;
     return;
+  }
   calibrate_zones();
   // Reset the full FSM state so stale partial sequences from before calibration
   // cannot combine with post-calibration readings and fire phantom counts.
@@ -1962,8 +1980,12 @@ void Roode::sensor_task(void *param) {
         // Only calibrate when both zones are clear — calibrating with someone present corrupts the baseline.
         // Use debounced state — a momentary raw reading above threshold->max does not
         // mean the zone is truly empty (noise can produce false clearances).
+        // Also require 10s of no zone activity — the debounced clear state can be true
+        // for ~80ms while a person is transitioning between entry and exit zones.
         bool zones_clear = !self->zone_debounced_active_[0] && !self->zone_debounced_active_[1];
-        if (zones_clear) {
+        bool zones_stable = (self->last_zone_activity_ts_ == 0) ||
+                            (millis() - self->last_zone_activity_ts_ >= 10000);
+        if (zones_clear && zones_stable) {
           ESP_LOGI(TAG, "auto_calibration_running");
           // sensor_task_reading_ remains true during auto-cal so that Core 0's
           // suspend_sensor_task_for_calibration() correctly waits rather than proceeding
@@ -1971,7 +1993,8 @@ void Roode::sensor_task(void *param) {
           // slow phase and returns early if Core 0 claims the bus mid-calibration.
           self->calibrate_zones(true);
         } else {
-          ESP_LOGD(TAG, "auto_calibration_deferred: zones occupied");
+          ESP_LOGD(TAG, "auto_calibration_deferred: %s",
+                   !zones_clear ? "zones occupied" : "zones not stable (recent activity)");
         }
       }
     }

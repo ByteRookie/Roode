@@ -325,7 +325,10 @@ class Roode : public PollingComponent {
   bool zone_active_prev_[2]{false, false};  // tracks previous zone state for cpu-opt clearing events
 
   // Configurable FSM timing thresholds (exposed to YAML)
-  uint32_t zone_dwell_ms_{150};
+  // zone_dwell_ms_: 100ms default — each zone is read every ~50ms (alternating), so 100ms
+  // requires 2 consecutive active reads. 150ms was too conservative and caused fast-walker
+  // misses when transit time through a zone was shorter than the dwell window.
+  uint32_t zone_dwell_ms_{100};
   uint32_t zone_clear_ms_{80};
   uint32_t min_sequence_ms_{300};
 
@@ -340,6 +343,11 @@ class Roode : public PollingComponent {
   // Timestamp of the first FSM event in the current crossing sequence.
   // Used to enforce a minimum sequence duration and reject rapid noise sequences.
   uint32_t path_track_first_event_ts_{0};
+
+  // Timestamp of the last time any zone transitioned to debounced-active (SOMEONE).
+  // Used to enforce a minimum quiet period before auto-calibration fires, preventing
+  // a brief inter-zone gap during an active crossing from triggering calibration.
+  uint32_t last_zone_activity_ts_{0};
 
   // PathTrack FSM crossing-sequence buffer — previously function-scoped statics.
   // Moving them to member variables lets recalibration() and restart_sensor()

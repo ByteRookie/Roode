@@ -101,7 +101,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_CALIBRATION_PERSISTENCE, default=True): cv.boolean,
         cv.Optional(CONF_PERFORMANCE_MODE, default=True): cv.boolean,
         cv.Optional(CONF_ALLOW_DEVICE_RESTART, default=True): cv.boolean,
-        cv.Optional(CONF_ZONE_DWELL_MS, default=150): cv.All(cv.positive_int, cv.Range(min=50, max=1000)),
+        cv.Optional(CONF_ZONE_DWELL_MS, default=100): cv.All(cv.positive_int, cv.Range(min=50, max=1000)),
         cv.Optional(CONF_ZONE_CLEAR_MS, default=80): cv.All(cv.positive_int, cv.Range(min=20, max=500)),
         cv.Optional(CONF_MIN_SEQUENCE_MS, default=300): cv.All(cv.positive_int, cv.Range(min=100, max=2000)),
         cv.Optional(CONF_OBSTACLE_BUFFER_MM, default=40): cv.All(cv.uint16_t, cv.Range(min=10, max=200)),

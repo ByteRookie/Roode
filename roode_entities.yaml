@@ -1,121 +1,69 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Roode HA Entities Package
-# Include this in your main YAML with one line:
+# Include this file via packages in your main YAML:
 #
 #   packages:
-#     roode_entities: !include roode_entities.yaml
+#     roode_entities:
+#       url: https://github.com/ByteRookie/Roode
+#       ref: 1.8.0-Dev
+#       files: [roode_entities.yaml]
 #
-# Substitutions below are defaults — override them in your main YAML if needed:
-#   friendly_name — prefix used for all entity names (default: "Roode")
-#   roode_id      — must match the `id:` of your `roode:` block (default: roode_platform)
+# Override substitutions in your main YAML if needed:
+#   friendly_name — label prefix for all entities   (default: "Roode")
+#   roode_id      — must match `id:` in your roode: block (default: roode_platform)
 #
-# ── Entity layout in Home Assistant ──────────────────────────────────────────
+# ── What you see in HA by default ────────────────────────────────────────────
 #
-# HA splits entities into four fixed sections (in this order):
-#   Controls   — non-sensor entities with no entity_category
-#   Sensors    — sensor/binary_sensor entities with no entity_category
-#   Configuration — entity_category: config
-#   Diagnostic — entity_category: diagnostic
+#   Sensors
+#     • Presence (binary)   • Last Direction   • Status
 #
-#   Controls  (main — always visible)
-#     • People Count (in your main YAML)
-#     • Last Direction
-#
-#   Sensors  (live sensor data)
-#     • Status  • Presence
-#     • Distance Zone 0  • Distance Zone 1  (hidden when Performance Mode ON)
-#
-#   Configuration  (calibration + all tuning controls)
-#     • Calibration Mode (select)  • Run Calibration (button)
-#     • Restart                    • Performance Mode  (disabled by default)
-#     • Filter Window  • Sampling       • Filter Mode    • Ranging Mode
-#     • Entry / Exit Max & Min Threshold
-#     • Entry / Exit ROI Height & Width
-#     • Invert Direction  • Save Calibration to Flash
+#   Configuration
+#     • Calibrate (select — pick mode, runs immediately)
 #     • Auto Calibration Interval
+#     • Performance Mode     • Restart
 #
-#   Diagnostic  (collapsed by default — raw readbacks, hidden when Performance Mode ON)
-#     • Threshold sensors  • ROI sensors           (disabled by default)
-#     • Sensor Status Code • Manual Adjustments     (disabled by default)
-#     • Loop Time  • CPU Usage  • RAM Free  • Flash Used  (disabled by default)
-#     • Version    • Features
-#     • (optional) Interrupt Status • XSHUT State
-#     • (optional) Entry Presence   • Exit Presence
+#   Everything else is hidden (disabled_by_default: true).
+#   To unhide: HA → Settings → Devices → [device] → tap entity count link.
 #
 # ─────────────────────────────────────────────────────────────────────────────
 substitutions:
   friendly_name: Roode
   roode_id: roode_platform
 
-# ── Controls: primary entities (no entity_category → Controls) ───────────────
+# ── Primary sensors ───────────────────────────────────────────────────────────
+
+binary_sensor:
+  - platform: roode
+    roode_id: ${roode_id}
+    presence:
+      name: $friendly_name Presence
+      device_class: occupancy
 
 text_sensor:
   - platform: roode
     roode_id: ${roode_id}
     entry_exit_event:
       name: $friendly_name Last Direction
-      entity_category: ""   # Override DIAGNOSTIC Python default → Controls section
-
+      entity_category: ""        # → Sensors section
     sensor_status:
       name: $friendly_name Status
-      entity_category: ""   # Sensors section
-
+      entity_category: ""        # → Sensors section
     version:
-      name: $friendly_name Version       # Diagnostic (default in text_sensor.py)
+      name: $friendly_name Version
+      disabled_by_default: true
     enabled_features:
-      name: $friendly_name Features      # Diagnostic (default)
+      name: $friendly_name Features
+      disabled_by_default: true
 
-number:
-  - platform: roode
-    roode_id: ${roode_id}
-    # entity_category: config → Configuration section (grouped with calibration)
-    auto_calibration_interval:
-      name: $friendly_name Auto Calibration Interval
-      entity_category: config
-    entry_max_threshold:
-      name: $friendly_name Entry Max Threshold
-      entity_category: config
-    entry_min_threshold:
-      name: $friendly_name Entry Min Threshold
-      entity_category: config
-    exit_max_threshold:
-      name: $friendly_name Exit Max Threshold
-      entity_category: config
-    exit_min_threshold:
-      name: $friendly_name Exit Min Threshold
-      entity_category: config
-    filter_window:
-      name: $friendly_name Filter Window
-      entity_category: config
-    sampling:
-      name: $friendly_name Sampling
-      entity_category: config
-    entry_roi_height:
-      name: $friendly_name Entry ROI Height
-      entity_category: config
-    entry_roi_width:
-      name: $friendly_name Entry ROI Width
-      entity_category: config
-    exit_roi_height:
-      name: $friendly_name Exit ROI Height
-      entity_category: config
-    exit_roi_width:
-      name: $friendly_name Exit ROI Width
-      entity_category: config
+# ── Configuration ─────────────────────────────────────────────────────────────
 
+# Calibration: pick a mode from the dropdown → calibration runs immediately.
+# No separate button needed. The selected option stays so you can see what
+# was last run. Change it to run a different mode at any time.
 select:
-  - platform: roode
-    roode_id: ${roode_id}
-    filter_mode:
-      name: $friendly_name Filter Mode
-      entity_category: config
-    ranging_mode:
-      name: $friendly_name Ranging Mode
-      entity_category: config
-
   - platform: template
-    name: $friendly_name Calibration Mode
-    id: calibration_mode_select
+    name: $friendly_name Calibrate
+    id: calibration_trigger_select
     entity_category: config
     icon: mdi:tune
     options:
@@ -126,82 +74,106 @@ select:
     initial_option: "Empty Room"
     optimistic: true
     set_action:
-      - lambda: ""
+      - lambda: |-
+          if (x == "Empty Room")         id(${roode_id})->recalibration();
+          else if (x == "With Person")   id(${roode_id})->person_calibration();
+          else if (x == "Low Obstacle")  id(${roode_id})->calibrate_low_obstacle();
+          else if (x == "High Obstacle") id(${roode_id})->calibrate_high_obstacle();
+
+  - platform: roode
+    roode_id: ${roode_id}
+    filter_mode:
+      name: $friendly_name Filter Mode
+      entity_category: config
+      disabled_by_default: true
+    ranging_mode:
+      name: $friendly_name Ranging Mode
+      entity_category: config
+      disabled_by_default: true
+
+number:
+  - platform: roode
+    roode_id: ${roode_id}
+    auto_calibration_interval:
+      name: $friendly_name Auto Calibration Interval
+      entity_category: config
+    # ── Hidden by default — enable in HA to tune manually ──────────────────
+    filter_window:
+      name: $friendly_name Filter Window
+      entity_category: config
+      disabled_by_default: true
+    sampling:
+      name: $friendly_name Sampling
+      entity_category: config
+      disabled_by_default: true
+    entry_max_threshold:
+      name: $friendly_name Entry Max Threshold
+      entity_category: config
+      disabled_by_default: true
+    entry_min_threshold:
+      name: $friendly_name Entry Min Threshold
+      entity_category: config
+      disabled_by_default: true
+    exit_max_threshold:
+      name: $friendly_name Exit Max Threshold
+      entity_category: config
+      disabled_by_default: true
+    exit_min_threshold:
+      name: $friendly_name Exit Min Threshold
+      entity_category: config
+      disabled_by_default: true
+    entry_roi_height:
+      name: $friendly_name Entry ROI Height
+      entity_category: config
+      disabled_by_default: true
+    entry_roi_width:
+      name: $friendly_name Entry ROI Width
+      entity_category: config
+      disabled_by_default: true
+    exit_roi_height:
+      name: $friendly_name Exit ROI Height
+      entity_category: config
+      disabled_by_default: true
+    exit_roi_width:
+      name: $friendly_name Exit ROI Width
+      entity_category: config
+      disabled_by_default: true
 
 switch:
   - platform: roode
     roode_id: ${roode_id}
-    invert_direction:
-      name: $friendly_name Invert Direction
-      entity_category: config
-    calibration_persistence:
-      name: $friendly_name Save Calibration to Flash
-      entity_category: config
     performance_mode:
       name: $friendly_name Performance Mode
       entity_category: config
+    invert_direction:
+      name: $friendly_name Invert Direction
+      entity_category: config
+      disabled_by_default: true
+    calibration_persistence:
+      name: $friendly_name Save Calibration to Flash
+      entity_category: config
       disabled_by_default: true
 
-# ── Sensors: passive readouts (no entity_category → Sensors) ─────────────────
-
-binary_sensor:
-  - platform: roode
-    roode_id: ${roode_id}
-    presence:
-      name: $friendly_name Presence
-      device_class: occupancy
-
-    # Optional: uncomment to expose XSHUT pin state (diagnostic)
-    # sensor_xshut_state:
-    #   name: $friendly_name XSHUT State
-    #   entity_category: diagnostic
-
-    # Optional: uncomment to expose per-zone presence sensors
-    # zones:
-    #   entry:
-    #     presence:
-    #       name: $friendly_name Entry Zone Presence
-    #       device_class: occupancy
-    #   exit:
-    #     presence:
-    #       name: $friendly_name Exit Zone Presence
-    #       device_class: occupancy
-
-# ── Configuration: calibration controls + all tuning knobs ──────────────────
-
 button:
-  - platform: template
-    name: $friendly_name Run Calibration
-    icon: mdi:play-circle
-    entity_category: config
-    on_press:
-      - lambda: |-
-          auto sel = id(calibration_mode_select).state;
-          if (sel == "Empty Room")         id(${roode_id})->recalibration();
-          else if (sel == "With Person")   id(${roode_id})->person_calibration();
-          else if (sel == "Low Obstacle")  id(${roode_id})->calibrate_low_obstacle();
-          else if (sel == "High Obstacle") id(${roode_id})->calibrate_high_obstacle();
-
   - platform: restart
     name: $friendly_name Restart
     entity_category: config
 
-# ── Diagnostic: raw sensor data for setup and troubleshooting ────────────────
-# All sensor entities default to entity_category: diagnostic (set in sensor.py).
-# Sensors marked with (*) are suppressed (show "unavailable") when Performance
-# Mode is ON — they are only useful during setup/troubleshooting.
+# ── Diagnostic sensors (all hidden by default) ────────────────────────────────
 
 sensor:
   - platform: roode
     roode_id: ${roode_id}
     distance_entry:
-      name: $friendly_name Distance Zone 0  # (*) suppressed in Performance Mode
-      entity_category: ""                   # Sensors section (override diagnostic default)
+      name: $friendly_name Distance Zone 0
+      entity_category: ""
+      disabled_by_default: true
       filters:
         - delta: 100
     distance_exit:
-      name: $friendly_name Distance Zone 1  # (*) suppressed in Performance Mode
-      entity_category: ""                   # Sensors section (override diagnostic default)
+      name: $friendly_name Distance Zone 1
+      entity_category: ""
+      disabled_by_default: true
       filters:
         - delta: 100
     max_threshold_entry:
@@ -235,18 +207,14 @@ sensor:
       name: $friendly_name Manual Adjustments
       disabled_by_default: true
     loop_time:
-      name: $friendly_name Loop Time         # (*) suppressed in Performance Mode
+      name: $friendly_name Loop Time
       disabled_by_default: true
     cpu_usage:
-      name: $friendly_name CPU Usage         # (*) suppressed in Performance Mode
+      name: $friendly_name CPU Usage
       disabled_by_default: true
     ram_free:
-      name: $friendly_name RAM Free          # (*) suppressed in Performance Mode
+      name: $friendly_name RAM Free
       disabled_by_default: true
     flash_free:
-      name: $friendly_name Flash Used        # (*) suppressed in Performance Mode
+      name: $friendly_name Flash Used
       disabled_by_default: true
-
-    # Optional: uncomment to expose interrupt status (diagnostic, advanced)
-    # interrupt_status:
-    #   name: $friendly_name Interrupt Status

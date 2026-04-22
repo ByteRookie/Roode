@@ -495,8 +495,8 @@ void Roode::path_tracking(Zone *zone) {
   // registers as NOBODY.  Single sensor frames of noise (< 150 ms) cannot
   // advance the FSM, eliminating the primary source of phantom crossings.
   {
-    const uint32_t kZoneDwellMs = std::max(50U, zone_dwell_ms_);
-    const uint32_t kZoneClearMs = std::max(20U, zone_clear_ms_);
+    const uint32_t kZoneDwellMs = std::max(uint32_t{50}, zone_dwell_ms_);
+    const uint32_t kZoneClearMs = std::max(uint32_t{20}, zone_clear_ms_);
     uint32_t now_deb = millis();
     uint8_t zid = zone->id;
     bool raw_active = zone->getMinDistance() < zone->threshold->max &&
@@ -640,7 +640,7 @@ void Roode::path_tracking(Zone *zone) {
 
         // Reject sequences that completed faster than a real person could walk
         // through two zones.  300 ms is conservative — actual people take 700 ms+.
-        const uint32_t kMinSeqMs = std::max(100U, min_sequence_ms_);
+        const uint32_t kMinSeqMs = std::max(uint32_t{100}, min_sequence_ms_);
         bool timing_ok = (path_track_first_event_ts_ == 0) ||
                          ((millis() - path_track_first_event_ts_) >= kMinSeqMs);
 

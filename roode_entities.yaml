@@ -44,10 +44,8 @@ text_sensor:
     roode_id: ${roode_id}
     entry_exit_event:
       name: $friendly_name Last Direction
-      entity_category: ""        # → Sensors section
     sensor_status:
       name: $friendly_name Status
-      entity_category: ""        # → Sensors section
     version:
       name: $friendly_name Version
       disabled_by_default: true
@@ -90,6 +88,11 @@ select:
       name: $friendly_name Ranging Mode
       entity_category: config
       disabled_by_default: true
+    orientation:
+      name: $friendly_name Orientation
+      entity_category: config
+      disabled_by_default: true
+      icon: mdi:rotate-3d-variant
 
 number:
   - platform: roode
@@ -166,13 +169,11 @@ sensor:
     roode_id: ${roode_id}
     distance_entry:
       name: $friendly_name Distance Zone 0
-      entity_category: ""
       disabled_by_default: true
       filters:
         - delta: 100
     distance_exit:
       name: $friendly_name Distance Zone 1
-      entity_category: ""
       disabled_by_default: true
       filters:
         - delta: 100

@@ -76,11 +76,33 @@ ROI_SCHEMA = cv.Any(
 
 threshold = cv.Any(cv.percentage, cv.All(distance_as_mm, cv.uint16_t))
 
-THRESHOLDS_SCHEMA = NullableSchema(
-    {
-        cv.Optional(CONF_MIN): threshold,
-        cv.Optional(CONF_MAX): threshold,
-    }
+def _validate_cpu_optimization(value):
+    if value[CONF_ACTIVATE] <= value[CONF_DEACTIVATE]:
+        raise cv.Invalid(
+            f"cpu_optimization: activate ({value[CONF_ACTIVATE]:.0%}) must be greater than"
+            f" deactivate ({value[CONF_DEACTIVATE]:.0%})"
+        )
+    return value
+
+
+def _validate_thresholds(value):
+    if CONF_MIN in value and CONF_MAX in value:
+        mn, mx = value[CONF_MIN], value[CONF_MAX]
+        if isinstance(mn, float) and isinstance(mx, float) and mn >= mx:
+            raise cv.Invalid(
+                f"detection_thresholds: min ({mn:.0%}) must be less than max ({mx:.0%})"
+            )
+    return value
+
+
+THRESHOLDS_SCHEMA = cv.All(
+    NullableSchema(
+        {
+            cv.Optional(CONF_MIN): threshold,
+            cv.Optional(CONF_MAX): threshold,
+        }
+    ),
+    _validate_thresholds,
 )
 
 ZONE_SCHEMA = NullableSchema(
@@ -112,11 +134,14 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_FORCE_SINGLE_CORE, default=False): cv.boolean,
         cv.Optional(CONF_INVALID_DISTANCE_LIMIT, default=10): cv.All(cv.uint8_t, cv.Range(min=1)),
         cv.Optional(CONF_RESTART_TIMEOUT, default="30s"): cv.positive_time_period_milliseconds,
-        cv.Optional(CONF_CPU_OPTIMIZATION, default={}): cv.Schema(
-            {
-                cv.Optional(CONF_ACTIVATE, default=0.90): cv.percentage,
-                cv.Optional(CONF_DEACTIVATE, default=0.50): cv.percentage,
-            }
+        cv.Optional(CONF_CPU_OPTIMIZATION, default={}): cv.All(
+            cv.Schema(
+                {
+                    cv.Optional(CONF_ACTIVATE, default=0.90): cv.percentage,
+                    cv.Optional(CONF_DEACTIVATE, default=0.50): cv.percentage,
+                }
+            ),
+            _validate_cpu_optimization,
         ),
         cv.Optional(CONF_ZONES, default={}): NullableSchema(
             {

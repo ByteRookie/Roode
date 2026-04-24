@@ -39,5 +39,22 @@ class RangingModeSelect : public esphome::select::Select {
   Roode *hub_{nullptr};
 };
 
+/**
+ * ESPHome select entity that exposes the sensor orientation at runtime.
+ * Options: "parallel", "perpendicular"
+ * Changing the orientation resets ROI centers and triggers a full recalibration.
+ * The selection is persisted to flash when calibration_persistence is enabled.
+ */
+class OrientationSelect : public esphome::select::Select {
+ public:
+  void set_roode_hub(Roode *hub) { hub_ = hub; }
+
+ protected:
+  void control(const std::string &value) override;
+
+ private:
+  Roode *hub_{nullptr};
+};
+
 }  // namespace roode
 }  // namespace esphome

@@ -19,7 +19,7 @@ CONF_ORIENTATION = "orientation"
 
 FILTER_MODE_OPTIONS = ["min", "median", "percentile10"]
 RANGING_MODE_OPTIONS = ["auto", "short", "medium", "long", "longer", "longest"]
-ORIENTATION_OPTIONS = ["parallel", "perpendicular"]
+ORIENTATION_OPTIONS = ["Above", "Side"]
 
 CONFIG_SCHEMA = cv.Schema(
     {

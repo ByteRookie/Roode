@@ -41,7 +41,7 @@ class RangingModeSelect : public esphome::select::Select {
 
 /**
  * ESPHome select entity that exposes the sensor orientation at runtime.
- * Options: "parallel", "perpendicular"
+ * Options: "Above", "Side"
  * Changing the orientation resets ROI centers and triggers a full recalibration.
  * The selection is persisted to flash when calibration_persistence is enabled.
  */

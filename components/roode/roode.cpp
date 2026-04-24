@@ -410,7 +410,7 @@ void Roode::loop() {
     // calibration to fire immediately on every first NTP sync.
     if (last_calibration_ts_ == 0)
       last_calibration_ts_ = now_epoch;
-    if (now_epoch - last_calibration_ts_ >= auto_calibration_interval_sec_) {
+    if (now_epoch >= last_calibration_ts_ && (now_epoch - last_calibration_ts_) >= auto_calibration_interval_sec_) {
       // Use debounced state — a momentary raw reading above threshold->max does not
       // mean the zone is truly empty (noise can produce false clearances).
       // Also require 10s of no zone activity — the debounced clear state can be true
@@ -697,7 +697,8 @@ void Roode::updateCounter(int delta) {
   if (this->people_counter == nullptr) {
     return;
   }
-  auto next = this->people_counter->state + (float) delta;
+  float current = std::isnan(this->people_counter->state) ? 0.0f : this->people_counter->state;
+  auto next = current + (float) delta;
   ESP_LOGI(TAG, "Updating people count: %d", (int) next);
   // Record the time before performing the update so update() can suppress the
   // narrow race window where people_counter->state has not yet reflected the
@@ -1322,7 +1323,7 @@ void Roode::publish_setting_entities() {
     ranging_mode_select_->publish_state(rm);
   }
   if (orientation_select_ != nullptr)
-    orientation_select_->publish_state(orientation_ == Parallel ? "parallel" : "perpendicular");
+    orientation_select_->publish_state(orientation_ == Parallel ? "Above" : "Side");
   if (invert_direction_switch_ != nullptr)
     invert_direction_switch_->publish_state(invert_direction_);
   if (cal_persistence_switch_ != nullptr)
@@ -1833,7 +1834,7 @@ void RangingModeSelect::control(const std::string &value) {
 }
 
 void Roode::apply_orientation(const std::string &val) {
-  orientation_ = (val == "perpendicular") ? Perpendicular : Parallel;
+  orientation_ = (val == "Side") ? Perpendicular : Parallel;
   if (calibration_persistence_) {
     uint8_t v = (orientation_ == Perpendicular) ? 1 : 0;
     orientation_pref_.save(&v);

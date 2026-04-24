@@ -281,8 +281,6 @@ void Roode::setup() {
   if (manual_adjustment_sensor != nullptr)
     manual_adjustment_sensor->publish_state(0);
   if (performance_mode_) {
-    if (distance_entry != nullptr) distance_entry->publish_state(NAN);
-    if (distance_exit != nullptr) distance_exit->publish_state(NAN);
     if (interrupt_status_sensor != nullptr) interrupt_status_sensor->publish_state(NAN);
     if (enabled_features_sensor != nullptr) enabled_features_sensor->publish_state("");
   }
@@ -310,11 +308,11 @@ void Roode::setup() {
 }
 
 void Roode::update() {
+  if (distance_entry != nullptr)
+    distance_entry->publish_state(entry->getDistance());
+  if (distance_exit != nullptr)
+    distance_exit->publish_state(exit->getDistance());
   if (!performance_mode_) {
-    if (distance_entry != nullptr)
-      distance_entry->publish_state(entry->getDistance());
-    if (distance_exit != nullptr)
-      distance_exit->publish_state(exit->getDistance());
     if (xshut_state_binary_sensor != nullptr) {
       auto val = distanceSensor->get_xshut_state();
       if (val.has_value())
@@ -1257,6 +1255,7 @@ void Roode::restore_settings_from_flash() {
   exit_roi_width_pref_    = global_preferences->make_preference<uint8_t>(0xBB);
   ranging_mode_pref_      = global_preferences->make_preference<uint8_t>(0xBC);
   invert_direction_pref_  = global_preferences->make_preference<uint8_t>(0xBD);
+  orientation_pref_       = global_preferences->make_preference<uint8_t>(0xBE);
 
   uint8_t val;
 
@@ -1302,6 +1301,8 @@ void Roode::restore_settings_from_flash() {
   }
   if (invert_direction_pref_.load(&val))
     invert_direction_ = (val != 0);
+  if (orientation_pref_.load(&val) && val < 2)
+    orientation_ = (val == 1) ? Perpendicular : Parallel;
 }
 
 void Roode::publish_setting_entities() {
@@ -1320,6 +1321,8 @@ void Roode::publish_setting_entities() {
     }
     ranging_mode_select_->publish_state(rm);
   }
+  if (orientation_select_ != nullptr)
+    orientation_select_->publish_state(orientation_ == Parallel ? "parallel" : "perpendicular");
   if (invert_direction_switch_ != nullptr)
     invert_direction_switch_->publish_state(invert_direction_);
   if (cal_persistence_switch_ != nullptr)
@@ -1506,12 +1509,8 @@ void Roode::apply_performance_mode(bool val) {
   if (performance_mode_switch_ != nullptr)
     performance_mode_switch_->publish_state(val);
   if (val) {
-    // When enabling performance mode, push NAN to every sensor that will now be
-    // suppressed so HA shows "unavailable" rather than displaying a stale reading.
-    // This makes it visually obvious that diagnostics are off, and prevents old
-    // values from being mistaken for live data during long-term operation.
-    if (distance_entry != nullptr) distance_entry->publish_state(NAN);
-    if (distance_exit != nullptr) distance_exit->publish_state(NAN);
+    // When enabling performance mode, push NAN to overhead diagnostic sensors
+    // so HA shows "unavailable" rather than a stale reading.
     if (loop_time_sensor != nullptr) loop_time_sensor->publish_state(NAN);
     if (cpu_usage_sensor != nullptr) cpu_usage_sensor->publish_state(NAN);
     if (ram_free_sensor != nullptr) ram_free_sensor->publish_state(NAN);
@@ -1831,6 +1830,22 @@ void FilterModeSelect::control(const std::string &value) {
 
 void RangingModeSelect::control(const std::string &value) {
   hub_->apply_ranging_mode(value);
+}
+
+void Roode::apply_orientation(const std::string &val) {
+  orientation_ = (val == "perpendicular") ? Perpendicular : Parallel;
+  if (calibration_persistence_) {
+    uint8_t v = (orientation_ == Perpendicular) ? 1 : 0;
+    orientation_pref_.save(&v);
+  }
+  if (orientation_select_ != nullptr)
+    orientation_select_->publish_state(val);
+  ESP_LOGI(TAG, "orientation changed: %s — recalibrating", val.c_str());
+  recalibration();
+}
+
+void OrientationSelect::control(const std::string &value) {
+  hub_->apply_orientation(value);
 }
 
 void RoodeSettingNumber::control(float value) {

@@ -24,6 +24,7 @@ namespace esphome {
 namespace roode {
 class FilterModeSelect;     // forward declaration — full type in select.h
 class RangingModeSelect;    // forward declaration — full type in select.h
+class OrientationSelect;    // forward declaration — full type in select.h
 class RoodeSettingNumber;   // forward declaration — full type in setting_number.h
 class InvertDirectionSwitch;         // forward declaration — full type in switch.h
 class CalibrationPersistenceSwitch;  // forward declaration — full type in switch.h
@@ -155,6 +156,7 @@ class Roode : public PollingComponent {
   }
   void set_filter_mode_select(FilterModeSelect *sel) { filter_mode_select_ = sel; }
   void set_ranging_mode_select(RangingModeSelect *sel) { ranging_mode_select_ = sel; }
+  void set_orientation_select(OrientationSelect *sel) { orientation_select_ = sel; }
   void set_invert_direction_switch(InvertDirectionSwitch *sw) { invert_direction_switch_ = sw; }
   void set_calibration_persistence_switch(CalibrationPersistenceSwitch *sw) { cal_persistence_switch_ = sw; }
   void set_performance_mode_switch(PerformanceModeSwitch *sw) { performance_mode_switch_ = sw; }
@@ -213,12 +215,14 @@ class Roode : public PollingComponent {
   void apply_calibration_persistence(bool val);
   void apply_performance_mode(bool val);
   void apply_ranging_mode(const std::string &mode);
+  void apply_orientation(const std::string &val);
 
  protected:
   TofSensor *distanceSensor;
   Zone *current_zone = entry;
   FilterModeSelect *filter_mode_select_{nullptr};
   RangingModeSelect *ranging_mode_select_{nullptr};
+  OrientationSelect *orientation_select_{nullptr};
   InvertDirectionSwitch *invert_direction_switch_{nullptr};
   CalibrationPersistenceSwitch *cal_persistence_switch_{nullptr};
   PerformanceModeSwitch *performance_mode_switch_{nullptr};
@@ -273,7 +277,7 @@ class Roode : public PollingComponent {
   ESPPreferenceObject calibration_prefs_[2];
 
   // Flash preference keys: 0xA0-0xA1 calibration, 0xB0 filter_mode,
-  // 0xB1-0xBB settings, 0xBC ranging_mode, 0xBD invert_direction
+  // 0xB1-0xBB settings, 0xBC ranging_mode, 0xBD invert_direction, 0xBE orientation
   ESPPreferenceObject filter_mode_pref_;
   ESPPreferenceObject sampling_pref_;
   ESPPreferenceObject filter_window_pref_;
@@ -288,6 +292,7 @@ class Roode : public PollingComponent {
   ESPPreferenceObject exit_roi_width_pref_;
   ESPPreferenceObject ranging_mode_pref_;
   ESPPreferenceObject invert_direction_pref_;
+  ESPPreferenceObject orientation_pref_;
 
   bool calibration_persistence_{true};
   bool performance_mode_{true};

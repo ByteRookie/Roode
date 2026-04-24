@@ -6,6 +6,7 @@ from esphome.const import (
     CONF_ICON,
     CONF_ENTITY_CATEGORY,
     ENTITY_CATEGORY_DIAGNOSTIC,
+    ENTITY_CATEGORY_NONE,
 )
 from . import Roode, CONF_ROODE_ID
 
@@ -35,7 +36,7 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional(CONF_ICON, default="mdi:sign-direction"): cv.icon,
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
                 cv.Optional(
-                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_NONE
                 ): cv.entity_category,
             }
         ),
@@ -44,7 +45,7 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional(CONF_ICON, default="mdi:check-circle"): cv.icon,
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
                 cv.Optional(
-                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_NONE
                 ): cv.entity_category,
             }
         ),

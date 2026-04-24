@@ -14,8 +14,10 @@ void Zone::dump_config() const {
   ESP_LOGCONFIG(TAG, "   %s", id == 0U ? "Entry" : "Exit");
   ESP_LOGCONFIG(TAG, "     ROI: { width: %d, height: %d, center: %d }", roi->width, roi->height, roi->center);
   ESP_LOGCONFIG(TAG, "     Threshold: { min: %dmm (%d%%), max: %dmm (%d%%), idle: %dmm }", threshold->min,
-                threshold->min_percentage.value_or((threshold->min * 100) / threshold->idle), threshold->max,
-                threshold->max_percentage.value_or((threshold->max * 100) / threshold->idle), threshold->idle);
+                threshold->min_percentage.value_or(threshold->idle > 0 ? (threshold->min * 100) / threshold->idle : 0),
+                threshold->max,
+                threshold->max_percentage.value_or(threshold->idle > 0 ? (threshold->max * 100) / threshold->idle : 0),
+                threshold->idle);
 }
 
 VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
@@ -45,7 +47,7 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
       min_distance = tmp[sample_count_ / 2];
       break;
     case FILTER_PERCENTILE10: {
-      uint8_t idx = (sample_count_ * 10) / 100;
+      uint8_t idx = (sample_count_ * 10 + 99) / 100;  // ceiling division → idx≥1 for n≥1
       if (idx >= sample_count_)
         idx = sample_count_ - 1;
       min_distance = tmp[idx];
@@ -164,6 +166,12 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
   // Hard floor: never allow min < 100 mm regardless of idle distance.
   // Prevents near-zero thresholds from matching virtually all sensor readings.
   if (threshold->min < 100) threshold->min = 100;
+  // Ensure max is always meaningfully above min. For very close-range sensors
+  // (idle < ~125mm) the 100mm floor can push min above max, killing detection.
+  if (threshold->max < threshold->min + 50) {
+    threshold->max = threshold->min + 50;
+    ESP_LOGW(CALIBRATION, "Zone %d: max_threshold raised to %dmm to stay above min floor", id, threshold->max);
+  }
 
   ESP_LOGI(CALIBRATION,
            "Calibrated zone %d: idle=%dmm min=%dmm(%d%%) max=%dmm(%d%%) samples=%d/%d",
@@ -224,11 +232,17 @@ uint16_t Zone::getDistance() const { return this->last_distance; }
 uint16_t Zone::getMinDistance() const { return this->min_distance; }
 
 void Zone::set_threshold_percentages(uint8_t min_percent, uint8_t max_percent) {
+  if (min_percent >= max_percent) {
+    ESP_LOGW(TAG, "Zone %d: ignoring threshold update — min_pct(%d) >= max_pct(%d)", id, min_percent, max_percent);
+    return;
+  }
   threshold->min_percentage = min_percent;
   threshold->max_percentage = max_percent;
   if (threshold->idle > 0) {
     threshold->min = (threshold->idle * min_percent) / 100;
     threshold->max = (threshold->idle * max_percent) / 100;
+    if (threshold->min < 100) threshold->min = 100;
+    if (threshold->max < threshold->min + 50) threshold->max = threshold->min + 50;
   }
 }
 }  // namespace roode

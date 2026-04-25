@@ -34,7 +34,8 @@ The sensor's 16×16 SPAD grid is split into two detection zones (entry and exit)
 ### Key abilities
 
 - **Accurate bidirectional counting** — distinguishes entries from exits using the crossing sequence
-- **Fully configurable at runtime** — adjust thresholds, filter settings, ROI, and direction via Home Assistant sliders; no reflash needed
+- **Fully configurable at runtime** — adjust thresholds, filter settings, ROI, orientation, and direction via Home Assistant sliders and dropdowns; no reflash needed
+- **Rich calibration UI** — four calibration modes available from a single HA dropdown: Empty Room, With Person, Low Obstacle, High Obstacle
 - **Auto-calibration** — measures idle distance on first boot and periodically recalibrates as temperature changes
 - **Dual-core support** — offloads sensor polling to ESP32 core 1, keeping the main loop free
 - **Performance Mode** — suppress diagnostic sensor publishing during daily operation to reduce overhead; flip it off for setup or troubleshooting
@@ -46,15 +47,41 @@ The sensor's 16×16 SPAD grid is split into two detection zones (entry and exit)
 
 ## What's New in 1.8.0
 
-Version 1.8.0 is a stability-focused release targeting long-term, always-on deployments. See [CHANGELOG.md](CHANGELOG.md) for the full list.
+Version 1.8.0 is a major stability and usability release targeting long-term, always-on deployments.
 
-- **Zone dwell-time debounce** — 150 ms to register SOMEONE, 80 ms to register NOBODY; single-frame noise cannot advance the FSM
-- **Crossing timing guard** — sequences shorter than 300 ms (door swings, reflections) are discarded
-- **Boot-time threshold validation** — corrupt flash values are rejected automatically; 5-layer clamping prevents the "100% threshold = idle distance" false-detection loop
-- **Dual-core race fix** — `expected_counter_` is now written after `call.perform()` completes, eliminating phantom "manual adjustment" log entries
-- **Debounced calibration triggers** — auto-calibration only fires when both zones have been clear for the full debounce period; cannot interrupt a slow-moving person
-- **Performance Mode switch** — suppress CPU/RAM/loop-time/distance sensor publishing at runtime; the counting core keeps running unaffected
-- **Entity grouping** — HA device page now has three clear sections: Main (daily use), Configuration (calibration + tuning), Diagnostic (setup/troubleshooting)
+### Detection quality fixes
+
+- **PERCENTILE10 filter fixed** — previously used ceiling division that made it identical to FILTER_MIN at default buffer sizes; now correctly picks the 10th percentile value
+- **100 mm hard floor no longer kills detection** — for close-range sensors where the hard floor raised `min` above `max`, the max threshold is now automatically raised and logged; no more silent dead zones
+- **Runtime threshold guard** — setting min ≥ max via HA number sliders is now rejected with a log warning; zone never silently stops detecting
+- **YAML compile-time validation** — `detection_thresholds` with `min ≥ max` now produces a clear compile error; `cpu_optimization` with `activate ≤ deactivate` also errors at compile time
+- **`dump_config()` divide-by-zero fixed** — if calibration failed (idle = 0), boot log no longer crashes with undefined behaviour
+
+### FSM and counting stability
+
+- **Zone dwell-time debounce** — a zone must be continuously active for `zone_dwell_ms` (default 100 ms) to register as SOMEONE, and clear for `zone_clear_ms` (default 80 ms) to register as NOBODY; single-frame noise cannot advance the FSM
+- **Crossing timing guard** — sequences shorter than `min_sequence_ms` (default 300 ms) are discarded as noise or door swings
+- **FSM timeout reset** — stale partial sequences are cleared on timeout, preventing phantom counts when someone stands in the doorway
+- **PathTrack buffer and state moved to member variables** — recalibration and sensor restart now properly reset FSM state; stale partial sequences can no longer combine with post-restart readings
+- **Dual-core race fix** — `expected_counter_` is written after `call.perform()` completes, eliminating phantom "manual adjustment" log entries
+- **NaN guard in people counter** — if the people counter number entity hasn't been set yet (NaN on fresh flash), first crossing now correctly starts from 0 instead of producing a NaN counter
+
+### Calibration improvements
+
+- **Outlier rejection during calibration** — median ± 25% band discards readings from people walking through mid-calibration; falls back to ± 40% for noisy environments before using raw median
+- **Debounced auto-calibration trigger** — auto-cal only fires when both zones have been continuously clear for 10 s; cannot interrupt a slow-moving person
+- **Fail-safe calibration uses debounced state** — single noisy frames above threshold cannot falsely trigger fail-safe calibration with a person present
+- **NTP backward-jump protection** — auto-calibration interval guard now checks `now_epoch >= last_calibration_ts_` before subtracting; NTP corrections or brief clock jumps cannot fire immediate unscheduled calibration
+- **Baseline drift guard** — auto-calibration that would shift the idle baseline by more than `max_baseline_drift_pct` (default 15%) is rejected and logged; prevents environmental changes from destabilising long-running deployments
+
+### Runtime UI and HA entity management
+
+- **Rich calibration UI** — single "Calibrate" dropdown in HA with four modes: *Empty Room*, *With Person*, *Low Obstacle*, *High Obstacle*; selection runs calibration immediately, no separate button needed
+- **Orientation as a runtime HA select** — change between **Above** (sensor mounted overhead, zones side-by-side) and **Side** (sensor mounted on the wall, zones stacked) without reflashing; ROI centers reset and full recalibration runs automatically; persisted to flash
+- **All runtime settings persisted** — filter mode, filter window, sampling, ROI, ranging mode, orientation, invert direction, and threshold percentages all saved to flash via ESPHome preferences and restored on reboot
+- **Entity grouping** — HA device page now has three clear sections: Sensors (Presence, Last Direction, Status), Configuration (calibration + settings), Diagnostic (setup/troubleshooting)
+- **Distance Zone sensors always update** — Distance Zone 0/1 are published on every update cycle regardless of Performance Mode
+- **Status heartbeat** — Status text sensor re-publishes every 60 s so HA never marks it Unavailable after a reconnect during a long "ok" period
 
 ---
 
@@ -249,12 +276,12 @@ For further tuning see [Configuration Reference](#configuration-reference) and [
 |--------|---------|-------------|
 | `id` | `roode_platform` | Must match `roode_id` in the entity package |
 | `sampling` | `2` | Raw readings averaged per update |
-| `orientation` | `parallel` | `parallel` or `perpendicular` mounting |
+| `orientation` | `parallel` | `parallel` (sensor mounted **above**, zones side-by-side) or `perpendicular` (sensor mounted on the **wall**, zones stacked). Changeable at runtime via HA — select **Above** or **Side** in the Orientation dropdown |
 | `roi` | `h16 w6` | Region of interest; `auto` for automatic |
 | `detection_thresholds.min` | `15%` | Min distance (% of idle or absolute mm) |
 | `detection_thresholds.max` | `85%` | Max distance (% of idle or absolute mm) |
-| `calibration_persistence` | `false` | Save calibration to flash across reboots |
-| `performance_mode` | `false` | Boot into Performance Mode — suppresses diagnostic publishing (CPU, RAM, loop time, distance zones, features). Toggle off in HA to re-enable diagnostics. |
+| `calibration_persistence` | `true` | Save calibration to flash across reboots |
+| `performance_mode` | `false` | Boot into Performance Mode — suppresses diagnostic publishing (CPU, RAM, loop time, features). Toggle off in HA to re-enable diagnostics. Distance Zone sensors always publish. |
 | `filter_mode` | `min` | `min`, `median`, or `percentile10` |
 | `filter_window` | `5` | Samples in the filter buffer |
 | `zones.invert` | `false` | Swap entry/exit zones |
@@ -262,11 +289,11 @@ For further tuning see [Configuration Reference](#configuration-reference) and [
 | `invalid_distance_limit` | `10` | Consecutive bad readings before restart |
 | `restart_timeout` | `30s` | Cooldown between sensor restarts |
 | `log_fallback_events` | `false` | Log INT fallbacks and XSHUT recoveries |
-| `zone_dwell_ms` | `150` | Ms a zone must stay active before registering as occupied. Lower = catches faster crossings but more noise-sensitive |
-| `zone_clear_ms` | `80` | Ms a zone must stay inactive before registering as clear |
+| `zone_dwell_ms` | `100` | ms a zone must stay active before registering as occupied. Lower catches faster crossings but increases noise sensitivity |
+| `zone_clear_ms` | `80` | ms a zone must stay inactive before registering as clear |
 | `min_sequence_ms` | `300` | Min ms a full crossing sequence must take to be counted. Rejects rapid noise sequences |
-| `obstacle_buffer_mm` | `40` | Safety margin (mm) added/subtracted from the obstacle distance during low/high obstacle calibration |
-| `max_baseline_drift_pct` | `15` | Max % shift auto-calibration may apply to the idle baseline. `0` disables the guard. Manual calibration always applies without limit |
+| `obstacle_buffer_mm` | `40` | Safety margin (mm) for low/high obstacle calibration modes |
+| `max_baseline_drift_pct` | `15` | Max % the idle baseline may shift during auto-calibration. `0` disables the guard. Manual calibration always applies without limit |
 
 ### Per-zone overrides
 
@@ -300,37 +327,41 @@ The package uses two substitutions you can override in your main YAML:
 
 ### Entities by HA section
 
-HA's device page automatically creates four sections based on entity domain and `entity_category`:
+HA's device page groups entities into sections based on `entity_category`:
 
 | HA section | What appears there |
 |------------|-------------------|
-| **Controls** | Actionable entities with no `entity_category` — numbers, switches, selects, text sensors |
-| **Sensors** | Passive entities with no `entity_category` — sensors, binary sensors |
+| **Sensors** | Passive entities with no `entity_category` — binary sensors, sensors, text sensors |
 | **Configuration** | Any entity with `entity_category: config` |
 | **Diagnostic** | Any entity with `entity_category: diagnostic` |
 
+**Visible by default (7 entities):**
+
 | Entity | Type | HA section | Description |
 |--------|------|-----------|-------------|
-| Last Direction | text_sensor | Controls | Most recent entry or exit event |
-| Auto Calibration Interval | number | Controls | Hours between auto-calibrations (0 = off) |
-| Entry / Exit Max Threshold | number | Controls | Upper detection limit per zone (live, saved) |
-| Entry / Exit Min Threshold | number | Controls | Lower detection limit per zone (live, saved) |
-| Filter Mode | select | Controls | `min` / `median` / `percentile10` (live, saved) |
-| Filter Window | number | Controls | Samples in filter buffer (live, saved) |
-| Invert Direction | switch | Controls | Flip entry/exit direction (live, saved) |
-| Ranging Mode | select | Controls | `auto` / `short` / `medium` / `long` (live, saved) |
-| Entry / Exit ROI Height & Width | number | Controls | ROI dimensions per zone (live, saved) |
-| Sampling | number | Controls | Raw readings averaged per update (live, saved) |
-| Save Calibration to Flash | switch | Controls | Persist calibration thresholds across reboots |
-| Distance Zone 0 / 1 | sensor | Sensors | Measured distance per zone (mm) — live readout |
 | Presence | binary_sensor | Sensors | True while a crossing zone is active |
-| Status | text_sensor | Configuration | `ok` / `timeout` / `reinitializing` / `error` / `offline` |
-| Calibrate Empty Room | button | Configuration | Re-measure idle distance |
-| Calibrate With Person | button | Configuration | Person-present calibration |
-| Calibrate Low Obstacle | button | Configuration | Calibrate ignoring low objects (e.g. pets) |
-| Calibrate High Obstacle | button | Configuration | Calibrate for door-open scenario |
-| Performance Mode | switch | Configuration | Suppress diagnostic publishing during daily use |
+| Last Direction | text_sensor | Sensors | Most recent crossing event: `Entry` or `Exit` |
+| Status | text_sensor | Sensors | `ok` / `timeout` / `error` / `offline` — re-published every 60 s |
+| Calibrate | select | Configuration | Pick a mode → runs immediately: *Empty Room*, *With Person*, *Low Obstacle*, *High Obstacle* |
+| Auto Calibration Interval | number | Configuration | Hours between automatic background recalibrations (0 = off) |
+| Performance Mode | switch | Configuration | Suppress diagnostic publishing during normal use |
 | Restart | button | Configuration | Reboot the device |
+
+**Hidden by default** (enable in HA → Settings → Devices → tap entity count link):
+
+| Entity | Type | HA section | Description |
+|--------|------|-----------|-------------|
+| Distance Zone 0 / 1 | sensor | Sensors | Measured distance per zone (mm) — live readout |
+| Orientation | select | Configuration | **Above** (overhead mount) or **Side** (wall mount) — changes ROI centers and recalibrates |
+| Filter Mode | select | Configuration | `min` / `median` / `percentile10` (live, saved) |
+| Ranging Mode | select | Configuration | `auto` / `short` / `medium` / `long` / `longer` / `longest` (live, saved) |
+| Entry / Exit Max Threshold | number | Configuration | Upper detection limit per zone as % of idle distance (live, saved) |
+| Entry / Exit Min Threshold | number | Configuration | Lower detection limit per zone as % of idle distance (live, saved) |
+| Entry / Exit ROI Height & Width | number | Configuration | ROI dimensions per zone (live, saved) |
+| Filter Window | number | Configuration | Samples in filter buffer (live, saved) |
+| Sampling | number | Configuration | Raw readings averaged per update (live, saved) |
+| Invert Direction | switch | Configuration | Flip entry/exit direction (live, saved) |
+| Save Calibration to Flash | switch | Configuration | Persist calibration thresholds across reboots |
 | Max / Min Zone 0 / 1 | sensor | Diagnostic | Active threshold values per zone (mm) |
 | ROI Height / Width Zone 0 / 1 | sensor | Diagnostic | Active ROI dimensions |
 | Sensor Status Code | sensor | Diagnostic | Numeric VL53L1X status (0 = ok) |
@@ -338,6 +369,7 @@ HA's device page automatically creates four sections based on entity domain and 
 | Loop Time | sensor | Diagnostic | Average sensor loop time (ms) |
 | CPU Usage | sensor | Diagnostic | Estimated MCU CPU % |
 | RAM Free | sensor | Diagnostic | Heap usage % |
+| Flash Used | sensor | Diagnostic | Partition size as % of total flash |
 | Version | text_sensor | Diagnostic | Firmware version string |
 | Features | text_sensor | Diagnostic | Active runtime features summary |
 
@@ -351,6 +383,28 @@ number:
       name: "$friendly_name People Count"
 ```
 
+### About "Calibrate" dropdown
+
+Select a mode from the dropdown and calibration runs immediately — no separate button needed. The dropdown stays on your last selection so you can see what was last run.
+
+| Mode | When to use |
+|------|------------|
+| Empty Room | Standard recalibration — clear the doorway and select this |
+| With Person | Stand in the doorway to teach the sensor "occupied" distance |
+| Low Obstacle | Calibrate so low objects (pets, boxes) are ignored |
+| High Obstacle | Calibrate for doors that swing through the detection zone |
+
+### About "Orientation"
+
+Controls how the two detection zones are arranged relative to the doorway:
+
+| Option | Sensor position | Zone arrangement |
+|--------|----------------|-----------------|
+| **Above** | Mounted on the ceiling/lintel looking down | Zones are side-by-side across the width of the opening |
+| **Side** | Mounted on the door frame looking across | Zones are stacked vertically |
+
+Changing orientation resets the ROI zone centers and runs a full recalibration automatically. The selection is persisted to flash.
+
 ### About "Save Calibration to Flash"
 
 This switch controls whether **calibration threshold data** (idle distance, min/max thresholds) survives reboots. All other settings (filter mode, ROI, ranging mode, etc.) are always saved to flash automatically via ESPHome preferences.
@@ -360,11 +414,9 @@ Turn it **off** to test threshold changes in HA without committing them permanen
 ### About "Performance Mode"
 
 When **on**, the following are suppressed to reduce overhead during normal operation:
-- CPU Usage, RAM Free, Loop Time sensor publishing (and the heap query that feeds them)
-- Features text sensor publishing
-- Manual Adjustments counter publishing
+- CPU Usage, RAM Free, Loop Time, Features sensor publishing
 
-Distance Zone sensors remain active (they are in the Sensors section and always publish). Counting, presence, calibration, and Status continue working normally. Turn it **off** when setting up or troubleshooting to see the full diagnostic readouts.
+Distance Zone 0/1, counting, presence, calibration, and Status continue working normally regardless of Performance Mode. Turn it **off** when setting up or troubleshooting to see the full diagnostic readouts.
 
 ---
 
@@ -379,7 +431,7 @@ The sensor's 16×16 SPAD grid is split into two Regions of Interest. The PathTra
 | 3 | NOBODY | SOMEONE | Person has crossed to zone 1 side |
 | 4 | NOBODY | NOBODY | Crossing complete → **Entry +1** |
 
-Reverse sequence → **Exit +1**. Zone states are debounced (150 ms enter / 80 ms clear) and the full sequence must span ≥ 300 ms.
+Reverse sequence → **Exit +1**. Zone states are debounced (`zone_dwell_ms` enter / `zone_clear_ms` clear) and the full sequence must span ≥ `min_sequence_ms`.
 
 ### SPAD center reference
 
@@ -416,7 +468,7 @@ On first boot (or after a reset) leave the doorway clear for ~10 s. Roode sample
 
 A crossing registers when the measured distance in a zone is **between** min and max.
 
-With `calibration_persistence: true` these values survive reboots. If they become corrupted (e.g. via an HA slider set to 100 %), the boot-time validator in 1.8.0 automatically discards them and recalibrates.
+With `calibration_persistence: true` (the default) these values survive reboots. If they become corrupted (e.g. via an HA slider set to 100 %), the boot-time validator automatically discards them and recalibrates.
 
 ---
 
@@ -445,7 +497,7 @@ Total raw reads per reported value = `sampling × filter_window`.
 Set `sensor_invert: "true"` (or flip the **Invert Direction** switch in HA → Configuration) and the zones will swap without a reflash.
 
 **False counts in empty room.**
-Check boot logs for `Threshold:` lines. `max` must be less than `idle`. If not, press **Calibrate Empty Room** in HA. With 1.8.0, corrupted flash thresholds are automatically rejected on boot.
+Check boot logs for `Threshold:` lines. `max` must be less than `idle`. If not, press **Calibrate → Empty Room** in HA. Corrupted flash thresholds are automatically rejected on boot.
 
 **Sensor not measuring correct distances.**
 1. Remove the yellow protective film from the sensor lens.
@@ -460,10 +512,11 @@ Enable `calibration_persistence: true`. Roode auto-recalibrates when zones are c
 Fixed in 1.8.0 — was a dual-core race condition where `expected_counter_` was written before the HA number update completed.
 
 **Diagnostic sensors stopped updating.**
-Performance Mode is probably on. Go to the device in HA → Configuration → **Performance Mode** and turn it off. CPU, RAM, Loop Time, and Features resume publishing immediately. Distance Zone sensors are in the Sensors section and are never suppressed.
+Performance Mode is probably on. Go to the device in HA → Configuration → **Performance Mode** and turn it off. CPU, RAM, Loop Time, and Features resume publishing immediately. Distance Zone sensors are always active.
+
+**Entities not appearing in the right HA sections after upgrade.**
+After flashing new firmware, remove the device from HA (Settings → Devices → three-dot menu → Delete), restart HA, and wait for the device to reconnect and re-register its entities with the correct categories.
 
 ---
 
 ## License
-
-This project is licensed under the terms of the [Unlicense](LICENSE).

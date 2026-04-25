@@ -28,10 +28,10 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
     return sensor_status;
   }
 
-  last_distance = result.value();
   if (sensor_status != VL53L1_ERROR_NONE || result.value() == 0 || result.value() > 4000) {
     return sensor_status;
   }
+  last_distance = result.value();
 
   samples[sample_idx_] = result.value();
   sample_idx_ = (sample_idx_ + 1) % max_samples;

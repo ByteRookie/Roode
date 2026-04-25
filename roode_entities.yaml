@@ -158,6 +158,17 @@ switch:
       disabled_by_default: true
 
 button:
+  - platform: template
+    name: $friendly_name Run Calibration
+    entity_category: config
+    icon: mdi:play-circle
+    on_press:
+      - lambda: |-
+          std::string mode = id(calibration_trigger_select).state;
+          if (mode == "With Person")        id(${roode_id})->person_calibration();
+          else if (mode == "Low Obstacle")  id(${roode_id})->calibrate_low_obstacle();
+          else if (mode == "High Obstacle") id(${roode_id})->calibrate_high_obstacle();
+          else                              id(${roode_id})->recalibration();
   - platform: restart
     name: $friendly_name Restart
     entity_category: config

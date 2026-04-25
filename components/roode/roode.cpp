@@ -308,9 +308,9 @@ void Roode::setup() {
 }
 
 void Roode::update() {
-  if (distance_entry != nullptr)
+  if (distance_entry != nullptr && entry->getDistance() > 0)
     distance_entry->publish_state(entry->getDistance());
-  if (distance_exit != nullptr)
+  if (distance_exit != nullptr && exit->getDistance() > 0)
     distance_exit->publish_state(exit->getDistance());
   if (!performance_mode_) {
     if (xshut_state_binary_sensor != nullptr) {

@@ -308,10 +308,16 @@ void Roode::setup() {
 }
 
 void Roode::update() {
-  if (distance_entry != nullptr && entry->getDistance() > 0)
-    distance_entry->publish_state(entry->getDistance());
-  if (distance_exit != nullptr && exit->getDistance() > 0)
-    distance_exit->publish_state(exit->getDistance());
+  if (distance_entry != nullptr) {
+    uint16_t d = entry->getDistance();
+    if (d > 0 && d <= 4000)
+      distance_entry->publish_state(d);
+  }
+  if (distance_exit != nullptr) {
+    uint16_t d = exit->getDistance();
+    if (d > 0 && d <= 4000)
+      distance_exit->publish_state(d);
+  }
   if (!performance_mode_) {
     if (xshut_state_binary_sensor != nullptr) {
       auto val = distanceSensor->get_xshut_state();

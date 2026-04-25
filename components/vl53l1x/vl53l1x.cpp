@@ -283,7 +283,7 @@ optional<uint16_t> VL53L1X::read_distance(ROI *roi, VL53L1_Error &status) {
   uint8_t dataReady = false;
   bool use_int = is_interrupt_enabled();
   if (!use_int && this->interrupt_pin.has_value() &&
-      (millis() - last_interrupt_retry_ >= 1800000UL)) {
+      (millis() - last_interrupt_retry_ >= 60000UL)) {
     if (validate_interrupt()) {
       interrupt_active_ = true;
       interrupt_miss_count_ = 0;

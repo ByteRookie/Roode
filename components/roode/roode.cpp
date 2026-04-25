@@ -487,6 +487,13 @@ void Roode::path_tracking(Zone *zone) {
     path_track_first_event_ts_ = 0;
     left_prev_status_ = NOBODY;
     right_prev_status_ = NOBODY;
+    // Reset debounce state too — without this, a stale zone_debounced_active_=true
+    // immediately re-fires an FSM event on the very next path_tracking call
+    // (left/right_prev was just forced to NOBODY, zone_debounced still SOMEONE →
+    // new event → STATE_ENTRY_ACTIVE again → 2.5s cycle → valid crossings never complete).
+    zone_debounced_active_[0] = zone_debounced_active_[1] = false;
+    zone_dwell_first_active_[0] = zone_dwell_first_active_[1] = 0;
+    zone_dwell_first_clear_[0] = zone_dwell_first_clear_[1] = 0;
     ESP_LOGW(TAG, "fsm_timeout_reset");
   }
 
@@ -1900,14 +1907,17 @@ void Roode::restart_sensor() {
   distanceSensor->restart();
   last_sensor_restart_ts_ = now;
   invalid_read_count_ = 0;
-  // Reset FSM crossing-sequence state so any partial sequence captured before
-  // the restart cannot combine with post-restart readings and fire phantom counts.
+  // Reset full FSM + debounce state so no stale partial sequence or stuck
+  // zone_debounced_active_ can combine with post-restart readings.
   state_ = STATE_IDLE;
   path_track_buf_[0] = path_track_buf_[1] = path_track_buf_[2] = path_track_buf_[3] = 0;
   path_track_filling_size_ = 1;
   left_prev_status_ = NOBODY;
   right_prev_status_ = NOBODY;
   path_track_first_event_ts_ = 0;
+  zone_debounced_active_[0] = zone_debounced_active_[1] = false;
+  zone_dwell_first_active_[0] = zone_dwell_first_active_[1] = 0;
+  zone_dwell_first_clear_[0] = zone_dwell_first_clear_[1] = 0;
   // Double the backoff for the next attempt, capped at 120s
   restart_backoff_ms_ = std::min(restart_backoff_ms_ * 2, static_cast<uint32_t>(120000));
   if (restart_attempt_count_ >= max_restart_attempts_) {
@@ -1959,11 +1969,13 @@ void Roode::sensor_task(void *param) {
       self->restart_backoff_ms_ = self->restart_timeout_ms_;  // reset backoff on successful read
     }
     uint16_t dist = self->current_zone->getDistance();
-    if (status == VL53L1_ERROR_NONE && (dist == 0 || dist > 4000)) {
+    if (status == VL53L1_ERROR_NONE && dist == 0) {
+      // Only count dist==0 as a hardware fault.  dist > 4000 (including the
+      // VL53L1X "no target" sentinel 65535) is a normal "nothing in FOV"
+      // result and must NOT increment this counter — doing so caused spurious
+      // restart-backoff escalation in wide-angle / open-space installations.
       self->invalid_read_count_++;
     } else if (status == VL53L1_ERROR_NONE) {
-      // Only reset on a genuinely valid read (status OK AND distance in range).
-      // A sensor error alone should not clear the consecutive-invalid counter.
       self->invalid_read_count_ = 0;
     }
     // Similar recovery check for the asynchronous sensor task

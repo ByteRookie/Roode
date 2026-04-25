@@ -69,6 +69,7 @@ class Zone {
     sample_count_ = 0;
     min_distance = 0;
     last_distance = 0;
+    consecutive_oor_ = 0;
   }
 
  protected:
@@ -82,6 +83,13 @@ class Zone {
   uint8_t sample_count_{0};
   uint8_t max_samples{2};
   FilterMode filter_mode_{FILTER_MIN};
+  // Counts consecutive out-of-range / no-target readings.  After
+  // kOorClearThreshold consecutive misses, min_distance is zeroed so the
+  // zone registers as inactive rather than holding a stale person-present
+  // distance indefinitely (which would keep raw_active=true and make the
+  // FSM cycle on timeout instead of settling back to IDLE).
+  uint8_t consecutive_oor_{0};
+  static const uint8_t kOorClearThreshold = 5;
 };
 }  // namespace roode
 }  // namespace esphome

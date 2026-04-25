@@ -28,6 +28,10 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
     return sensor_status;
   }
 
+  // Always record the raw reading so getDistance() reflects what the sensor
+  // actually returned (including 65535 "no target") — used for diagnostics.
+  last_distance = result.value();
+
   if (sensor_status != VL53L1_ERROR_NONE || result.value() == 0 || result.value() > 4000) {
     // Count consecutive out-of-range / no-target reads.  After
     // kOorClearThreshold misses, zero min_distance so the zone is treated as
@@ -40,7 +44,6 @@ VL53L1_Error Zone::readDistance(TofSensor *distanceSensor) {
     return sensor_status;
   }
   consecutive_oor_ = 0;
-  last_distance = result.value();
 
   samples[sample_idx_] = result.value();
   sample_idx_ = (sample_idx_ + 1) % max_samples;

@@ -310,12 +310,12 @@ void Roode::setup() {
 void Roode::update() {
   if (distance_entry != nullptr) {
     uint16_t d = entry->getDistance();
-    if (d > 0 && d <= 4000)
+    if (d > 0)  // 0 = uninitialized; publish everything else including 65535 "no target"
       distance_entry->publish_state(d);
   }
   if (distance_exit != nullptr) {
     uint16_t d = exit->getDistance();
-    if (d > 0 && d <= 4000)
+    if (d > 0)
       distance_exit->publish_state(d);
   }
   if (!performance_mode_) {

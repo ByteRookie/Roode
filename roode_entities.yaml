@@ -160,7 +160,6 @@ switch:
 button:
   - platform: template
     name: $friendly_name Run Calibration
-    entity_category: config
     icon: mdi:play-circle
     on_press:
       - lambda: |-

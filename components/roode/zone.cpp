@@ -194,7 +194,7 @@ void Zone::calibrateThreshold(TofSensor *distanceSensor, int number_attempts) {
            count, (int) zone_count);
 }
 
-void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Orientation orientation) {
+void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold) {
   // the value of the average distance is used for computing the optimal size of the ROI and consequently also the
   // center of the two zones
   int function_of_the_distance = 16 * (1 - (0.15 * 2) / (0.34 * (std::min(entry_threshold, exit_threshold) / 1000)));
@@ -206,34 +206,19 @@ void Zone::roi_calibration(uint16_t entry_threshold, uint16_t exit_threshold, Or
     this->roi->center = this->roi_override->center;
   } else {
     // now we set the position of the center of the two zones
-    if (orientation == Parallel) {
-      switch (this->roi->width) {
-        case 4:
-          this->roi->center = this->id == 0U ? 150 : 247;
-          break;
-        case 5:
-        case 6:
-          this->roi->center = this->id == 0U ? 159 : 239;
-          break;
-        case 7:
-        case 8:
-          this->roi->center = this->id == 0U ? 167 : 231;
-          break;
-      }
-    } else {
-      switch (this->roi->width) {
-        case 4:
-          this->roi->center = this->id == 0U ? 193 : 58;
-          break;
-        case 5:
-        case 6:
-          this->roi->center = this->id == 0U ? 194 : 59;
-          break;
-        case 7:
-        case 8:
-          this->roi->center = this->id == 0U ? 195 : 60;
-          break;
-      }
+    // Side/Perpendicular orientation was removed — always use Parallel (Above) centers.
+    switch (this->roi->width) {
+      case 4:
+        this->roi->center = this->id == 0U ? 150 : 247;
+        break;
+      case 5:
+      case 6:
+        this->roi->center = this->id == 0U ? 159 : 239;
+        break;
+      case 7:
+      case 8:
+        this->roi->center = this->id == 0U ? 167 : 231;
+        break;
     }
   }
   ESP_LOGI(CALIBRATION, "Calibrated ROI for zone. zoneId: %d, width: %d, height: %d, center: %d", id, roi->width,

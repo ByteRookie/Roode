@@ -217,10 +217,10 @@ void Roode::setup() {
       }
     }
     if (loaded) {
-      entry->reset_roi(orientation_ == Parallel ? 167 : 195);
-      exit->reset_roi(orientation_ == Parallel ? 231 : 60);
-      entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-      exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
+      entry->reset_roi(167);
+      exit->reset_roi(231);
+      entry->roi_calibration(entry->threshold->idle, exit->threshold->idle);
+      exit->roi_calibration(entry->threshold->idle, exit->threshold->idle);
       auto *mode = determine_ranging_mode(entry->threshold->idle, exit->threshold->idle);
       distanceSensor->set_ranging_mode(mode);
       publish_sensor_configuration(entry, exit, true);
@@ -478,7 +478,7 @@ void Roode::path_tracking(Zone *zone) {
     state_ = STATE_IDLE;
     // Clear the entire PathTrack sequence buffer and both previous-status values.
     // Clearing left_prev_status_ / right_prev_status_ unconditionally is safe
-    // because the debounce layer (kZoneDwellMs=150ms) below already filters
+    // because the debounce layer (kZoneDwellMs=100ms) below already filters
     // rapid re-entry events — the prior concern about "rapid state cycling" no
     // longer applies.  Leaving stale SOMEONE values was the primary source of
     // phantom counts when a person stood in the doorway during a timeout.
@@ -791,7 +791,7 @@ void Roode::recalibration() {
 void Roode::run_zone_calibration(uint8_t zone_id, bool apply_drift_guard) {
   ESP_LOGI(CALIBRATION, "Calibration triggered for zone %d", zone_id);
   Zone *z = zone_id == 0 ? entry : exit;
-  z->reset_roi(zone_id == 0 ? (orientation_ == Parallel ? 167 : 195) : (orientation_ == Parallel ? 231 : 60));
+  z->reset_roi(zone_id == 0 ? 167 : 231);
 
   // First pass: measure with reset ROI to get idle distance for ROI sizing.
   // 25 samples — enough for a reliable average while keeping WDT budget safe.
@@ -802,8 +802,8 @@ void Roode::run_zone_calibration(uint8_t zone_id, bool apply_drift_guard) {
   z->calibrateThreshold(distanceSensor, 25);
 
   // Recalculate ROI for both zones based on the measured idle distance.
-  entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
-  exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
+  entry->roi_calibration(entry->threshold->idle, exit->threshold->idle);
+  exit->roi_calibration(entry->threshold->idle, exit->threshold->idle);
 
   // Second pass: re-measure with the calibrated ROI so thresholds match the ROI
   // that will actually be used during detection.
@@ -990,8 +990,8 @@ void Roode::calibrate_zones(bool auto_cal) {
   ESP_LOGI(SETUP, "Calibrating sensor zones");
   update_status_text("cal: keep room empty...");
 
-  entry->reset_roi(orientation_ == Parallel ? 167 : 195);
-  exit->reset_roi(orientation_ == Parallel ? 231 : 60);
+  entry->reset_roi(167);
+  exit->reset_roi(231);
 
   // Phase 1: baseline measurement with wide default ROI.
   // Uses 30 samples per zone — statistically solid, stays within the 5 s task WDT.
@@ -1018,7 +1018,7 @@ void Roode::calibrate_zones(bool auto_cal) {
   esp_task_wdt_reset();
 #endif
   update_status_text("cal: calibrating entry zone...");
-  entry->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
+  entry->roi_calibration(entry->threshold->idle, exit->threshold->idle);
   entry->calibrateThreshold(distanceSensor, 20);
 
   if (auto_cal && calibration_in_progress_.load(std::memory_order_acquire)) {
@@ -1032,7 +1032,7 @@ void Roode::calibrate_zones(bool auto_cal) {
   esp_task_wdt_reset();
 #endif
   update_status_text("cal: calibrating exit zone...");
-  exit->roi_calibration(entry->threshold->idle, exit->threshold->idle, orientation_);
+  exit->roi_calibration(entry->threshold->idle, exit->threshold->idle);
   exit->calibrateThreshold(distanceSensor, 20);
 
   App.feed_wdt();
@@ -1315,8 +1315,8 @@ void Roode::restore_settings_from_flash() {
   }
   if (invert_direction_pref_.load(&val))
     invert_direction_ = (val != 0);
-  if (orientation_pref_.load(&val) && val < 2)
-    orientation_ = (val == 1) ? Perpendicular : Parallel;
+  // Side/Perpendicular orientation was removed — always use Parallel (Above) ROI centers.
+  orientation_ = Parallel;
 }
 
 void Roode::publish_setting_entities() {
@@ -1847,14 +1847,12 @@ void RangingModeSelect::control(const std::string &value) {
 }
 
 void Roode::apply_orientation(const std::string &val) {
-  orientation_ = (val == "Side") ? Perpendicular : Parallel;
-  if (calibration_persistence_) {
-    uint8_t v = (orientation_ == Perpendicular) ? 1 : 0;
-    orientation_pref_.save(&v);
-  }
+  // Side orientation removed — always Parallel.  Recalibrate on any change
+  // (kept for API compat; UI only ever sends "Above" now).
+  orientation_ = Parallel;
   if (orientation_select_ != nullptr)
-    orientation_select_->publish_state(val);
-  ESP_LOGI(TAG, "orientation changed: %s — recalibrating", val.c_str());
+    orientation_select_->publish_state("Above");
+  ESP_LOGI(TAG, "orientation: above (side mode removed)");
   recalibration();
 }
 

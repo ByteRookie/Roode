@@ -76,8 +76,7 @@ Version 1.8.0 is a major stability and usability release targeting long-term, al
 
 ### Runtime UI and HA entity management
 
-- **Rich calibration UI** — single "Calibrate" dropdown in HA with four modes: *Empty Room*, *With Person*, *Low Obstacle*, *High Obstacle*; selection runs calibration immediately, no separate button needed
-- **Orientation as a runtime HA select** — change between **Above** (sensor mounted overhead, zones side-by-side) and **Side** (sensor mounted on the wall, zones stacked) without reflashing; ROI centers reset and full recalibration runs automatically; persisted to flash
+- **Rich calibration UI** — "Calibrate" dropdown in HA with four modes: *Empty Room*, *With Person*, *Low Obstacle*, *High Obstacle*; select the mode then press "Run Calibration" to execute; works for both overhead and side-wall mounting positions
 - **All runtime settings persisted** — filter mode, filter window, sampling, ROI, ranging mode, orientation, invert direction, and threshold percentages all saved to flash via ESPHome preferences and restored on reboot
 - **Entity grouping** — HA device page now has three clear sections: Sensors (Presence, Last Direction, Status), Configuration (calibration + settings), Diagnostic (setup/troubleshooting)
 - **Distance Zone sensors always update** — Distance Zone 0/1 are published on every update cycle regardless of Performance Mode
@@ -276,7 +275,7 @@ For further tuning see [Configuration Reference](#configuration-reference) and [
 |--------|---------|-------------|
 | `id` | `roode_platform` | Must match `roode_id` in the entity package |
 | `sampling` | `2` | Raw readings averaged per update |
-| `orientation` | `parallel` | `parallel` (sensor mounted **above**, zones side-by-side) or `perpendicular` (sensor mounted on the **wall**, zones stacked). Changeable at runtime via HA — select **Above** or **Side** in the Orientation dropdown |
+| `orientation` | `parallel` | Always `parallel` — the Above (parallel) ROI centers work correctly for both overhead and side-wall mounting positions |
 | `roi` | `h16 w6` | Region of interest; `auto` for automatic |
 | `detection_thresholds.min` | `15%` | Min distance (% of idle or absolute mm) |
 | `detection_thresholds.max` | `85%` | Max distance (% of idle or absolute mm) |
@@ -342,7 +341,8 @@ HA's device page groups entities into sections based on `entity_category`:
 | Presence | binary_sensor | Sensors | True while a crossing zone is active |
 | Last Direction | text_sensor | Sensors | Most recent crossing event: `Entry` or `Exit` |
 | Status | text_sensor | Sensors | `ok` / `timeout` / `error` / `offline` — re-published every 60 s |
-| Calibrate | select | Configuration | Pick a mode → runs immediately: *Empty Room*, *With Person*, *Low Obstacle*, *High Obstacle* |
+| Calibrate | select | Configuration | Pick a mode: *Empty Room*, *With Person*, *Low Obstacle*, *High Obstacle* |
+| Run Calibration | button | — (main card) | Execute the currently selected calibration mode |
 | Auto Calibration Interval | number | Configuration | Hours between automatic background recalibrations (0 = off) |
 | Performance Mode | switch | Configuration | Suppress diagnostic publishing during normal use |
 | Restart | button | Configuration | Reboot the device |
@@ -352,7 +352,6 @@ HA's device page groups entities into sections based on `entity_category`:
 | Entity | Type | HA section | Description |
 |--------|------|-----------|-------------|
 | Distance Zone 0 / 1 | sensor | Sensors | Measured distance per zone (mm) — live readout |
-| Orientation | select | Configuration | **Above** (overhead mount) or **Side** (wall mount) — changes ROI centers and recalibrates |
 | Filter Mode | select | Configuration | `min` / `median` / `percentile10` (live, saved) |
 | Ranging Mode | select | Configuration | `auto` / `short` / `medium` / `long` / `longer` / `longest` (live, saved) |
 | Entry / Exit Max Threshold | number | Configuration | Upper detection limit per zone as % of idle distance (live, saved) |
@@ -394,16 +393,16 @@ Select a mode from the dropdown and calibration runs immediately — no separate
 | Low Obstacle | Calibrate so low objects (pets, boxes) are ignored |
 | High Obstacle | Calibrate for doors that swing through the detection zone |
 
-### About "Orientation"
+### About mounting position
 
-Controls how the two detection zones are arranged relative to the doorway:
+The sensor works correctly in both mounting positions using the same Above/parallel ROI centers:
 
-| Option | Sensor position | Zone arrangement |
-|--------|----------------|-----------------|
-| **Above** | Mounted on the ceiling/lintel looking down | Zones are side-by-side across the width of the opening |
-| **Side** | Mounted on the door frame looking across | Zones are stacked vertically |
+| Position | Description |
+|----------|-------------|
+| **Above** | Mounted on the ceiling or door lintel, looking straight down |
+| **Side wall** | Mounted on the door frame, looking across the opening |
 
-Changing orientation resets the ROI zone centers and runs a full recalibration automatically. The selection is persisted to flash.
+Both positions use the same parallel ROI zone split. If entry and exit directions are swapped for your mounting, enable **Invert Direction** in HA or set `zones.invert: true` in your YAML.
 
 ### About "Save Calibration to Flash"
 

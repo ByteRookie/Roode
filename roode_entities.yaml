@@ -88,11 +88,9 @@ select:
       name: $friendly_name Ranging Mode
       entity_category: config
       disabled_by_default: true
-    orientation:
-      name: $friendly_name Orientation
-      entity_category: config
-      disabled_by_default: true
-      icon: mdi:rotate-3d-variant
+    # orientation: removed — Side mode ROI centers were invalid; Above works for
+    # all mounting positions (above door and side wall). Use invert_direction to
+    # swap entry/exit if needed.
 
 number:
   - platform: roode

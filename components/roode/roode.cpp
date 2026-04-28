@@ -468,6 +468,12 @@ void Roode::handle_sensor_status() {
   sensor_status = VL53L1_ERROR_NONE;
 }
 
+void Roode::set_rejection(const std::string &reason) {
+  ESP_LOGI("Roode pathTracking", "rejection: %s", reason.c_str());
+  if (rejection_reason_sensor != nullptr)
+    rejection_reason_sensor->publish_state(reason);
+}
+
 void Roode::path_tracking(Zone *zone) {
   int CurrentZoneStatus = NOBODY;
   int AllZonesCurrentStatus = 0;
@@ -475,6 +481,12 @@ void Roode::path_tracking(Zone *zone) {
 
   uint32_t timeout = state_ == STATE_ENTRY_ACTIVE ? 2500 : 3500;
   if (state_ != STATE_IDLE && millis() - state_started_ts > timeout) {
+    // Capture pre-reset diagnostics so the rejection_reason includes the
+    // partial sequence that was lost.
+    int state_at_timeout = (int) state_;
+    int size_at_timeout = path_track_filling_size_;
+    int b0 = path_track_buf_[0], b1 = path_track_buf_[1],
+        b2 = path_track_buf_[2], b3 = path_track_buf_[3];
     state_ = STATE_IDLE;
     // Clear the entire PathTrack sequence buffer and both previous-status values.
     // Clearing left_prev_status_ / right_prev_status_ unconditionally is safe
@@ -494,7 +506,10 @@ void Roode::path_tracking(Zone *zone) {
     zone_debounced_active_[0] = zone_debounced_active_[1] = false;
     zone_dwell_first_active_[0] = zone_dwell_first_active_[1] = 0;
     zone_dwell_first_clear_[0] = zone_dwell_first_clear_[1] = 0;
-    ESP_LOGW(TAG, "fsm_timeout_reset");
+    char buf[96];
+    snprintf(buf, sizeof(buf), "fsm_timeout state=%d size=%d buf=[%d,%d,%d,%d]",
+             state_at_timeout, size_at_timeout, b0, b1, b2, b3);
+    set_rejection(buf);
   }
 
   ESP_LOGV(TAG, "Zone %d distance %u (min=%u max=%u)", zone->id, zone->getMinDistance(), zone->threshold->min,
@@ -665,8 +680,11 @@ void Roode::path_tracking(Zone *zone) {
               entry_exit_event_sensor->publish_state("Exit");
             }
           } else {
-            ESP_LOGD(TAG, "crossing_rejected: exit sequence too fast (%ums)",
-                     (unsigned) (millis() - path_track_first_event_ts_));
+            char rb[64];
+            snprintf(rb, sizeof(rb), "too_fast exit %ums<%ums",
+                     (unsigned) (millis() - path_track_first_event_ts_),
+                     (unsigned) kMinSeqMs);
+            set_rejection(rb);
           }
         } else if ((path_track_buf_[1] == 2) && (path_track_buf_[2] == 3) && (path_track_buf_[3] == 1)) {
           // This an entry
@@ -678,9 +696,22 @@ void Roode::path_tracking(Zone *zone) {
               entry_exit_event_sensor->publish_state("Entry");
             }
           } else {
-            ESP_LOGD(TAG, "crossing_rejected: entry sequence too fast (%ums)",
-                     (unsigned) (millis() - path_track_first_event_ts_));
+            char rb[64];
+            snprintf(rb, sizeof(rb), "too_fast entry %ums<%ums",
+                     (unsigned) (millis() - path_track_first_event_ts_),
+                     (unsigned) kMinSeqMs);
+            set_rejection(rb);
           }
+        } else {
+          // Sequence completed (4 events) but the buffer pattern matches
+          // neither exit (1,3,2) nor entry (2,3,1).  Most often caused by a
+          // mid-crossing zone flicker overwriting buf[3] with 1 or 3 before
+          // the all-clear flush.  Surface the actual buffer so we can see
+          // which patterns dominate and decide whether to widen matching.
+          char rb[64];
+          snprintf(rb, sizeof(rb), "pattern_mismatch buf=[_,%d,%d,%d]",
+                   path_track_buf_[1], path_track_buf_[2], path_track_buf_[3]);
+          set_rejection(rb);
         }
       }
 

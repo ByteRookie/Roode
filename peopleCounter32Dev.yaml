@@ -185,6 +185,9 @@ text_sensor:
     entry_exit_event:
       name: $friendly_name last direction
   - platform: roode
+    rejection_reason:
+      name: $friendly_name last rejection reason
+  - platform: roode
     enabled_features:
       name: $friendly_name enabled features
   - platform: template

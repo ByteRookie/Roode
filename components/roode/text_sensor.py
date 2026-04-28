@@ -14,10 +14,11 @@ DEPENDENCIES = ["roode"]
 
 VERSION = "version"
 ENTRY_EXIT_EVENT = "entry_exit_event"
+REJECTION_REASON = "rejection_reason"
 STATUS = "sensor_status"
 FEATURES = "enabled_features"
 
-TYPES = [VERSION, ENTRY_EXIT_EVENT, STATUS, FEATURES]
+TYPES = [VERSION, ENTRY_EXIT_EVENT, REJECTION_REASON, STATUS, FEATURES]
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -37,6 +38,15 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
                 cv.Optional(
                     CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_NONE
+                ): cv.entity_category,
+            }
+        ),
+        cv.Optional(REJECTION_REASON): text_sensor.text_sensor_schema().extend(
+            {
+                cv.Optional(CONF_ICON, default="mdi:alert-circle-outline"): cv.icon,
+                cv.GenerateID(): cv.declare_id(text_sensor.TextSensor),
+                cv.Optional(
+                    CONF_ENTITY_CATEGORY, default=ENTITY_CATEGORY_DIAGNOSTIC
                 ): cv.entity_category,
             }
         ),

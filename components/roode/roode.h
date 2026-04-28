@@ -130,6 +130,7 @@ class Roode : public PollingComponent {
   void set_entry_exit_event_text_sensor(text_sensor::TextSensor *entry_exit_event_sensor_) {
     entry_exit_event_sensor = entry_exit_event_sensor_;
   }
+  void set_rejection_reason_text_sensor(text_sensor::TextSensor *sensor_) { rejection_reason_sensor = sensor_; }
   void set_xshut_state_binary_sensor(binary_sensor::BinarySensor *sens) { xshut_state_binary_sensor = sens; }
   void set_sensor_xshut_state_binary_sensor(binary_sensor::BinarySensor *sens) { xshut_state_binary_sensor = sens; }
   void set_interrupt_status_sensor(sensor::Sensor *sens) { interrupt_status_sensor = sens; }
@@ -262,6 +263,7 @@ class Roode : public PollingComponent {
   binary_sensor::BinarySensor *xshut_state_binary_sensor{nullptr};
   text_sensor::TextSensor *version_sensor{nullptr};
   text_sensor::TextSensor *entry_exit_event_sensor{nullptr};
+  text_sensor::TextSensor *rejection_reason_sensor{nullptr};
   text_sensor::TextSensor *enabled_features_sensor{nullptr};
   text_sensor::TextSensor *status_text_sensor{nullptr};
   sensor::Sensor *manual_adjustment_sensor{nullptr};
@@ -335,7 +337,7 @@ class Roode : public PollingComponent {
   // misses when transit time through a zone was shorter than the dwell window.
   uint32_t zone_dwell_ms_{100};
   uint32_t zone_clear_ms_{80};
-  uint32_t min_sequence_ms_{300};
+  uint32_t min_sequence_ms_{150};
 
   // Dwell-time debounce: a zone must be continuously within threshold for
   // kZoneDwellMs before it registers as SOMEONE, and continuously outside for
@@ -374,6 +376,7 @@ class Roode : public PollingComponent {
   VL53L1_Error last_sensor_status = VL53L1_ERROR_NONE;
   VL53L1_Error sensor_status = VL53L1_ERROR_NONE;
   void path_tracking(Zone *zone);
+  void set_rejection(const std::string &reason);
   void handle_sensor_status();
   void update_status_text(const std::string &status);
   void calibrateDistance();
